@@ -40,7 +40,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         
         $args = array(
             'slug'              => 'tasks',
-            'name'              => __('Tasks', 'task-board-plugin'), // Use __() for name, BP handles display
+            'name'              => __('Tasks', 'pandatask'), // Use __() for name, BP handles display
             'nav_item_position' => 80,
             'visibility'        => 'private', // Only visible to group members
             'show_in_create'    => true,      // Show settings during group creation
@@ -48,13 +48,13 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
             'screens'           => array(
                 'admin' => array( // Settings in Group Admin > Manage
                     'enabled' => true, 
-                    'name'    => __('Tasks Settings', 'task-board-plugin'), // Settings page title
+                    'name'    => __('Tasks Settings', 'pandatask'), // Settings page title
                     'slug'    => 'task-settings', // Slug for admin sub-nav
                     'position'=> 50,
                 ),
                 'create' => array( // Settings during Group Create process
                     'enabled' => true,
-                    'name'    => __('Tasks Settings', 'task-board-plugin'), // Creation step title
+                    'name'    => __('Tasks Settings', 'pandatask'), // Creation step title
                     'position'=> 50,
                 ),
                 // The main display screen is handled by screen_function below
@@ -92,7 +92,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
             $group_link = bp_get_group_permalink($group);
             
             bp_core_new_subnav_item(array(
-                'name'            => __('Tasks', 'task-board-plugin'), // Name for the tab
+                'name'            => __('Tasks', 'pandatask'), // Name for the tab
                 'slug'            => $this->slug, // Use the main slug 'tasks'
                 'parent_url'      => $group_link,
                 'parent_slug'     => $group->slug,
@@ -119,7 +119,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
 
     /** Set page title */
     public function display_screen_title() {
-         echo esc_html__( 'Tasks', 'task-board-plugin' ); 
+         echo esc_html__( 'Tasks', 'pandatask' ); 
     }
     
     /**
@@ -132,7 +132,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         if ( !is_user_logged_in() || ( !bp_group_is_member() && !bp_is_item_admin() && !bp_is_item_mod() ) ) {
             echo '<div id="message" class="bp-feedback error"><span class="bp-icon" aria-hidden="true"></span><p>';
             // Use esc_html_e for safe HTML output
-            esc_html_e('You must be a member of this group to view tasks.', 'task-board-plugin');
+            esc_html_e('You must be a member of this group to view tasks.', 'pandatask');
             echo '</p></div>';
             return;
         }
@@ -142,7 +142,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         if ($enabled !== '1') {
             echo '<div id="message" class="bp-feedback info"><span class="bp-icon" aria-hidden="true"></span><p>';
             // Use esc_html_e for safe HTML output
-            esc_html_e('Tasks are currently disabled for this group.', 'task-board-plugin');
+            esc_html_e('Tasks are currently disabled for this group.', 'pandatask');
             echo '</p></div>';
             return;
         }
@@ -165,14 +165,14 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
              return;
         }
         ?>
-        <h4 class="bp-create-step-title"><?php esc_html_e('Task Board Settings', 'task-board-plugin'); ?></h4>
+        <h4 class="bp-create-step-title"><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         
         <label for="tbp_tasks_enabled" class="bp-label">
              <input type="checkbox" name="tbp_tasks_enabled" id="tbp_tasks_enabled" value="1" checked="checked">
-             <?php esc_html_e('Enable task board for this group?', 'task-board-plugin'); ?>
+             <?php esc_html_e('Enable task board for this group?', 'pandatask'); ?>
         </label>
         <p class="description">
-            <?php esc_html_e('Adds a "Tasks" tab to the group for managing projects and tasks.', 'task-board-plugin'); ?>
+            <?php esc_html_e('Adds a "Tasks" tab to the group for managing projects and tasks.', 'pandatask'); ?>
         </p>
         <?php
         // Nonce for security
@@ -205,7 +205,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         if ( !bp_is_item_admin() && !bp_is_item_mod() ) {
             echo '<div id="message" class="bp-feedback error"><span class="bp-icon" aria-hidden="true"></span><p>';
             // Use esc_html_e for safe HTML output
-            esc_html_e('You do not have permission to manage task settings.', 'task-board-plugin');
+            esc_html_e('You do not have permission to manage task settings.', 'pandatask');
             echo '</p></div>';
             return;
         }
@@ -217,21 +217,21 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         // Check if tasks are enabled ('1' means enabled, other values or unset mean disabled)
         $enabled = groups_get_groupmeta($group_id, 'tbp_tasks_enabled', true) === '1';
         ?>
-        <h4><?php esc_html_e('Task Board Settings', 'task-board-plugin'); ?></h4>
+        <h4><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         
         <label for="tbp_tasks_enabled" class="bp-label">
              <input type="checkbox" name="tbp_tasks_enabled" id="tbp_tasks_enabled" value="1" <?php checked($enabled); ?>>
-             <?php esc_html_e('Enable task board for this group?', 'task-board-plugin'); ?>
+             <?php esc_html_e('Enable task board for this group?', 'pandatask'); ?>
         </label>
         <p class="description">
-            <?php esc_html_e('When enabled, a "Tasks" tab will be available for group members.', 'task-board-plugin'); ?>
+            <?php esc_html_e('When enabled, a "Tasks" tab will be available for group members.', 'pandatask'); ?>
         </p>
         <p class="description">
-            <?php esc_html_e('Note: You might need to refresh the page after saving to see the Tasks tab appear or disappear in the navigation.', 'task-board-plugin'); ?>
+            <?php esc_html_e('Note: You might need to refresh the page after saving to see the Tasks tab appear or disappear in the navigation.', 'pandatask'); ?>
         </p>
         
         <p class="submit">
-            <input type="submit" name="save" value="<?php esc_attr_e('Save Settings', 'task-board-plugin'); ?>" class="button-primary">
+            <input type="submit" name="save" value="<?php esc_attr_e('Save Settings', 'pandatask'); ?>" class="button-primary">
         </p>
         
         <?php
@@ -254,7 +254,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         
         // Check capabilities again for safety
         if ( !bp_is_item_admin() && !bp_is_item_mod() ) {
-             bp_core_add_message(__('You do not have permission to save task settings.', 'task-board-plugin'), 'error');
+             bp_core_add_message(__('You do not have permission to save task settings.', 'pandatask'), 'error');
             return;
         }
 
@@ -267,9 +267,9 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         $updated = groups_update_groupmeta($group_id, 'tbp_tasks_enabled', $enabled);
         
         if ($updated) {
-            bp_core_add_message(__('Task settings saved successfully.', 'task-board-plugin'));
+            bp_core_add_message(__('Task settings saved successfully.', 'pandatask'));
         } else {
-             bp_core_add_message(__('There was an error saving task settings. Please try again.', 'task-board-plugin'), 'error');
+             bp_core_add_message(__('There was an error saving task settings. Please try again.', 'pandatask'), 'error');
         }
 
         // Redirect back to the settings page

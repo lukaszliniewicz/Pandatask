@@ -47,27 +47,27 @@ class Task_Board_Email {
             // Removed log_message call
             
             // translators: %s: Site name.
-            $subject = sprintf(__('You have been assigned to a task on %s', 'task-board-plugin'), $site_name);
+            $subject = sprintf(__('You have been assigned to a task on %s', 'pandatask'), $site_name);
             
             // --- Plain text email ---
             // translators: %s: User display name.
-            $greeting = sprintf( __('Hello %s,', 'task-board-plugin'), $user->display_name );
-            $assignment_intro = __('You have been assigned to the following task:', 'task-board-plugin');
+            $greeting = sprintf( __('Hello %s,', 'pandatask'), $user->display_name );
+            $assignment_intro = __('You have been assigned to the following task:', 'pandatask');
             // translators: %s: Task name.
-            $task_line = sprintf( __('Task: %s', 'task-board-plugin'), $task->name );
+            $task_line = sprintf( __('Task: %s', 'pandatask'), $task->name );
              // translators: %s: Task status (e.g., "Pending", "In Progress").
-            $status_line = sprintf( __('Status: %s', 'task-board-plugin'), ucfirst(str_replace('-', ' ', $task->status)) );
+            $status_line = sprintf( __('Status: %s', 'pandatask'), ucfirst(str_replace('-', ' ', $task->status)) );
              // translators: %s: Task priority number (1-10).
-            $priority_line = sprintf( __('Priority: %s', 'task-board-plugin'), $task->priority );
+            $priority_line = sprintf( __('Priority: %s', 'pandatask'), $task->priority );
              // translators: %s: Task deadline string (e.g., "YYYY-MM-DD" or "No deadline").
-            $deadline_line = sprintf( __('Deadline: %s', 'task-board-plugin'), $task->deadline ?: __('No deadline', 'task-board-plugin') );
-            $instructions = __('Please login to view the task details and update its status as needed.', 'task-board-plugin');
+            $deadline_line = sprintf( __('Deadline: %s', 'pandatask'), $task->deadline ?: __('No deadline', 'pandatask') );
+            $instructions = __('Please login to view the task details and update its status as needed.', 'pandatask');
             $task_link_line = '';
             if ($task_url) {
                 // translators: %s: URL to the task board.
-                $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
+                $task_link_line = sprintf( __('View Task Board: %s', 'pandatask'), $task_url ) . "\n\n";
             }
-            $regards = __('Regards,', 'task-board-plugin');
+            $regards = __('Regards,', 'pandatask');
              // FIX: Directly use the site name variable, don't try to translate '%s'.
             $signature = $site_name; 
 
@@ -87,13 +87,13 @@ class Task_Board_Email {
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($assignment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Status', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html(ucfirst(str_replace('-', ' ', $task->status))) . '</td></tr>' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Priority', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->priority) . '</td></tr>' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Deadline', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->deadline ?: __('No deadline', 'task-board-plugin')) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Status', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html(ucfirst(str_replace('-', ' ', $task->status))) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Priority', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->priority) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Deadline', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->deadline ?: __('No deadline', 'pandatask')) . '</td></tr>' .
                             '</table>' .
                             '<p>' . esc_html($instructions) . '</p>' .
-                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'task-board-plugin')) . '</a></p>' : '') .
+                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'pandatask')) . '</a></p>' : '') .
                             '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
             
             self::send_email($user->user_email, $subject, $text_message, $html_message);
@@ -126,7 +126,7 @@ class Task_Board_Email {
         
         if (!$commenter || !is_a($commenter, 'WP_User')) {
              // translators: Fallback name if the user who commented cannot be found.
-            $commenter_name = __('A user', 'task-board-plugin');
+            $commenter_name = __('A user', 'pandatask');
             // Removed log_message call
         } else {
             $commenter_name = $commenter->display_name;
@@ -157,24 +157,24 @@ class Task_Board_Email {
             // Removed log_message call
             
              // translators: %s: Task name.
-            $subject = sprintf(__('New comment on task: %s', 'task-board-plugin'), $task->name);
+            $subject = sprintf(__('New comment on task: %s', 'pandatask'), $task->name);
             
             // --- Plain text email ---
             // translators: %s: User display name.
-            $greeting = sprintf( __('Hello %s,', 'task-board-plugin'), $user->display_name );
+            $greeting = sprintf( __('Hello %s,', 'pandatask'), $user->display_name );
              // translators: %s: Name of the user who added the comment.
-            $comment_intro = sprintf( __('%s has commented on a task you are assigned to:', 'task-board-plugin'), $commenter_name );
+            $comment_intro = sprintf( __('%s has commented on a task you are assigned to:', 'pandatask'), $commenter_name );
             // translators: %s: Task name.
-            $task_line = sprintf( __('Task: %s', 'task-board-plugin'), $task->name );
+            $task_line = sprintf( __('Task: %s', 'pandatask'), $task->name );
             // translators: %s: The plain text content of the comment.
-            $comment_line = sprintf( __('Comment: %s', 'task-board-plugin'), $plain_text_comment );
-            $instructions = __('Please login to view the task and respond if needed.', 'task-board-plugin');
+            $comment_line = sprintf( __('Comment: %s', 'pandatask'), $plain_text_comment );
+            $instructions = __('Please login to view the task and respond if needed.', 'pandatask');
             $task_link_line = '';
             if ($task_url) {
                 // translators: %s: URL to the task board.
-                $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
+                $task_link_line = sprintf( __('View Task Board: %s', 'pandatask'), $task_url ) . "\n\n";
             }
-            $regards = __('Regards,', 'task-board-plugin');
+            $regards = __('Regards,', 'pandatask');
              // FIX: Directly use the site name variable, don't try to translate '%s'.
             $signature = $site_name;
 
@@ -192,11 +192,11 @@ class Task_Board_Email {
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($comment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
-                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Comment', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . wp_kses_post($comment_text) . '</td></tr>' . // Use wp_kses_post again for safety
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Comment', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . wp_kses_post($comment_text) . '</td></tr>' . // Use wp_kses_post again for safety
                             '</table>' .
                             '<p>' . esc_html($instructions) . '</p>' .
-                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'task-board-plugin')) . '</a></p>' : '') .
+                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'pandatask')) . '</a></p>' : '') .
                             '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
             
             self::send_email($user->user_email, $subject, $text_message, $html_message);
