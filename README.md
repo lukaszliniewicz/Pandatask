@@ -1,16 +1,26 @@
-# Task Board Plugin for WordPress
+=== Pandatask ===
+Contributors: lukaszliniewicz
+Tags: task, project management, buddypress, todo, tasks
+Requires at least: 5.0
+Tested up to: 6.8
+Stable tag: 1.0.7
+Requires PHP: 7.4
+License: GPL v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-![explorer_0zrwLV6BzW](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
+Adds a shortcode [task_board board_name="unique_board_id"] to display a task management board, with optional BuddyPress group integration.
+
+== Description ==
 
 A WordPress plugin that adds task management boards to your site, including BuddyPress groups, via a shortcode.
 
-## Overview
+![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
 
 This plugin provides a way to display and manage task lists directly within WordPress pages or posts. It uses a shortcode, `[task_board]`, to render the board interface. You can create multiple distinct boards by specifying a unique `board_name` in the shortcode.
 
 The interface allows logged-in users to view, add, edit, and manage tasks. It relies on AJAX for smoother interactions like adding tasks, comments, and updating statuses without full page reloads.
 
-## Features
+**Features**
 
 *   **Shortcode Driven:** Add a task board anywhere using `[task_board board_name="your_unique_board_name"]`.
 *   **Multiple Boards:** Create different boards for different projects or contexts using unique `board_name` values.
@@ -30,31 +40,31 @@ The interface allows logged-in users to view, add, edit, and manage tasks. It re
     *   User assignment searches BuddyPress members within the group context.
 *   **Email Notifications:** Sends email notifications to users when they are assigned to a task or when a comment is added to a task they are assigned to.
 
-## Installation
+== Installation ==
 
-1.  Download the plugin ZIP file.
+1.  Download the plugin ZIP file (`pandatask.zip`).
 2.  Log in to your WordPress admin area.
 3.  Go to `Plugins` -> `Add New`.
 4.  Click `Upload Plugin` at the top.
 5.  Upload the ZIP file you downloaded.
 6.  Activate the plugin through the 'Plugins' menu in WordPress.
 
-Alternatively, you can unzip the plugin and upload the `task-board-plugin` folder to your `/wp-content/plugins/` directory via FTP, then activate it from the Plugins menu.
+Alternatively, you can unzip the plugin and upload the `pandatask` folder to your `/wp-content/plugins/` directory via FTP, then activate it from the Plugins menu.
 
-## Usage
+== Usage ==
 
 1.  Create a new Page or Post (or edit an existing one).
 2.  Add the following shortcode to the content area:
-    ```
-    [task_board board_name="project_alpha"]
-    ```
+    `[task_board board_name="project_alpha"]`
     *   **Important:** Replace `"project_alpha"` with a unique identifier for this specific board. Use lowercase letters, numbers, and underscores only. Each board needs a different `board_name`.
 3.  Publish or update the Page/Post.
 4.  View the page on the front-end. You should see the task board interface.
 
-**Permissions (Standalone Boards):** For boards created directly on pages/posts using the shortcode (like `[task_board board_name="some_board"]`), the default behavior relies on the page/post visibility. Logged-in users who can view the page can generally interact with the board (add tasks, comments, etc.).
+**Permissions (Standalone Boards)**
 
-### BuddyPress Groups
+For boards created directly on pages/posts using the shortcode (like `[task_board board_name="some_board"]`), the default behavior relies on the page/post visibility. Logged-in users who can view the page can generally interact with the board (add tasks, comments, etc.).
+
+**BuddyPress Groups**
 
 If you have BuddyPress active with the Groups component enabled:
 
@@ -63,18 +73,18 @@ If you have BuddyPress active with the Groups component enabled:
 3.  This tab displays a task board specific to that group. The plugin automatically uses a `board_name` like `group_123` (where `123` is the group ID). You don't need to manually add the shortcode for group boards.
 4.  User assignment within a group task board will primarily search members of that group.
 
-## Permissions (BuddyPress Groups):
+**Permissions (BuddyPress Groups)**
 
 When used within BuddyPress groups, access control to the task board itself is primarily managed by the **group's settings**:
 
-1. In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
-2. In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
+1.  In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
+2.  In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
 
 The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board.
 
 *Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
 
-## Dependencies
+**Dependencies**
 
 *   WordPress (tested up to version 6.5)
 *   PHP (version 7.4 or higher recommended)
@@ -83,8 +93,25 @@ The plugin leverages BuddyPress's existing group privacy and membership system f
 *   TinyMCE (Bundled with WordPress)
 *   BuddyPress (Optional, but recommended for group-based task management and better permission handling)
 
-## Limitations
+**Limitations**
 
 *   Standalone boards (not in groups) have basic permission handling based on page visibility. The BuddyPress integration provides more robust access control via group membership.
 *   Relies heavily on the WordPress/BuddyPress user system for assignments and comments.
 *   No granular roles defined within the task board itself (e.g., admin vs. member).
+
+== Screenshots ==
+
+1.  The main task board interface showing tasks, filters, and controls.
+    ![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
+
+== Changelog ==
+
+= 1.0.7 =
+*   Fix: Corrected text domain path declaration.
+*   Fix: Removed redundant TinyMCE script enqueue, relying on wp_enqueue_editor().
+*   Fix: Updated README.md to meet WordPress.org standards (Headers, Stable Tag, Tested Up To, License).
+*   Fix: Corrected translation usage in email signature.
+*   Minor code standard adjustments.
+
+= 1.0.0 =
+* Initial release.

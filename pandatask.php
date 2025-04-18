@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define constants
-define( 'TBP_VERSION', '1.0.7' ); 
+define( 'TBP_VERSION', '1.0.7' );
 define( 'TBP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TBP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'TBP_PLUGIN_FILE', __FILE__ );
@@ -83,32 +83,27 @@ function tbp_enqueue_scripts() {
     }
 
     // Enqueue Styles
-    wp_enqueue_style( 'jquery-ui-css', '//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/base/jquery-ui.css', array(), '1.12.1' ); // Add version
-    wp_enqueue_style( 'tbp-style', TBP_PLUGIN_URL . 'assets/css/task-board-style.css', array(), TBP_VERSION );
+    wp_enqueue_style(
+        'tbp-jquery-ui-base',
+        TBP_PLUGIN_URL . 'assets/css/jquery-ui.css', 
+        array(), 
+        '1.12.1' 
+    );    wp_enqueue_style( 'tbp-style', TBP_PLUGIN_URL . 'assets/css/task-board-style.css', array(), TBP_VERSION );
 
     // Enqueue Scripts
-    wp_enqueue_script( 'jquery' ); // WordPress includes jQuery
+    wp_enqueue_script( 'jquery' );
     wp_enqueue_script( 'jquery-ui-datepicker' );
     wp_enqueue_script( 'jquery-ui-autocomplete' );
 
     // Enqueue WordPress editor assets (for TinyMCE dependencies)
-    wp_enqueue_editor(); 
-
-    wp_enqueue_script( 
-        'tiny-mce-script', 
-        includes_url( 'js/tinymce/tinymce.min.js' ), 
-        array('jquery', 'editor', 'quicktags'), 
-        false,
-        true
-    ); 
+    wp_enqueue_editor();
 
     // Enqueue your custom script
-    wp_enqueue_script( 
-        'tbp-script', 
-        TBP_PLUGIN_URL . 'assets/js/task-board-script.js', 
-        // Dependencies: Ensure all required jQuery UI components and TinyMCE are listed
-        array( 'jquery', 'jquery-ui-datepicker', 'jquery-ui-autocomplete', 'tiny-mce-script' ), 
-        TBP_VERSION, 
+    wp_enqueue_script(
+        'tbp-script',
+        TBP_PLUGIN_URL . 'assets/js/task-board-script.js',
+        array( 'jquery', 'jquery-ui-datepicker', 'jquery-ui-autocomplete', 'editor', 'quicktags' ),
+        TBP_VERSION,
         true // Load in footer
     );
 
@@ -122,17 +117,17 @@ function tbp_enqueue_scripts() {
         'promotion' => false, // Disable "Upgrade" promotion in TinyMCE 6+
     );
 
-    wp_localize_script( 
-        'tbp-script', 
-        'tbp_ajax_object', 
+    wp_localize_script(
+        'tbp-script',
+        'tbp_ajax_object',
         array(
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'tbp_ajax_nonce' ),
             'current_user_id' => get_current_user_id(),
             // Get display name safely
-            'current_user_display_name' => ( is_user_logged_in() ? wp_get_current_user()->display_name : '' ), 
+            'current_user_display_name' => ( is_user_logged_in() ? wp_get_current_user()->display_name : '' ),
             'tinymce_settings' => $tinymce_settings,
-            'text' => array( 
+            'text' => array(
                 'confirm_delete_task'     => esc_js(__( 'Are you sure you want to delete this task?', 'pandatask' )),
                 'confirm_delete_category' => esc_js(__( 'Are you sure you want to delete this category? Tasks using it will lose their category.', 'pandatask' )),
                 'error_general'           => esc_js(__( 'An error occurred. Please try again.', 'pandatask' )),
@@ -140,7 +135,7 @@ function tbp_enqueue_scripts() {
                 'type_to_search'          => esc_js(__( 'Type to search users...', 'pandatask' )),
                 'searching'               => esc_js(__( 'Searching...', 'pandatask' )),
             )
-        ) 
+        )
     );
 }
 add_action( 'wp_enqueue_scripts', 'tbp_enqueue_scripts' );
@@ -161,10 +156,9 @@ function tbp_is_buddypress_active() {
  * Load plugin textdomain for translation.
  */
 function tbp_load_textdomain() {
-    load_plugin_textdomain( 
+    load_plugin_textdomain(
         'pandatask', 
-        "",                  
-        dirname( plugin_basename( TBP_PLUGIN_FILE ) ) . '/languages/' 
-    ); 
+        dirname( plugin_basename( TBP_PLUGIN_FILE ) ) . '/languages/' // Use standard 'languages' folder
+    );
 }
 add_action( 'plugins_loaded', 'tbp_load_textdomain' );
