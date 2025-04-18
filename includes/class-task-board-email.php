@@ -4,34 +4,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Task_Board_Email {
-    /**
-     * Debug logging function
-     */
-    public static function log_message($message) {
-        // Log to a file in the plugin directory
-        $log_file = TBP_PLUGIN_DIR . 'email-debug.log';
-        $timestamp = current_time('mysql');
-        error_log("[{$timestamp}] {$message}\n", 3, $log_file);
-    }
-    
-    /**
-     * Test mail function - call this directly to verify email functionality
-     */
-    public static function test_mail() {
-        $admin_email = get_option('admin_email');
-        $site_name = get_bloginfo('name');
-        
-        self::log_message("Running mail test to admin: {$admin_email}");
-        
-        $subject = 'Task Board Plugin - Mail Test';
-        $message = 'This is a test email from the Task Board Plugin to verify email functionality.';
-        $headers = array('From: ' . $site_name . ' <' . $admin_email . '>');
-        
-        $result = wp_mail($admin_email, $subject, $message, $headers);
-        self::log_message("Test email result: " . ($result ? "SUCCESS" : "FAILED"));
-        
-        return $result;
-    }
 
     /**
      * Send notification to newly assigned users
@@ -41,82 +13,87 @@ class Task_Board_Email {
      * @return void
      */
     public static function send_assignment_notification($task_id, $new_user_ids) {
-        self::log_message("Assignment notification triggered for task ID: {$task_id}, users: " . implode(',', $new_user_ids));
+        // Removed log_message call
         
         if (empty($new_user_ids)) {
-            self::log_message("No new users to notify - exiting");
+            // Removed log_message call
             return;
         }
         
         // Get task details
         $task = Task_Board_DB::get_task($task_id);
         if (!$task) {
-            self::log_message("Task not found with ID: {$task_id}");
+            // Removed log_message call
             return;
         }
         
-        self::log_message("Retrieved task: {$task->name}");
+        // Removed log_message call
         
-        $admin_email = get_option('admin_email');
+        $admin_email = get_option('admin_email'); // Used for 'From' address fallback
         $site_name = get_bloginfo('name');
         $site_url = home_url();
         
-        // Try to determine task URL (if we can find a page with shortcode)
+        // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name);
-        self::log_message("Task URL resolved to: " . ($task_url ? $task_url : "Not found"));
+        // Removed log_message call
         
         foreach ($new_user_ids as $user_id) {
             $user = get_userdata($user_id);
             if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
-                self::log_message("User {$user_id} not found or has no email - skipping");
+                // Removed log_message call
                 continue;
             }
             
-            self::log_message("Preparing email for user: {$user->user_email}");
+            // Removed log_message call
             
+            // translators: %s: Site name.
             $subject = sprintf(__('You have been assigned to a task on %s', 'task-board-plugin'), $site_name);
             
-            // Plain text email
-            $text_message = sprintf(
-                __('Hello %s,', 'task-board-plugin') . "\n\n" .
-                __('You have been assigned to the following task:', 'task-board-plugin') . "\n\n" .
-                __('Task: %s', 'task-board-plugin') . "\n" .
-                __('Status: %s', 'task-board-plugin') . "\n" .
-                __('Priority: %s', 'task-board-plugin') . "\n" .
-                __('Deadline: %s', 'task-board-plugin') . "\n\n" .
-                __('Please login to view the task details and update its status as needed.', 'task-board-plugin') . "\n\n" .
-                ($task_url ? __('View Task Board: %s', 'task-board-plugin') . "\n\n" : '') .
-                __('Regards,', 'task-board-plugin') . "\n" .
-                '%s',
-                $user->display_name,
-                $task->name,
-                ucfirst(str_replace('-', ' ', $task->status)),
-                $task->priority,
-                $task->deadline ?: __('No deadline', 'task-board-plugin'),
-                $task_url,
-                $site_name
-            );
+            // --- Plain text email ---
+            // translators: %s: User display name.
+            $greeting = sprintf( __('Hello %s,', 'task-board-plugin'), $user->display_name );
+            $assignment_intro = __('You have been assigned to the following task:', 'task-board-plugin');
+            // translators: %s: Task name.
+            $task_line = sprintf( __('Task: %s', 'task-board-plugin'), $task->name );
+             // translators: %s: Task status (e.g., "Pending", "In Progress").
+            $status_line = sprintf( __('Status: %s', 'task-board-plugin'), ucfirst(str_replace('-', ' ', $task->status)) );
+             // translators: %s: Task priority number (1-10).
+            $priority_line = sprintf( __('Priority: %s', 'task-board-plugin'), $task->priority );
+             // translators: %s: Task deadline string (e.g., "YYYY-MM-DD" or "No deadline").
+            $deadline_line = sprintf( __('Deadline: %s', 'task-board-plugin'), $task->deadline ?: __('No deadline', 'task-board-plugin') );
+            $instructions = __('Please login to view the task details and update its status as needed.', 'task-board-plugin');
+            $task_link_line = '';
+            if ($task_url) {
+                // translators: %s: URL to the task board.
+                $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
+            }
+            $regards = __('Regards,', 'task-board-plugin');
+             // translators: %s: Site name.
+            $signature = sprintf( __('%s', 'task-board-plugin'), $site_name ); 
+
+            $text_message = $greeting . "\n\n" .
+                            $assignment_intro . "\n\n" .
+                            $task_line . "\n" .
+                            $status_line . "\n" .
+                            $priority_line . "\n" .
+                            $deadline_line . "\n\n" .
+                            $instructions . "\n\n" .
+                            $task_link_line . // Already includes \n\n if present
+                            $regards . "\n" .
+                            $signature;
             
-            // HTML email
-            $html_message = sprintf(
-                '<p>' . __('Hello %s,', 'task-board-plugin') . '</p>' .
-                '<p>' . __('You have been assigned to the following task:', 'task-board-plugin') . '</p>' .
-                '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px;">' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%%"><strong>' . __('Task', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . __('Status', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . __('Priority', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . __('Deadline', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                '</table>' .
-                '<p>' . __('Please login to view the task details and update its status as needed.', 'task-board-plugin') . '</p>' .
-                ($task_url ? '<p><a href="' . $task_url . '" style="background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('View Task Board', 'task-board-plugin') . '</a></p>' : '') .
-                '<p>' . __('Regards,', 'task-board-plugin') . '<br>%s</p>',
-                $user->display_name,
-                esc_html($task->name),
-                esc_html(ucfirst(str_replace('-', ' ', $task->status))),
-                esc_html($task->priority),
-                esc_html($task->deadline ?: __('No deadline', 'task-board-plugin')),
-                esc_html($site_name)
-            );
+            // --- HTML email ---
+            $html_message = '<p>' . esc_html($greeting) . '</p>' .
+                            '<p>' . esc_html($assignment_intro) . '</p>' .
+                            '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Status', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html(ucfirst(str_replace('-', ' ', $task->status))) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Priority', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->priority) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Deadline', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->deadline ?: __('No deadline', 'task-board-plugin')) . '</td></tr>' .
+                            '</table>' .
+                            '<p>' . esc_html($instructions) . '</p>' .
+                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'task-board-plugin')) . '</a></p>' : '') .
+                            '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
             
             self::send_email($user->user_email, $subject, $text_message, $html_message);
         }
@@ -127,93 +104,98 @@ class Task_Board_Email {
      * 
      * @param int $task_id The task ID
      * @param int $comment_user_id The user ID who added the comment
-     * @param string $comment_text The comment text
+     * @param string $comment_text The comment text (HTML allowed from DB)
      * @return void
      */
     public static function send_comment_notification($task_id, $comment_user_id, $comment_text) {
-        self::log_message("Comment notification triggered for task ID: {$task_id}, commenter: {$comment_user_id}");
+        // Removed log_message call
         
         // Get task details
         $task = Task_Board_DB::get_task($task_id);
         if (!$task || empty($task->assigned_user_ids)) {
-            self::log_message("Task not found or has no assignees: {$task_id}");
+            // Removed log_message call
             return;
         }
         
-        self::log_message("Retrieved task: {$task->name} with " . count($task->assigned_user_ids) . " assignees");
+        // Removed log_message call
         
-        $admin_email = get_option('admin_email');
+        $admin_email = get_option('admin_email'); // Used for 'From' address fallback
         $site_name = get_bloginfo('name');
         $commenter = get_userdata($comment_user_id);
         
         if (!$commenter || !is_a($commenter, 'WP_User')) {
+             // translators: Fallback name if the user who commented cannot be found.
             $commenter_name = __('A user', 'task-board-plugin');
-            self::log_message("Commenter user not found: {$comment_user_id}");
+            // Removed log_message call
         } else {
             $commenter_name = $commenter->display_name;
-            self::log_message("Commenter identified as: {$commenter_name}");
+            // Removed log_message call
         }
         
-        // Clean up comment text for email
-        $clean_comment = wp_strip_all_tags(preg_replace('/<a class="tbp-mention"[^>]*>@([^<]+)<\/a>/', '@$1', $comment_text));
-        self::log_message("Cleaned comment text: " . substr($clean_comment, 0, 100) . (strlen($clean_comment) > 100 ? '...' : ''));
+        // Clean up comment text for *plain text* email (keep HTML for HTML version)
+        $plain_text_comment = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="tbp-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $comment_text));
+        // Removed log_message call
         
         // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name);
-        self::log_message("Task URL resolved to: " . ($task_url ? $task_url : "Not found"));
+        // Removed log_message call
         
         foreach ($task->assigned_user_ids as $user_id) {
             // Skip sending notification to the commenter themselves
             if ($user_id == $comment_user_id) {
-                self::log_message("Skipping notification to commenter (user ID: {$user_id})");
+                // Removed log_message call
                 continue;
             }
             
             $user = get_userdata($user_id);
             if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
-                self::log_message("User {$user_id} not found or has no email - skipping");
+                // Removed log_message call
                 continue;
             }
             
-            self::log_message("Preparing comment notification email for: {$user->user_email}");
+            // Removed log_message call
             
+             // translators: %s: Task name.
             $subject = sprintf(__('New comment on task: %s', 'task-board-plugin'), $task->name);
             
-            // Plain text email
-            $text_message = sprintf(
-                __('Hello %s,', 'task-board-plugin') . "\n\n" .
-                __('%s has commented on a task you are assigned to:', 'task-board-plugin') . "\n\n" .
-                __('Task: %s', 'task-board-plugin') . "\n" .
-                __('Comment: %s', 'task-board-plugin') . "\n\n" .
-                __('Please login to view the task and respond if needed.', 'task-board-plugin') . "\n\n" .
-                ($task_url ? __('View Task Board: %s', 'task-board-plugin') . "\n\n" : '') .
-                __('Regards,', 'task-board-plugin') . "\n" .
-                '%s',
-                $user->display_name,
-                $commenter_name,
-                $task->name,
-                $clean_comment,
-                $task_url,
-                $site_name
-            );
+            // --- Plain text email ---
+            // translators: %s: User display name.
+            $greeting = sprintf( __('Hello %s,', 'task-board-plugin'), $user->display_name );
+             // translators: %s: Name of the user who added the comment.
+            $comment_intro = sprintf( __('%s has commented on a task you are assigned to:', 'task-board-plugin'), $commenter_name );
+            // translators: %s: Task name.
+            $task_line = sprintf( __('Task: %s', 'task-board-plugin'), $task->name );
+            // translators: %s: The plain text content of the comment.
+            $comment_line = sprintf( __('Comment: %s', 'task-board-plugin'), $plain_text_comment );
+            $instructions = __('Please login to view the task and respond if needed.', 'task-board-plugin');
+            $task_link_line = '';
+            if ($task_url) {
+                // translators: %s: URL to the task board.
+                $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
+            }
+            $regards = __('Regards,', 'task-board-plugin');
+             // translators: %s: Site name.
+            $signature = sprintf( __('%s', 'task-board-plugin'), $site_name );
+
+            $text_message = $greeting . "\n\n" .
+                            $comment_intro . "\n\n" .
+                            $task_line . "\n" .
+                            $comment_line . "\n\n" .
+                            $instructions . "\n\n" .
+                            $task_link_line .
+                            $regards . "\n" .
+                            $signature;
             
-            // HTML email
-            $html_message = sprintf(
-                '<p>' . __('Hello %s,', 'task-board-plugin') . '</p>' .
-                '<p>' . __('%s has commented on a task you are assigned to:', 'task-board-plugin') . '</p>' .
-                '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px;">' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%%"><strong>' . __('Task', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                    '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . __('Comment', 'task-board-plugin') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">%s</td></tr>' .
-                '</table>' .
-                '<p>' . __('Please login to view the task and respond if needed.', 'task-board-plugin') . '</p>' .
-                ($task_url ? '<p><a href="' . $task_url . '" style="background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('View Task Board', 'task-board-plugin') . '</a></p>' : '') .
-                '<p>' . __('Regards,', 'task-board-plugin') . '<br>%s</p>',
-                $user->display_name,
-                esc_html($commenter_name),
-                esc_html($task->name),
-                esc_html($clean_comment),
-                esc_html($site_name)
-            );
+            // --- HTML email ---
+            $html_message = '<p>' . esc_html($greeting) . '</p>' .
+                            '<p>' . esc_html($comment_intro) . '</p>' .
+                            '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Comment', 'task-board-plugin')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . wp_kses_post($comment_text) . '</td></tr>' . // Use wp_kses_post again for safety
+                            '</table>' .
+                            '<p>' . esc_html($instructions) . '</p>' .
+                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'task-board-plugin')) . '</a></p>' : '') .
+                            '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
             
             self::send_email($user->user_email, $subject, $text_message, $html_message);
         }
@@ -226,62 +208,45 @@ class Task_Board_Email {
         $admin_email = get_option('admin_email');
         $site_name = get_bloginfo('name');
         
-        self::log_message("Attempting to send email to: {$to}, subject: {$subject}");
+        // Removed log_message call
         
-        // SIMPLIFIED EMAIL METHOD FOR TROUBLESHOOTING
-        // Just using HTML email format for now to test
+        // Use WordPress default From Name/Email if available, otherwise construct one.
+        $from_name = apply_filters('wp_mail_from_name', get_bloginfo('name'));
+        $from_email = apply_filters('wp_mail_from', $admin_email);
+        
         $headers = array(
-            'From: ' . $site_name . ' <' . $admin_email . '>',
-            'Content-Type: text/html; charset=UTF-8'
+            'From: ' . $from_name . ' <' . $from_email . '>',
+            'Content-Type: text/html; charset=UTF-8', 
         );
         
-        foreach ($headers as $header) {
-            self::log_message("Header: {$header}");
-        }
+        // Use HTML message directly
+        $message = "<html><body>" . $html_message . "</body></html>";
         
-        // For debug purposes, check that WordPress functions exist
+        // Removed header logging loop
+        
         if (!function_exists('wp_mail')) {
-            self::log_message("ERROR: wp_mail function does not exist!");
+            // Removed log_message call
+            // Maybe add a standard PHP error_log here if wp_mail is critical and missing
+            error_log('Task Board Plugin Error: wp_mail function does not exist!');
             return false;
         }
         
-        $result = wp_mail($to, $subject, "<html><body>" . $html_message . "</body></html>", $headers);
-        self::log_message("Email send result: " . ($result ? "SUCCESS" : "FAILED"));
+        // Send the email
+        $result = wp_mail($to, $subject, $message, $headers);
         
-        // If failed, try to get more information
+        // Removed log_message call for result
+        
+        // If failed, log the error (using standard PHP error log now)
         if (!$result) {
             global $phpmailer;
-            if (isset($phpmailer->ErrorInfo) && !empty($phpmailer->ErrorInfo)) {
-                self::log_message("Mail error: " . $phpmailer->ErrorInfo);
+            if (isset($phpmailer) && is_a($phpmailer, 'PHPMailer\PHPMailer\PHPMailer')) {
+                 error_log("Task Board Plugin Mail Error: " . $phpmailer->ErrorInfo); // Log actual error
             } else {
-                self::log_message("No specific error information available from PHPMailer");
+                 error_log("Task Board Plugin Mail Error: wp_mail failed, PHPMailer object not available or not expected class.");
             }
         }
         
         return $result;
-        
-        /* Original multipart code - uncomment when basic email works
-        // Generate a boundary for the multipart message
-        $boundary = md5(time());
-        
-        $headers = array(
-            'From: ' . $site_name . ' <' . $admin_email . '>',
-            'Content-Type: multipart/alternative; boundary=' . $boundary
-        );
-        
-        // Create the multipart message body
-        $message = "--$boundary\r\n" .
-                   "Content-Type: text/plain; charset=UTF-8\r\n" .
-                   "Content-Transfer-Encoding: 8bit\r\n\r\n" .
-                   $text_message . "\r\n\r\n" .
-                   "--$boundary\r\n" .
-                   "Content-Type: text/html; charset=UTF-8\r\n" .
-                   "Content-Transfer-Encoding: 8bit\r\n\r\n" .
-                   "<html><body>" . $html_message . "</body></html>\r\n\r\n" .
-                   "--$boundary--";
-        
-        return wp_mail($to, $subject, $message, $headers);
-        */
     }
     
     /**
@@ -290,77 +255,53 @@ class Task_Board_Email {
     private static function get_task_board_url($board_name) {
         global $wpdb;
         
-        self::log_message("Looking for task board URL for board: {$board_name}");
+        // Removed log_message call
         
         // Check if this is a BuddyPress group board (named like "group_123")
         if (preg_match('/^group_(\d+)$/', $board_name, $matches)) {
             $group_id = intval($matches[1]);
             
-            if ($group_id > 0 && function_exists('bp_get_group_permalink')) {
-                self::log_message("Detected board is for BuddyPress group ID: {$group_id}");
+            if ($group_id > 0 && function_exists('bp_get_group_permalink') && function_exists('groups_get_group')) {
+                // Removed log_message call
                 $group = groups_get_group($group_id);
                 
-                if ($group && !empty($group->id)) {
+                if ($group && !empty($group->slug)) { // Check slug exists
                     $group_url = bp_get_group_permalink($group);
-                    $final_url = trailingslashit($group_url) . 'tasks';
+                    $final_url = trailingslashit($group_url) . 'tasks'; 
                     
-                    self::log_message("Constructed group task board URL: {$final_url}");
+                    // Removed log_message call
                     return $final_url;
+                } else {
+                    // Removed log_message call
                 }
             }
         }
         
-        // Fallback to the original post content search if not a group board
-        // Try to find a page with the shortcode for this board and extract group_id and page_name
+        // Fallback: Try to find a page with the shortcode
         $shortcode_pattern = '[task_board board_name="' . $board_name . '"';
         $alt_shortcode_pattern = "[task_board board_name='" . $board_name . "'";
         
-        $posts = $wpdb->get_results(
+        $post_id = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT ID, post_content FROM $wpdb->posts 
+                "SELECT ID FROM $wpdb->posts 
                 WHERE (post_content LIKE %s OR post_content LIKE %s) 
-                AND post_status = 'publish' 
-                LIMIT 1",
+                AND post_status = 'publish' AND post_type IN ('page', 'post') 
+                ORDER BY post_date DESC 
+                LIMIT 1", 
                 '%' . $wpdb->esc_like($shortcode_pattern) . '%',
                 '%' . $wpdb->esc_like($alt_shortcode_pattern) . '%'
             )
         );
         
-        if (!empty($posts)) {
-            $post_content = $posts[0]->post_content;
-            
-            // Extract group_id from shortcode
-            $group_id = 0;
-            if (preg_match('/group_id=[\"\']?(\d+)[\"\']?/i', $post_content, $group_matches)) {
-                $group_id = intval($group_matches[1]);
+        if ($post_id) {
+            $url = get_permalink($post_id);
+            if ($url) {
+                 // Removed log_message call
+                 return $url;
             }
-            
-            // Extract page_name from shortcode
-            $page_name = '';
-            if (preg_match('/page_name=[\"\']?([^\"\'\s\]]+)[\"\']?/i', $post_content, $page_matches)) {
-                $page_name = sanitize_title($page_matches[1]);
-            }
-            
-            // If we have both group_id and page_name, construct the BuddyPress group URL
-            if ($group_id > 0 && !empty($page_name)) {
-                if (function_exists('bp_get_group_permalink')) {
-                    $group_url = bp_get_group_permalink(groups_get_group($group_id));
-                    if ($group_url) {
-                        // Add the page name to the URL
-                        $final_url = trailingslashit($group_url) . $page_name;
-                        self::log_message("Constructed task board URL from group and page: {$final_url}");
-                        return $final_url;
-                    }
-                }
-            }
-            
-            // Fallback to regular page permalink if group URL construction fails
-            $url = get_permalink($posts[0]->ID);
-            self::log_message("Found task board URL from page content: {$url}");
-            return $url;
         }
         
-        self::log_message("Could not find a published page with the task board shortcode");
-        return false;
+        // Removed log_message call
+        return false; // Return false if no URL found
     }
 }
