@@ -2,11 +2,11 @@
 
 ![explorer_0zrwLV6BzW](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
 
-A WordPress plugin that adds task management boards to your site via a shortcode.
+A WordPress plugin that adds task management boards to your site, including BuddyPress groups, via a shortcode.
 
 ## Overview
 
-This plugin provides a way to display and manage simple task lists or Kanban-style boards directly within your WordPress pages or posts. It uses a shortcode, `[task_board]`, to render the board interface. You can create multiple distinct boards by specifying a unique `board_name` in the shortcode.
+This plugin provides a way to display and manage task lists directly within WordPress pages or posts. It uses a shortcode, `[task_board]`, to render the board interface. You can create multiple distinct boards by specifying a unique `board_name` in the shortcode.
 
 The interface allows logged-in users to view, add, edit, and manage tasks. It relies on AJAX for smoother interactions like adding tasks, comments, and updating statuses without full page reloads.
 
@@ -21,14 +21,14 @@ The interface allows logged-in users to view, add, edit, and manage tasks. It re
     *   Organize tasks with categories (managed per board).
     *   Set optional deadlines using a datepicker.
     *   Assign tasks to one or more registered WordPress users (uses autocomplete search).
-*   **Comments:** Add comments to tasks. Supports @mentioning other registered users (links to their profile/author page).
+*   **Comments:** Add comments to tasks. Supports @mentioning other registered users.
 *   **Filtering & Sorting:** Search tasks by keyword, filter by status, and sort by name, priority, deadline, or status.
 *   **User Assignment:** Search and select registered WordPress users to assign to tasks.
 *   **BuddyPress Integration (Optional):** If BuddyPress is active, the plugin can add a "Tasks" tab to groups.
     *   Each group gets its own task board (using `board_name="group_X"` where X is the group ID).
     *   Group admins can enable/disable the Tasks feature in the group settings.
     *   User assignment searches BuddyPress members within the group context.
-*   **Email Notifications:** Sends basic email notifications to users when they are assigned to a task or when a comment is added to a task they are assigned to.
+*   **Email Notifications:** Sends email notifications to users when they are assigned to a task or when a comment is added to a task they are assigned to.
 
 ## Installation
 
@@ -63,7 +63,8 @@ If you have BuddyPress active with the Groups component enabled:
 3.  This tab displays a task board specific to that group. The plugin automatically uses a `board_name` like `group_123` (where `123` is the group ID). You don't need to manually add the shortcode for group boards.
 4.  User assignment within a group task board will primarily search members of that group.
 
-**Permissions (BuddyPress Groups):** When used within BuddyPress groups, access control to the task board itself is primarily managed by the **group's settings**:
+## Permissions (BuddyPress Groups):
+When used within BuddyPress groups, access control to the task board itself is primarily managed by the **group's settings**:
     *   In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
     *   In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
     *   The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board. *Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
