@@ -64,10 +64,13 @@ If you have BuddyPress active with the Groups component enabled:
 4.  User assignment within a group task board will primarily search members of that group.
 
 ## Permissions (BuddyPress Groups):
+
 When used within BuddyPress groups, access control to the task board itself is primarily managed by the **group's settings**:
-    *   In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
-    *   In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
-    *   The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board. *Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
+
+1. In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
+2. In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
+
+The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board. *Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
 
 ## Dependencies
 
@@ -83,7 +86,3 @@ When used within BuddyPress groups, access control to the task board itself is p
 *   Standalone boards (not in groups) have basic permission handling based on page visibility. The BuddyPress integration provides more robust access control via group membership.
 *   Relies heavily on the WordPress/BuddyPress user system for assignments and comments.
 *   No granular roles defined within the task board itself (e.g., admin vs. member).
-
-## License
-
-GPL v2 or later - https://www.gnu.org/licenses/gpl-2.0.html
