@@ -156,9 +156,6 @@ function tbp_is_buddypress_active() {
  * Load plugin textdomain for translation.
  */
 function tbp_load_textdomain() {
-    load_plugin_textdomain(
-        'pandatask', 
-        dirname( plugin_basename( TBP_PLUGIN_FILE ) ) . '/languages/' // Use standard 'languages' folder
-    );
+    load_plugin_textdomain( 'pandatask' );
 }
 add_action( 'plugins_loaded', 'tbp_load_textdomain' );
