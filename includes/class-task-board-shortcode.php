@@ -20,21 +20,26 @@ class Task_Board_Shortcode {
         $group_id = absint( $atts['group_id'] );
         $page_name = sanitize_title( $atts['page_name'] );
         
-        // Store the group_id and page_name as data attributes
-        $data_attributes = 'data-board-name="' . esc_attr($board_name) . '"';
-        if ($group_id > 0) {
-            $data_attributes .= ' data-group-id="' . esc_attr($group_id) . '"';
-        }
-        if (!empty($page_name)) {
-            $data_attributes .= ' data-page-name="' . esc_attr($page_name) . '"';
-        }
+        // Removed the construction of $data_attributes variable here
         
         // Get a display name for the board
         $display_name = $this->get_board_display_name($board_name, $group_id);
         
         ob_start();
         ?>
-        <div class="tbp-container" id="tbp-container-<?php echo esc_attr($board_name); ?>" <?php echo $data_attributes; ?>>
+        <div class="tbp-container" 
+             id="tbp-container-<?php echo esc_attr($board_name); ?>" 
+             data-board-name="<?php echo esc_attr($board_name); ?>"
+             <?php 
+             // Output group_id attribute only if it exists
+             if ($group_id > 0) { 
+                 echo ' data-group-id="' . esc_attr($group_id) . '"'; 
+             } 
+             // Output page_name attribute only if it exists
+             if (!empty($page_name)) { 
+                 echo ' data-page-name="' . esc_attr($page_name) . '"'; 
+             } 
+             ?>>
             <div class="tbp-header">
                 <h2>Task Board: <?php echo esc_html($display_name); ?></h2>
                 <div class="tbp-controls">

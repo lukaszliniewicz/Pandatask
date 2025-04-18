@@ -68,8 +68,8 @@ class Task_Board_Email {
                 $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
             }
             $regards = __('Regards,', 'task-board-plugin');
-             // translators: %s: Site name.
-            $signature = sprintf( __('%s', 'task-board-plugin'), $site_name ); 
+             // FIX: Directly use the site name variable, don't try to translate '%s'.
+            $signature = $site_name; 
 
             $text_message = $greeting . "\n\n" .
                             $assignment_intro . "\n\n" .
@@ -80,9 +80,10 @@ class Task_Board_Email {
                             $instructions . "\n\n" .
                             $task_link_line . // Already includes \n\n if present
                             $regards . "\n" .
-                            $signature;
+                            $signature; // Use the variable directly
             
             // --- HTML email ---
+            // Note: The HTML version correctly uses esc_html($site_name) directly, no change needed here.
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($assignment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
@@ -174,8 +175,8 @@ class Task_Board_Email {
                 $task_link_line = sprintf( __('View Task Board: %s', 'task-board-plugin'), $task_url ) . "\n\n";
             }
             $regards = __('Regards,', 'task-board-plugin');
-             // translators: %s: Site name.
-            $signature = sprintf( __('%s', 'task-board-plugin'), $site_name );
+             // FIX: Directly use the site name variable, don't try to translate '%s'.
+            $signature = $site_name;
 
             $text_message = $greeting . "\n\n" .
                             $comment_intro . "\n\n" .
@@ -184,9 +185,10 @@ class Task_Board_Email {
                             $instructions . "\n\n" .
                             $task_link_line .
                             $regards . "\n" .
-                            $signature;
+                            $signature; // Use the variable directly
             
             // --- HTML email ---
+            // Note: The HTML version correctly uses esc_html($site_name) directly, no change needed here.
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($comment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
@@ -216,12 +218,26 @@ class Task_Board_Email {
         
         $headers = array(
             'From: ' . $from_name . ' <' . $from_email . '>',
-            'Content-Type: text/html; charset=UTF-8', 
+            // Set multipart content type for HTML + Plain Text
+            'Content-Type: multipart/alternative; boundary="boundary-tbp-mail"', 
         );
         
-        // Use HTML message directly
-        $message = "<html><body>" . $html_message . "</body></html>";
-        
+        // Build the multipart message body
+        // Start with plain text part
+        $message = "--boundary-tbp-mail\r\n";
+        $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= $text_message . "\r\n\r\n"; // Add plain text message
+
+        // Add HTML part
+        $message .= "--boundary-tbp-mail\r\n";
+        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= "<html><body>" . $html_message . "</body></html>\r\n\r\n"; // Add HTML message
+
+        // End the boundary
+        $message .= "--boundary-tbp-mail--\r\n";
+
         // Removed header logging loop
         
         if (!function_exists('wp_mail')) {

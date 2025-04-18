@@ -236,7 +236,7 @@ div.tbp-container,
     display: inline-block;
     padding: 3px 8px;
     font-size: 0.8em;
-    color: white;
+    color: white !important;
     text-transform: capitalize;
 }
 
