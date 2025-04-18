@@ -70,7 +70,9 @@ When used within BuddyPress groups, access control to the task board itself is p
 1. In a **Private** or **Hidden** group, only members of that group will be able to access the "Tasks" tab and interact with the board.
 2. In a **Public** group, any site member might be able to view the tab (depending on BuddyPress settings), but interaction (adding tasks, commenting) typically requires group membership.
 
-The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board. *Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
+The plugin leverages BuddyPress's existing group privacy and membership system for access control to the board.
+
+*Note: Within the board itself, there are currently no specific roles defined (e.g., task manager vs. regular user)*.
 
 ## Dependencies
 
