@@ -1,5 +1,7 @@
 # Task Board Plugin for WordPress
 
+![explorer_0zrwLV6BzW](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
+
 A WordPress plugin that adds task management boards to your site via a shortcode.
 
 ## Overview
