@@ -1,6 +1,6 @@
 # Pandatask
 
-A WordPress plugin that adds task management boards, including BuddyPress groups, via a shortcode.
+A WordPress plugin that adds task management boards, including in BuddyPress groups (can be turned on for individual groups), via a shortcode.
 
 ![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
 
