@@ -88,19 +88,24 @@ class Pandat69_Group_Extension extends BP_Group_Extension {
         if ($enabled === '1') {
             $group = groups_get_group($group_id);
             if (!$group) return; // Bail if group not found
-
+    
             $group_link = bp_get_group_permalink($group);
+            $current_user_id = get_current_user_id();
+            
+            // Use direct function calls with explicit parameters instead of context-dependent functions
+            $is_member = groups_is_user_member($current_user_id, $group_id);
+            $is_admin = groups_is_user_admin($current_user_id, $group_id);
+            $is_mod = groups_is_user_mod($current_user_id, $group_id);
             
             bp_core_new_subnav_item(array(
-                'name'            => __('Tasks', 'pandatask'), // Name for the tab
-                'slug'            => $this->slug, // Use the main slug 'tasks'
+                'name'            => __('Tasks', 'pandatask'),
+                'slug'            => $this->slug,
                 'parent_url'      => $group_link,
                 'parent_slug'     => $group->slug,
-                'screen_function' => array($this, 'display_screen_callback'), // Wrapper function
+                'screen_function' => array($this, 'display_screen_callback'),
                 'position'        => $this->nav_item_position,
-                // Only group members/mods/admins can see the tab
-                'user_has_access' => ( is_user_logged_in() && ( bp_is_item_admin() || bp_is_item_mod() || bp_group_is_member() ) ), 
-            ), 'groups'); // Ensure it's added to the 'groups' component nav
+                'user_has_access' => is_user_logged_in() && ($is_member || $is_admin || $is_mod),
+            ), 'groups');
         }
     }
     
