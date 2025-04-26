@@ -136,6 +136,96 @@ jQuery(document).ready(function($) {
         // ---- END NEW ----
     }
 
+    // Handle status label clicks for quick status change
+    $(document).on('click', '.pandat69-task-status', function(e) {
+        e.stopPropagation(); // Prevent triggering the task item click
+        
+        var $statusLabel = $(this);
+        var taskId = $statusLabel.closest('.pandat69-task-item').data('task-id');
+        var currentStatus = $statusLabel.attr('data-status');
+        
+        // Remove any existing dropdowns
+        $('.pandat69-status-dropdown').remove();
+        
+        // Create status dropdown
+        var $dropdown = $('<div class="pandat69-status-dropdown"></div>');
+        
+        // Add status options
+        var statuses = [
+            { value: 'pending', label: 'Pending', class: 'pandat69-status-pending' },
+            { value: 'in-progress', label: 'In Progress', class: 'pandat69-status-in-progress' },
+            { value: 'done', label: 'Done', class: 'pandat69-status-done' }
+        ];
+        
+        statuses.forEach(function(status) {
+            var $option = $('<div class="pandat69-status-option ' + status.class + '">' + status.label + '</div>');
+            
+            // Mark current status
+            if (status.value === currentStatus) {
+                $option.addClass('pandat69-current-status');
+            }
+            
+            // Handle option click
+            $option.on('click', function() {
+                // Don't do anything if clicking the current status
+                if (status.value === currentStatus) {
+                    $dropdown.remove();
+                    return;
+                }
+                
+                // Update status via AJAX
+                $.ajax({
+                    url: pandat69_ajax_object.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'pandat69_quick_update_status',
+                        nonce: pandat69_ajax_object.nonce,
+                        task_id: taskId,
+                        status: status.value
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update the UI
+                            $statusLabel.removeClass('pandat69-status-' + currentStatus)
+                                       .addClass('pandat69-status-' + status.value)
+                                       .attr('data-status', status.value)
+                                       .text(response.data.status_text);
+                            
+                            // Add a "Updated" indicator that fades out
+                            var $updated = $('<span class="pandat69-status-updated">✓</span>');
+                            $statusLabel.append($updated);
+                            
+                            // Remove dropdown
+                            $dropdown.remove();
+                        } else {
+                            alert(response.data.message || 'Failed to update status');
+                            $dropdown.remove();
+                        }
+                    },
+                    error: function() {
+                        alert('Error connecting to the server');
+                        $dropdown.remove();
+                    }
+                });
+            });
+            
+            $dropdown.append($option);
+        });
+        
+        // Position and append the dropdown
+        $dropdown.css({
+            'top': $statusLabel.position().top + $statusLabel.outerHeight(),
+            'left': $statusLabel.position().left
+        });
+        
+        $statusLabel.parent().append($dropdown);
+        
+        // Close dropdown when clicking outside
+        $(document).one('click', function() {
+            $dropdown.remove();
+        });
+    });
+
     function setupTabs() {
         $('.pandat69-tab-item').on('click', function() {
             const tabId = $(this).data('tab');
@@ -325,7 +415,7 @@ jQuery(document).ready(function($) {
             <div class="pandat69-task-item-details">
                 <div class="pandat69-task-item-name">${task.name}</div>
                 <div class="pandat69-task-item-meta">
-                    <span><span class="pandat69-task-status pandat69-status-${task.status}">${task.status.replace('-', ' ')}</span></span>
+                    <span><span class="pandat69-task-status pandat69-status-${task.status}" data-status="${task.status}">${task.status.replace('-', ' ')}</span></span>
                     <span><strong>Priority:</strong> ${task.priority}</span>
                     ${task.deadline ? `<span><strong>Deadline:</strong> ${task.deadline}</span>` : ''}
                     <span><strong>Category:</strong> ${task.category_name}</span>
