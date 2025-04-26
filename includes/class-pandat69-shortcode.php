@@ -12,15 +12,13 @@ class Pandat69_Shortcode {
     public function render_shortcode( $atts ) {
         $atts = shortcode_atts( array(
             'board_name' => 'default_board',
-            'group_id' => 0, // Add this parameter
-            'page_name' => '', // Add this parameter 
+            'group_id' => 0,
+            'page_name' => '',
         ), $atts, 'task_board' );
     
         $board_name = sanitize_key( $atts['board_name'] );
         $group_id = absint( $atts['group_id'] );
         $page_name = sanitize_title( $atts['page_name'] );
-        
-        // Removed the construction of $data_attributes variable here
         
         // Get a display name for the board
         $display_name = $this->get_board_display_name($board_name, $group_id);
@@ -42,31 +40,73 @@ class Pandat69_Shortcode {
              ?>>
             <div class="pandat69-header">
                 <h2>Task Board: <?php echo esc_html($display_name); ?></h2>
-                <div class="pandat69-controls">
-                    <button class="pandat69-button pandat69-add-task-btn">Add New Task</button>
-                    <button class="pandat69-button pandat69-manage-categories-btn">Manage Categories</button>
+            </div>
+            
+            <div class="pandat69-tabs">
+                <ul class="pandat69-tab-navigation">
+                    <li class="pandat69-tab-item active" data-tab="all">Task List</li>
+                    <li class="pandat69-tab-item" data-tab="week">Week Overview</li>
+                    <li class="pandat69-tab-item" data-tab="month">Month Overview</li>
+                </ul>
+                
+                <!-- "All" tab - existing content -->
+                <div class="pandat69-tab-content pandat69-tab-all active">
+                    <div class="pandat69-controls">
+                        <button class="pandat69-button pandat69-add-task-btn">Add New Task</button>
+                        <button class="pandat69-button pandat69-manage-categories-btn">Manage Categories</button>
+                    </div>
+                    <div class="pandat69-filters">
+                        <input type="text" class="pandat69-input pandat69-search-input" placeholder="Search tasks...">
+                        <select class="pandat69-select pandat69-sort-select">
+                            <option value="name_asc">Sort by Name (A-Z)</option>
+                            <option value="name_desc">Sort by Name (Z-A)</option>
+                            <option value="priority_asc">Sort by Priority (Low-High)</option>
+                            <option value="priority_desc">Sort by Priority (High-Low)</option>
+                            <option value="deadline_asc">Sort by Deadline (Soonest)</option>
+                            <option value="deadline_desc">Sort by Deadline (Latest)</option>
+                            <option value="status_asc">Sort by Status (A-Z)</option>
+                            <option value="status_desc">Sort by Status (Z-A)</option>
+                        </select>
+                        <select class="pandat69-select pandat69-status-filter-select">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+                    <div class="pandat69-task-list-container">
+                        <div class="pandat69-loading" style="display: none;">Loading...</div>
+                        <ul class="pandat69-task-list">
+                            <!-- Tasks will be loaded here by JavaScript -->
+                        </ul>
+                    </div>
                 </div>
-                <div class="pandat69-filters">
-                    <input type="text" class="pandat69-input pandat69-search-input" placeholder="Search tasks...">
-                    <select class="pandat69-select pandat69-sort-select">
-                        <option value="name_asc">Sort by Name (A-Z)</option>
-                        <option value="name_desc">Sort by Name (Z-A)</option>
-                        <option value="priority_asc">Sort by Priority (Low-High)</option>
-                        <option value="priority_desc">Sort by Priority (High-Low)</option>
-                        <option value="deadline_asc">Sort by Deadline (Soonest)</option>
-                        <option value="deadline_desc">Sort by Deadline (Latest)</option>
-                        <option value="status_asc">Sort by Status (A-Z)</option>
-                        <option value="status_desc">Sort by Status (Z-A)</option>
-                    </select>
-                     <select class="pandat69-select pandat69-status-filter-select">
-                        <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="done">Done</option>
-                    </select>
+                
+                <!-- Week overview tab -->
+                <div class="pandat69-tab-content pandat69-tab-week">
+                    <div class="pandat69-date-selector">
+                        <button class="pandat69-button pandat69-prev-week">◀ Previous Week</button>
+                        <span class="pandat69-current-week-display"></span>
+                        <button class="pandat69-button pandat69-next-week">Next Week ▶</button>
+                    </div>
+                    <div class="pandat69-week-task-container">
+                        <!-- Week tasks will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Month overview tab -->
+                <div class="pandat69-tab-content pandat69-tab-month">
+                    <div class="pandat69-date-selector">
+                        <button class="pandat69-button pandat69-prev-month">◀ Previous Month</button>
+                        <span class="pandat69-current-month-display"></span>
+                        <button class="pandat69-button pandat69-next-month">Next Month ▶</button>
+                    </div>
+                    <div class="pandat69-month-task-container">
+                        <!-- Month tasks will be loaded here -->
+                    </div>
                 </div>
             </div>
-
+    
             <!-- Add Task Expandable Section -->
             <div class="pandat69-expandable-section pandat69-add-task-section" style="display: none;">
                 <div class="pandat69-expandable-header">
@@ -77,17 +117,17 @@ class Pandat69_Shortcode {
                     <form class="pandat69-form pandat69-task-form">
                         <input type="hidden" id="pandat69-task-id" name="task_id" value="">
                         <input type="hidden" id="pandat69-board-name" name="board_name" value="<?php echo esc_attr($board_name); ?>">
-
+    
                         <div class="pandat69-form-field">
                             <label for="pandat69-task-name">Task Name:</label>
                             <input type="text" id="pandat69-task-name" name="name" class="pandat69-input" required>
                         </div>
-
+    
                          <div class="pandat69-form-field">
                             <label for="pandat69-task-description">Description:</label>
                             <textarea id="pandat69-task-description" name="description" class="pandat69-input pandat69-tinymce-editor" rows="6"></textarea>
                         </div>
-
+    
                         <div class="pandat69-form-row">
                             <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-status">Status:</label>
@@ -102,7 +142,7 @@ class Pandat69_Shortcode {
                                 <input type="number" id="pandat69-task-priority" name="priority" class="pandat69-input" min="1" max="10" value="5" required>
                              </div>
                         </div>
-
+    
                         <div class="pandat69-form-row">
                             <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-category">Category:</label>
@@ -128,7 +168,7 @@ class Pandat69_Shortcode {
                                 <input type="text" id="pandat69-task-deadline" name="deadline" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
                             </div>
                         </div>
-
+    
                         <div class="pandat69-form-field">
                             <label for="pandat69-task-assigned-search">Assign Persons:</label>
                             <div class="pandat69-user-autocomplete-container">
@@ -139,7 +179,7 @@ class Pandat69_Shortcode {
                                 <input type="hidden" id="pandat69-task-assigned" name="assigned_persons" value="">
                             </div>
                         </div>
-
+    
                         <div class="pandat69-form-actions">
                             <button type="submit" class="pandat69-button pandat69-submit-task-btn">Save Task</button>
                             <button type="button" class="pandat69-button pandat69-cancel-task-btn">Cancel</button>
@@ -148,7 +188,7 @@ class Pandat69_Shortcode {
                     </form>
                 </div>
             </div>
-
+    
             <!-- Categories Management Expandable Section -->
             <div class="pandat69-expandable-section pandat69-categories-section" style="display: none;">
                 <div class="pandat69-expandable-header">
@@ -172,13 +212,6 @@ class Pandat69_Shortcode {
                         </div>
                     </form>
                 </div>
-            </div>
-
-            <div class="pandat69-task-list-container">
-                <div class="pandat69-loading" style="display: none;">Loading...</div>
-                <ul class="pandat69-task-list">
-                    <!-- Tasks will be loaded here by JavaScript -->
-                </ul>
             </div>
         </div>
         <?php

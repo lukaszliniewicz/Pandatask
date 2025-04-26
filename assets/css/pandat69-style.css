@@ -1132,7 +1132,219 @@ div.pandat69-container,
     margin-right: 15px;
 }
 
+/* Tab Navigation */
+.pandat69-tabs {
+    margin-bottom: 20px;
+}
+
+.pandat69-tab-navigation {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+    border-bottom: 2px solid #e0e5eb;
+}
+
+.pandat69-tab-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-right: 5px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    color: #5d6b7b;
+}
+
+.pandat69-tab-item:hover {
+    background-color: #f5f7fa;
+    border-color: #e0e5eb;
+    color: #384D68;
+}
+
+.pandat69-tab-item.active {
+    background-color: #fff;
+    border-color: #e0e5eb;
+    border-bottom: 2px solid #fff;
+    margin-bottom: -2px;
+    color: #384D68;
+    font-weight: 600;
+}
+
+/* Tab Content */
+.pandat69-tab-content {
+    display: none;
+    padding: 0;
+}
+
+.pandat69-tab-content.active {
+    display: block;
+}
+
+/* Date Selector */
+.pandat69-date-selector {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #f5f7fa;
+    border-radius: 4px;
+}
+
+.pandat69-current-week-display,
+.pandat69-current-month-display {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #384D68;
+}
+
+/* Week View */
+.pandat69-week-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.pandat69-week-table th {
+    background-color: #f5f7fa;
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #384D68;
+    border-bottom: 2px solid #e0e5eb;
+}
+
+.pandat69-week-table td {
+    padding: 10px;
+    border-bottom: 1px solid #e0e5eb;
+    vertical-align: middle;
+}
+
+.pandat69-week-task-name {
+    font-weight: 500;
+    color: #384D68;
+}
+
+.pandat69-week-task-row:hover {
+    background-color: #f9f9f9;
+}
+
+.pandat69-week-task-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* Month View */
+.pandat69-month-date-group {
+    margin-bottom: 25px;
+}
+
+.pandat69-month-date-header {
+    padding: 10px;
+    background-color: #f5f7fa;
+    color: #384D68;
+    font-size: 1.1em;
+    font-weight: 600;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
 /* Status colors matching existing ones */
 .pandat69-container .pandat69-status-option.pandat69-status-pending { background-color: #e9b44c; }
 .pandat69-container .pandat69-status-option.pandat69-status-in-progress { background-color: #384D68; }
 .pandat69-container .pandat69-status-option.pandat69-status-done { background-color: #3e8d63; }
+
+/* Ensure consistent task styling across all views */
+.pandat69-month-date-group .pandat69-task-list,
+.pandat69-week-task-container .pandat69-task-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pandat69-month-date-group .pandat69-task-item,
+.pandat69-week-task-container .pandat69-task-item {
+    background-color: #fff;
+    border: 1px solid #e0e5eb;
+    margin-bottom: 10px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+    flex-wrap: wrap;
+}
+
+.pandat69-month-date-group .pandat69-task-item:hover,
+.pandat69-week-task-container .pandat69-task-item:hover {
+    box-shadow: 0 2px 5px rgba(56, 77, 104, 0.1);
+}
+
+.pandat69-month-date-group .pandat69-task-item-details,
+.pandat69-week-task-container .pandat69-task-item-details {
+    flex-grow: 1;
+    margin-right: 15px;
+}
+
+.pandat69-month-date-group .pandat69-task-item-name,
+.pandat69-week-task-container .pandat69-task-item-name {
+    font-weight: bold;
+    color: #384D68;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+}
+
+.pandat69-month-date-group .pandat69-task-item-meta,
+.pandat69-week-task-container .pandat69-task-item-meta {
+    font-size: 0.9em;
+    color: #5d6b7b;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.pandat69-month-date-group .pandat69-task-item-actions,
+.pandat69-week-task-container .pandat69-task-item-actions {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.pandat69-empty-day {
+    padding: 10px;
+    color: #5d6b7b;
+    font-style: italic;
+    background-color: #f9f9f9;
+    border: 1px dashed #e0e5eb;
+}
+
+/* Responsive adjustments for week and month views */
+@media (max-width: 768px) {
+    .pandat69-month-date-group .pandat69-task-item,
+    .pandat69-week-task-container .pandat69-task-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .pandat69-month-date-group .pandat69-task-item-actions,
+    .pandat69-week-task-container .pandat69-task-item-actions {
+        margin-top: 10px;
+        align-self: flex-end;
+    }
+    
+    .pandat69-month-date-group .pandat69-task-item-details,
+    .pandat69-week-task-container .pandat69-task-item-details {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    
+    .pandat69-month-date-group .pandat69-task-item-meta,
+    .pandat69-week-task-container .pandat69-task-item-meta {
+        flex-direction: column;
+        gap: 5px;
+    }
+}

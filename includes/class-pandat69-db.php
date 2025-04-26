@@ -82,7 +82,7 @@ class Pandat69_DB {
 
     // --- Task CRUD ---
 
-    public static function get_tasks($board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '') {
+    public static function get_tasks($board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '') {
         global $wpdb;
         $prefix = self::get_db_prefix();
         $tasks_table = $prefix . 'tasks';
@@ -110,6 +110,14 @@ class Pandat69_DB {
 
         if (!empty($status_filter)) {
              $sql .= $wpdb->prepare(" AND t.status = %s", $status_filter);
+        }
+        
+        // Add date range filtering
+        if ($date_filter === 'range' && !empty($start_date) && !empty($end_date)) {
+            $sql .= $wpdb->prepare(
+                " AND (t.deadline BETWEEN %s AND %s OR t.deadline IS NULL)",
+                $start_date, $end_date
+            );
         }
 
         $sql .= " GROUP BY t.id";
@@ -314,7 +322,6 @@ class Pandat69_DB {
         // Note: $result might be 0 if the data didn't actually change, but that's not an error.
         return true;
     }
-
 
     public static function delete_task($task_id) {
         global $wpdb;

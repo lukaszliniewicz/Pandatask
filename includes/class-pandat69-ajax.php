@@ -47,21 +47,35 @@ class Pandat69_Ajax {
     public function fetch_tasks() {
         $this->verify_nonce();
         $this->check_permissions();
-
+    
         $board_name = isset($_POST['board_name']) ? sanitize_key($_POST['board_name']) : '';
         $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
         $sort = isset($_POST['sort']) ? sanitize_text_field($_POST['sort']) : 'name_asc';
         $status_filter = isset($_POST['status_filter']) ? sanitize_text_field($_POST['status_filter']) : '';
-
+        
+        // Add date filtering parameters
+        $date_filter = isset($_POST['date_filter']) ? sanitize_text_field($_POST['date_filter']) : '';
+        $start_date = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
+        $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
+        
+        // Validate date format if provided (YYYY-MM-DD)
+        if (!empty($start_date) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
+            $start_date = ''; // Invalid format
+        }
+        
+        if (!empty($end_date) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)) {
+            $end_date = ''; // Invalid format
+        }
+    
         list($sort_by, $sort_order) = explode('_', $sort . '_'); // Add '_' to handle cases without order
         $sort_order = strtoupper($sort_order) === 'DESC' ? 'DESC' : 'ASC';
-
+    
         if (empty($board_name)) {
             wp_send_json_error(array('message' => 'Board name is required.'));
         }
-
-        $tasks = Pandat69_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter);
-
+    
+        $tasks = Pandat69_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date);
+    
         if (is_array($tasks)) {
             wp_send_json_success(array('tasks' => $tasks));
         } else {
