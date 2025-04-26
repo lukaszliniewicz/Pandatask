@@ -210,59 +210,27 @@ class Pandat69_Email {
         $admin_email = get_option('admin_email');
         $site_name = get_bloginfo('name');
         
-        // Removed log_message call
-        
-        // Use WordPress default From Name/Email if available, otherwise construct one.
+        // Use WordPress default From headers
         $from_name = apply_filters('wp_mail_from_name', get_bloginfo('name'));
         $from_email = apply_filters('wp_mail_from', $admin_email);
         
+        // Gmail API compatible headers - simpler is better
         $headers = array(
             'From: ' . $from_name . ' <' . $from_email . '>',
-            // Set multipart content type for HTML + Plain Text
-            'Content-Type: multipart/alternative; boundary="boundary-pandat69-mail"', 
+            'Content-Type: text/html; charset=UTF-8'
         );
         
-        // Build the multipart message body
-        // Start with plain text part
-        $message = "--boundary-pandat69-mail\r\n";
-        $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
-        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-        $message .= $text_message . "\r\n\r\n"; // Add plain text message
-
-        // Add HTML part
-        $message .= "--boundary-pandat69-mail\r\n";
-        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-        $message .= "<html><body>" . $html_message . "</body></html>\r\n\r\n"; // Add HTML message
-
-        // End the boundary
-        $message .= "--boundary-pandat69-mail--\r\n";
-
-        // Removed header logging loop
+        // Gmail API prefers simple HTML messages
+        $message = $html_message; // Just use the HTML part
         
-        if (!function_exists('wp_mail')) {
-            // Removed log_message call
-            // Maybe add a standard PHP error_log here if wp_mail is critical and missing
-            error_log('Task Board Plugin Error: wp_mail function does not exist!');
+        // Send email with error handling
+        try {
+            $result = wp_mail($to, $subject, $message, $headers);
+            return $result;
+        } catch (Exception $e) {
+            error_log('Pandatask email error: ' . $e->getMessage());
             return false;
         }
-        
-        // Send the email
-        $result = wp_mail($to, $subject, $message, $headers);
-        
-        // Removed log_message call for result
-        
-        // If failed, log the error (using standard PHP error log now)
-        if (!$result) {
-            global $phpmailer;
-            if (isset($phpmailer) && is_a($phpmailer, 'PHPMailer\PHPMailer\PHPMailer')) {
-                 error_log("Task Board Plugin Mail Error: " . $phpmailer->ErrorInfo); // Log actual error
-            } else {
-                 error_log("Task Board Plugin Mail Error: wp_mail failed, PHPMailer object not available or not expected class.");
-            }
-        }
-        
-        return $result;
     }
     /**
      * Send notification for approaching deadline

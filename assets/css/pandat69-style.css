@@ -897,7 +897,6 @@ div.pandat69-container,
 
 .pandat69-container span {
     font-size: inherit;
-    line-height: 1.5 !important;
     color: inherit;
     vertical-align: baseline;
     text-align: left !important;
@@ -1142,15 +1141,16 @@ div.pandat69-container,
     list-style: none;
     padding: 0;
     margin: 0 0 20px 0;
-    border-bottom: 2px solid #e0e5eb;
+    border-bottom: none !important;
+    padding-bottom: 10px !important;
 }
 
 .pandat69-tab-item {
-    padding: 10px 20px;
+    padding: 10px 20px !important;
     cursor: pointer;
     margin-right: 5px;
     border: 1px solid transparent;
-    border-bottom: none;
+    border-bottom: none !important;
     border-radius: 4px 4px 0 0;
     transition: all 0.2s ease;
     font-weight: 500;
