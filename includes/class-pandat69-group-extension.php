@@ -12,7 +12,7 @@ if ( ! class_exists( 'BP_Group_Extension' ) ) {
     return;
 }
 
-class Task_Board_Group_Extension extends BP_Group_Extension {
+class Pandat69_Group_Extension extends BP_Group_Extension {
     
     /**
      * Constructor
@@ -26,7 +26,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         
         // If we have a valid group ID, check the actual setting
         if ($group_id > 0) {
-            $enabled = groups_get_groupmeta($group_id, 'tbp_tasks_enabled', true);
+            $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
             // If it's never been set, default to enabled ('1')
             if ($enabled === '') {
                 $enabled = true; // Treat unset as enabled for logic below
@@ -82,7 +82,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         }
         
         // Check if tasks are enabled for this group ('1' means enabled)
-        $enabled = groups_get_groupmeta($group_id, 'tbp_tasks_enabled', true);
+        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
         
         // Add the nav item only if enabled is explicitly '1'
         if ($enabled === '1') {
@@ -138,7 +138,7 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         }
         
         // Verify tasks are enabled for this group
-        $enabled = groups_get_groupmeta($group_id, 'tbp_tasks_enabled', true);
+        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
         if ($enabled !== '1') {
             echo '<div id="message" class="bp-feedback info"><span class="bp-icon" aria-hidden="true"></span><p>';
             // Use esc_html_e for safe HTML output
@@ -167,8 +167,8 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         ?>
         <h4 class="bp-create-step-title"><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         
-        <label for="tbp_tasks_enabled" class="bp-label">
-             <input type="checkbox" name="tbp_tasks_enabled" id="tbp_tasks_enabled" value="1" checked="checked">
+        <label for="pandat69_tasks_enabled" class="bp-label">
+             <input type="checkbox" name="pandat69_tasks_enabled" id="pandat69_tasks_enabled" value="1" checked="checked">
              <?php esc_html_e('Enable task board for this group?', 'pandatask'); ?>
         </label>
         <p class="description">
@@ -192,8 +192,8 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         }
         if (!$group_id) return; // Bail if group ID is not found
 
-        $enabled = isset($_POST['tbp_tasks_enabled']) ? '1' : '0';
-        groups_update_groupmeta($group_id, 'tbp_tasks_enabled', $enabled);
+        $enabled = isset($_POST['pandat69_tasks_enabled']) ? '1' : '0';
+        groups_update_groupmeta($group_id, 'pandat69_tasks_enabled', $enabled);
     }
     
     /**
@@ -215,12 +215,12 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         }
         
         // Check if tasks are enabled ('1' means enabled, other values or unset mean disabled)
-        $enabled = groups_get_groupmeta($group_id, 'tbp_tasks_enabled', true) === '1';
+        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true) === '1';
         ?>
         <h4><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         
-        <label for="tbp_tasks_enabled" class="bp-label">
-             <input type="checkbox" name="tbp_tasks_enabled" id="tbp_tasks_enabled" value="1" <?php checked($enabled); ?>>
+        <label for="pandat69_tasks_enabled" class="bp-label">
+             <input type="checkbox" name="pandat69_tasks_enabled" id="pandat69_tasks_enabled" value="1" <?php checked($enabled); ?>>
              <?php esc_html_e('Enable task board for this group?', 'pandatask'); ?>
         </label>
         <p class="description">
@@ -263,8 +263,8 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
         }
         if (!$group_id) return; // Bail if group ID not found
 
-        $enabled = isset($_POST['tbp_tasks_enabled']) ? '1' : '0';
-        $updated = groups_update_groupmeta($group_id, 'tbp_tasks_enabled', $enabled);
+        $enabled = isset($_POST['pandat69_tasks_enabled']) ? '1' : '0';
+        $updated = groups_update_groupmeta($group_id, 'pandat69_tasks_enabled', $enabled);
         
         if ($updated) {
             bp_core_add_message(__('Task settings saved successfully.', 'pandatask'));
@@ -289,9 +289,9 @@ class Task_Board_Group_Extension extends BP_Group_Extension {
 }
 
 // Function to register the extension with BuddyPress
-function tbp_register_group_extension() {
+function pandat69_register_group_extension() {
     if ( bp_is_active( 'groups' ) ) {
-        bp_register_group_extension( 'Task_Board_Group_Extension' );
+        bp_register_group_extension( 'Pandat69_Group_Extension' );
     }
 }
-add_action( 'bp_loaded', 'tbp_register_group_extension' ); // Register once BuddyPress is fully loaded
+add_action( 'bp_loaded', 'pandat69_register_group_extension' ); // Register once BuddyPress is fully loaded

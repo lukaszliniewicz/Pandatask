@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Task_Board_DB {
+class Pandat69_DB {
 
     public static function activate() {
         self::create_tables();
@@ -11,7 +11,7 @@ class Task_Board_DB {
 
     public static function get_db_prefix() {
         global $wpdb;
-        return $wpdb->prefix . 'tbp_'; // Task Board Plugin prefix
+        return $wpdb->prefix . 'pandat69_'; // Task Board Plugin prefix
     }
 
     public static function create_tables() {
@@ -204,7 +204,7 @@ class Task_Board_DB {
         $result = $wpdb->insert($tasks_table, $task_data, $format);
 
         if ($result === false) {
-            error_log("TBP DB Error adding task: " . $wpdb->last_error);
+            error_log("PANDAT69 DB Error adding task: " . $wpdb->last_error);
             return false;
         }
         $task_id = $wpdb->insert_id;
@@ -272,7 +272,7 @@ class Task_Board_DB {
                      $format[] = '%s';
                  } else {
                      // Invalid date format passed - skip updating this field to prevent errors
-                     // Optionally log this: error_log("TBP Invalid deadline format received for task $task_id: $value");
+                     // Optionally log this: error_log("PANDAT69 Invalid deadline format received for task $task_id: $value");
                      continue;
                  }
             }
@@ -300,7 +300,7 @@ class Task_Board_DB {
 
         // Check for DB errors
         if ($result === false) {
-            error_log("TBP DB Error updating task $task_id: " . $wpdb->last_error);
+            error_log("PANDAT69 DB Error updating task $task_id: " . $wpdb->last_error);
             return false;
         }
 
@@ -371,8 +371,8 @@ class Task_Board_DB {
             }
 
             // Send email notifications to newly assigned users
-            if (class_exists('Task_Board_Email')) {
-                Task_Board_Email::send_assignment_notification($task_id, $users_to_add);
+            if (class_exists('Pandat69_Email')) {
+                Pandat69_Email::send_assignment_notification($task_id, $users_to_add);
             }
         }
     }
@@ -483,8 +483,8 @@ class Task_Board_DB {
              ));
 
             // Send email notifications to assigned users
-            if (class_exists('Task_Board_Email')) {
-                Task_Board_Email::send_comment_notification($task_id, $user_id, $comment_text);
+            if (class_exists('Pandat69_Email')) {
+                Pandat69_Email::send_comment_notification($task_id, $user_id, $comment_text);
             }
 
             return $comment;
@@ -495,7 +495,7 @@ class Task_Board_DB {
     // --- User Fetching ---
 
     public static function get_buddypress_users($search = '') {
-        if (!function_exists('tbp_is_buddypress_active') || !tbp_is_buddypress_active()) {
+        if (!function_exists('pandat69_is_buddypress_active') || !pandat69_is_buddypress_active()) {
             // Fallback to standard WP users if BuddyPress is not active or helper function missing
             return self::get_wp_users($search);
         }

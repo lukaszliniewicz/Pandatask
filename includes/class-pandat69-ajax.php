@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Task_Board_Ajax {
+class Pandat69_Ajax {
 
     public function register() {
         $ajax_actions = array(
@@ -21,12 +21,12 @@ class Task_Board_Ajax {
         );
 
         foreach ($ajax_actions as $action) {
-            add_action('wp_ajax_tbp_' . $action, array($this, $action));
+            add_action('wp_ajax_pandat69_' . $action, array($this, $action));
             // Add wp_ajax_nopriv_ if needed for public actions (not typical for task management)
         }
     }
 
-    private function verify_nonce($action = 'tbp_ajax_nonce') {
+    private function verify_nonce($action = 'pandat69_ajax_nonce') {
          if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field($_POST['nonce']), $action)) {
             wp_send_json_error(array('message' => 'Nonce verification failed.'), 403);
         }
@@ -60,7 +60,7 @@ class Task_Board_Ajax {
             wp_send_json_error(array('message' => 'Board name is required.'));
         }
 
-        $tasks = Task_Board_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter);
+        $tasks = Pandat69_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter);
 
         if (is_array($tasks)) {
             wp_send_json_success(array('tasks' => $tasks));
@@ -79,7 +79,7 @@ class Task_Board_Ajax {
             wp_send_json_error(array('message' => 'Invalid Task ID.'));
         }
 
-        $task = Task_Board_DB::get_task($task_id);
+        $task = Pandat69_DB::get_task($task_id);
 
         if ($task) {
             // Ensure description is not overly escaped if wp_kses_post was used correctly
@@ -129,11 +129,11 @@ class Task_Board_Ajax {
               wp_send_json_error(array('message' => 'Invalid deadline format. Use YYYY-MM-DD.'));
          }
 
-        $task_id = Task_Board_DB::add_task($data);
+        $task_id = Pandat69_DB::add_task($data);
 
         if ($task_id) {
             // Optionally fetch the newly added task to return full data
-            $new_task = Task_Board_DB::get_task($task_id);
+            $new_task = Pandat69_DB::get_task($task_id);
             wp_send_json_success(array('message' => 'Task added successfully.', 'task' => $new_task));
         } else {
             wp_send_json_error(array('message' => 'Failed to add task. Check data or logs.'));
@@ -184,11 +184,11 @@ class Task_Board_Ajax {
               wp_send_json_error(array('message' => 'Invalid deadline format. Use YYYY-MM-DD.'));
          }
 
-        $result = Task_Board_DB::update_task($task_id, $data);
+        $result = Pandat69_DB::update_task($task_id, $data);
 
         if ($result) {
              // Optionally fetch the updated task to return full data
-            $updated_task = Task_Board_DB::get_task($task_id);
+            $updated_task = Pandat69_DB::get_task($task_id);
             wp_send_json_success(array('message' => 'Task updated successfully.', 'task' => $updated_task));
         } else {
             wp_send_json_error(array('message' => 'Failed to update task.'));
@@ -208,7 +208,7 @@ class Task_Board_Ajax {
          // Add capability check: Can the current user delete this specific task?
          // e.g., check if user is admin or assigned to the task, or task creator etc.
 
-        $result = Task_Board_DB::delete_task($task_id);
+        $result = Pandat69_DB::delete_task($task_id);
 
         if ($result) {
             wp_send_json_success(array('message' => 'Task deleted successfully.'));
@@ -226,7 +226,7 @@ class Task_Board_Ajax {
             wp_send_json_error(array('message' => 'Board name is required.'));
         }
 
-        $categories = Task_Board_DB::get_categories($board_name);
+        $categories = Pandat69_DB::get_categories($board_name);
          if (is_array($categories)) {
             wp_send_json_success(array('categories' => $categories));
         } else {
@@ -245,7 +245,7 @@ class Task_Board_Ajax {
             wp_send_json_error(array('message' => 'Board name and category name are required.'));
         }
 
-        $category_id = Task_Board_DB::add_category($board_name, $category_name);
+        $category_id = Pandat69_DB::add_category($board_name, $category_name);
 
         if ($category_id) {
              wp_send_json_success(array('message' => 'Category added successfully.', 'category' => array('id' => $category_id, 'name' => $category_name)));
@@ -267,7 +267,7 @@ class Task_Board_Ajax {
 
          // Add capability check if needed
 
-        $result = Task_Board_DB::delete_category($category_id, $board_name);
+        $result = Pandat69_DB::delete_category($category_id, $board_name);
 
         if ($result) {
             wp_send_json_success(array('message' => 'Category deleted successfully.'));
@@ -299,16 +299,16 @@ class Task_Board_Ajax {
                 // Create link based on user ID
                 if (function_exists('bp_core_get_user_domain')) {
                     // BuddyPress profile link
-                    return '<a href="' . bp_core_get_user_domain($mentioned_user_id) . '" class="tbp-mention">@' . $mentioned_user_name . '</a>';
+                    return '<a href="' . bp_core_get_user_domain($mentioned_user_id) . '" class="pandat69-mention">@' . $mentioned_user_name . '</a>';
                 } else {
                     // WordPress author page link
-                    return '<a href="' . get_author_posts_url($mentioned_user_id) . '" class="tbp-mention">@' . $mentioned_user_name . '</a>';
+                    return '<a href="' . get_author_posts_url($mentioned_user_id) . '" class="pandat69-mention">@' . $mentioned_user_name . '</a>';
                 }
             }
             return $matches[0]; // Return original if user not found
         }, $comment_text);
     
-        $comment = Task_Board_DB::add_comment($task_id, $user_id, $comment_text);
+        $comment = Pandat69_DB::add_comment($task_id, $user_id, $comment_text);
     
         if ($comment) {
             wp_send_json_success(array('message' => 'Comment added successfully.', 'comment' => $comment));
@@ -325,10 +325,10 @@ class Task_Board_Ajax {
 
         $search = isset($_REQUEST['search']) ? sanitize_text_field($_REQUEST['search']) : ''; // Use REQUEST for flexibility
 
-        if (tbp_is_buddypress_active()) {
-            $users = Task_Board_DB::get_buddypress_users($search);
+        if (pandat69_is_buddypress_active()) {
+            $users = Pandat69_DB::get_buddypress_users($search);
         } else {
-             $users = Task_Board_DB::get_wp_users($search);
+             $users = Pandat69_DB::get_wp_users($search);
         }
 
         wp_send_json_success(array('users' => $users));
@@ -350,7 +350,7 @@ class Task_Board_Ajax {
             'status' => $status
         );
     
-        $result = Task_Board_DB::update_task($task_id, $data);
+        $result = Pandat69_DB::update_task($task_id, $data);
     
         if ($result) {
             wp_send_json_success(array(

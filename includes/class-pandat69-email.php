@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Task_Board_Email {
+class Pandat69_Email {
 
     /**
      * Send notification to newly assigned users
@@ -21,7 +21,7 @@ class Task_Board_Email {
         }
         
         // Get task details
-        $task = Task_Board_DB::get_task($task_id);
+        $task = Pandat69_DB::get_task($task_id);
         if (!$task) {
             // Removed log_message call
             return;
@@ -112,7 +112,7 @@ class Task_Board_Email {
         // Removed log_message call
         
         // Get task details
-        $task = Task_Board_DB::get_task($task_id);
+        $task = Pandat69_DB::get_task($task_id);
         if (!$task || empty($task->assigned_user_ids)) {
             // Removed log_message call
             return;
@@ -134,7 +134,7 @@ class Task_Board_Email {
         }
         
         // Clean up comment text for *plain text* email (keep HTML for HTML version)
-        $plain_text_comment = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="tbp-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $comment_text));
+        $plain_text_comment = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="pandat69-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $comment_text));
         // Removed log_message call
         
         // Try to determine task URL
@@ -219,24 +219,24 @@ class Task_Board_Email {
         $headers = array(
             'From: ' . $from_name . ' <' . $from_email . '>',
             // Set multipart content type for HTML + Plain Text
-            'Content-Type: multipart/alternative; boundary="boundary-tbp-mail"', 
+            'Content-Type: multipart/alternative; boundary="boundary-pandat69-mail"', 
         );
         
         // Build the multipart message body
         // Start with plain text part
-        $message = "--boundary-tbp-mail\r\n";
+        $message = "--boundary-pandat69-mail\r\n";
         $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
         $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $message .= $text_message . "\r\n\r\n"; // Add plain text message
 
         // Add HTML part
-        $message .= "--boundary-tbp-mail\r\n";
+        $message .= "--boundary-pandat69-mail\r\n";
         $message .= "Content-Type: text/html; charset=UTF-8\r\n";
         $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $message .= "<html><body>" . $html_message . "</body></html>\r\n\r\n"; // Add HTML message
 
         // End the boundary
-        $message .= "--boundary-tbp-mail--\r\n";
+        $message .= "--boundary-pandat69-mail--\r\n";
 
         // Removed header logging loop
         

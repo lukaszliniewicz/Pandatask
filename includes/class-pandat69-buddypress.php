@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Task_Board_BuddyPress {
+class Pandat69_BuddyPress {
     
     private static $instance;
     
@@ -44,8 +44,8 @@ class Task_Board_BuddyPress {
     public function register_group_extension() {
         // Only register if Groups component is active
         if ( bp_is_active( 'groups' ) ) {
-            require_once TBP_PLUGIN_DIR . 'includes/class-task-board-group-extension.php';
-            bp_register_group_extension( 'Task_Board_Group_Extension' );
+            require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-group-extension.php';
+            bp_register_group_extension( 'Pandat69_Group_Extension' );
         }
     }
 }
