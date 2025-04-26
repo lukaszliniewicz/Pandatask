@@ -26,6 +26,10 @@ require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-db.php';
 require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-shortcode.php';
 require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-ajax.php';
 require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-email.php';
+require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-notifications.php';
+require_once PANDAT69_PLUGIN_DIR . 'includes/class-pandat69-deadline-notifications.php';
+
+
 
 /**
  * Load BuddyPress integration if BuddyPress is active.
@@ -66,6 +70,11 @@ function pandat69_initialize_plugin() {
     if ( class_exists( 'Pandat69_Ajax' ) ) {
         $pandat69_ajax = new Pandat69_Ajax();
         $pandat69_ajax->register();
+    }
+    
+    // Initialize notifications integration
+    if ( class_exists( 'Pandat69_Notifications' ) ) {
+        Pandat69_Notifications::init();
     }
 }
 add_action('plugins_loaded', 'pandat69_initialize_plugin');

@@ -168,7 +168,17 @@ class Pandat69_Shortcode {
                                 <input type="text" id="pandat69-task-deadline" name="deadline" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
                             </div>
                         </div>
-    
+                        <div class="pandat69-form-field">
+                            <label for="pandat69-notify-deadline">
+                                <input type="checkbox" id="pandat69-notify-deadline" name="notify_deadline" value="1">
+                                Enable deadline notifications
+                            </label>
+                            <div class="pandat69-deadline-notification-days" style="margin-top: 8px; display: none;">
+                                <label for="pandat69-notify-days-before">Notify days before deadline:</label>
+                                <input type="number" id="pandat69-notify-days-before" name="notify_days_before" class="pandat69-input" min="1" max="30" value="3">
+                                <p class="description">Users assigned to this task will be notified this many days before the deadline.</p>
+                            </div>
+                        </div>    
                         <div class="pandat69-form-field">
                             <label for="pandat69-task-assigned-search">Assign Persons:</label>
                             <div class="pandat69-user-autocomplete-container">

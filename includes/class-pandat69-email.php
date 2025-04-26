@@ -264,7 +264,95 @@ class Pandat69_Email {
         
         return $result;
     }
-    
+    /**
+     * Send notification for approaching deadline
+     * 
+     * @param int $task_id The task ID
+     * @param int $user_id The user ID to notify
+     * @return bool Whether the email was sent
+     */
+    public static function send_deadline_notification($task_id, $user_id) {
+        // Get task details
+        $task = Pandat69_DB::get_task($task_id);
+        if (!$task || !$task->deadline) {
+            return false;
+        }
+        
+        $user = get_userdata($user_id);
+        if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+            return false;
+        }
+        
+        $admin_email = get_option('admin_email');
+        $site_name = get_bloginfo('name');
+        $days_remaining = max(1, floor((strtotime($task->deadline) - time()) / DAY_IN_SECONDS));
+        
+        // Try to determine task URL
+        $task_url = self::get_task_board_url($task->board_name);
+        
+        // translators: %s: Site name
+        $subject = sprintf(__('Deadline approaching for task on %s', 'pandatask'), $site_name);
+        
+        // --- Plain text email ---
+        // translators: %s: User display name
+        $greeting = sprintf(__('Hello %s,', 'pandatask'), $user->display_name);
+        
+        // translators: %1$s: Task name, %2$d: Number of days
+        $deadline_intro = sprintf(
+            _n(
+                'The deadline for task "%1$s" is approaching (%2$d day remaining).',
+                'The deadline for task "%1$s" is approaching (%2$d days remaining).',
+                $days_remaining,
+                'pandatask'
+            ),
+            $task->name,
+            $days_remaining
+        );
+        
+        // translators: %s: Task name
+        $task_line = sprintf(__('Task: %s', 'pandatask'), $task->name);
+        // translators: %s: Task deadline date
+        $deadline_line = sprintf(__('Deadline: %s', 'pandatask'), $task->deadline);
+        // translators: %s: Task status
+        $status_line = sprintf(__('Status: %s', 'pandatask'), ucfirst(str_replace('-', ' ', $task->status)));
+        // translators: %s: Task priority
+        $priority_line = sprintf(__('Priority: %s', 'pandatask'), $task->priority);
+        
+        $instructions = __('Please login to view the task details and update its status as needed.', 'pandatask');
+        $task_link_line = '';
+        if ($task_url) {
+            // translators: %s: URL to the task board
+            $task_link_line = sprintf(__('View Task Board: %s', 'pandatask'), $task_url) . "\n\n";
+        }
+        $regards = __('Regards,', 'pandatask');
+        $signature = $site_name;
+        
+        $text_message = $greeting . "\n\n" .
+                        $deadline_intro . "\n\n" .
+                        $task_line . "\n" .
+                        $deadline_line . "\n" .
+                        $status_line . "\n" .
+                        $priority_line . "\n\n" .
+                        $instructions . "\n\n" .
+                        $task_link_line .
+                        $regards . "\n" .
+                        $signature;
+        
+        // --- HTML email ---
+        $html_message = '<p>' . esc_html($greeting) . '</p>' .
+                        '<p>' . esc_html($deadline_intro) . '</p>' .
+                        '<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1px solid #ddd;">' .
+                            '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html__('Task', 'pandatask') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                            '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html__('Deadline', 'pandatask') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->deadline) . '</td></tr>' .
+                            '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html__('Status', 'pandatask') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html(ucfirst(str_replace('-', ' ', $task->status))) . '</td></tr>' .
+                            '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html__('Priority', 'pandatask') . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->priority) . '</td></tr>' .
+                        '</table>' .
+                        '<p>' . esc_html($instructions) . '</p>' .
+                        ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html__('View Task Board', 'pandatask') . '</a></p>' : '') .
+                        '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
+        
+        return self::send_email($user->user_email, $subject, $text_message, $html_message);
+    }    
     /**
      * Helper function to try and find a URL for the task board
      */

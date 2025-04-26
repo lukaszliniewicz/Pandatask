@@ -26,24 +26,28 @@ class Pandat69_DB {
 
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 
-        $sql_tasks = "CREATE TABLE $table_tasks (
-            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            board_name VARCHAR(100) NOT NULL,
-            name VARCHAR(255) NOT NULL,
-            description LONGTEXT NULL,
-            status VARCHAR(20) NOT NULL DEFAULT 'pending',
-            category_id BIGINT(20) UNSIGNED NULL,
-            priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
-            deadline DATE NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            KEY board_name (board_name),
-            KEY status (status),
-            KEY priority (priority),
-            KEY deadline (deadline),
-            KEY category_id (category_id)
-        ) $charset_collate;";
+// In class-pandat69-db.php, modify the create_tables() method:
+
+    $sql_tasks = "CREATE TABLE $table_tasks (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        board_name VARCHAR(100) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description LONGTEXT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        category_id BIGINT(20) UNSIGNED NULL,
+        priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
+        deadline DATE NULL,
+        notify_deadline TINYINT(1) NOT NULL DEFAULT 0,
+        notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        KEY board_name (board_name),
+        KEY status (status),
+        KEY priority (priority),
+        KEY deadline (deadline),
+        KEY category_id (category_id)
+    ) $charset_collate;";
         dbDelta( $sql_tasks );
 
         $sql_categories = "CREATE TABLE $table_categories (
@@ -148,6 +152,30 @@ class Pandat69_DB {
         }
 
         return $results;
+    }
+
+    public static function update_db_check() {
+        $current_version = get_option('pandat69_db_version', '1.0.0');
+        
+        if (version_compare($current_version, '1.0.8', '<')) {
+            global $wpdb;
+            $prefix = self::get_db_prefix();
+            $table_tasks = $prefix . 'tasks';
+            
+            // Check if columns exist before adding
+            $columns = $wpdb->get_results("SHOW COLUMNS FROM $table_tasks");
+            $column_names = wp_list_pluck($columns, 'Field');
+            
+            if (!in_array('notify_deadline', $column_names)) {
+                $wpdb->query("ALTER TABLE $table_tasks ADD COLUMN notify_deadline TINYINT(1) NOT NULL DEFAULT 0");
+            }
+            
+            if (!in_array('notify_days_before', $column_names)) {
+                $wpdb->query("ALTER TABLE $table_tasks ADD COLUMN notify_days_before INT UNSIGNED NOT NULL DEFAULT 3");
+            }
+            
+            update_option('pandat69_db_version', '1.0.8');
+        }
     }
 
     public static function get_task($task_id) {
@@ -367,6 +395,7 @@ class Pandat69_DB {
         }
 
         // Find users to add
+        // Find users to add
         $users_to_add = array_diff($new_assigned_ids, $current_assigned_ids);
         if (!empty($users_to_add)) {
             foreach ($users_to_add as $user_id) {
@@ -380,6 +409,17 @@ class Pandat69_DB {
             // Send email notifications to newly assigned users
             if (class_exists('Pandat69_Email')) {
                 Pandat69_Email::send_assignment_notification($task_id, $users_to_add);
+            }
+            
+            // Add BP notifications for assignment
+            if (class_exists('Pandat69_Notifications')) {
+                $current_user_id = get_current_user_id();
+                foreach ($users_to_add as $user_id) {
+                    // Skip if assigning to yourself
+                    if ($user_id != $current_user_id) {
+                        Pandat69_Notifications::add_assignment_notification($task_id, $user_id, $current_user_id);
+                    }
+                }
             }
         }
     }

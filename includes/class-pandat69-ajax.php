@@ -136,6 +136,8 @@ class Pandat69_Ajax {
              'priority' => absint($_POST['priority']),
              'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
              'assigned_persons' => $assigned_persons,
+             'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
+             'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
         );
 
          // Validate deadline format if provided
@@ -191,6 +193,8 @@ class Pandat69_Ajax {
              'priority' => absint($_POST['priority']),
              'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
              'assigned_persons' => $assigned_persons,
+             'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
+             'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
         );
 
          // Validate deadline format if provided
@@ -303,9 +307,15 @@ class Pandat69_Ajax {
         }
     
         // Process @mentions in format @[Username](123)
-        $comment_text = preg_replace_callback('/@\[(.*?)\]\((\d+)\)/', function($matches) {
+        $mentioned_users = array(); // Track mentioned users for notifications
+        $comment_text = preg_replace_callback('/@\[(.*?)\]\((\d+)\)/', function($matches) use (&$mentioned_users) {
             $mentioned_user_name = $matches[1];
             $mentioned_user_id = intval($matches[2]);
+            
+            // Add to our tracking array for notifications
+            if (!in_array($mentioned_user_id, $mentioned_users)) {
+                $mentioned_users[] = $mentioned_user_id;
+            }
             
             // Verify user exists
             $user = get_userdata($mentioned_user_id);
@@ -325,6 +335,35 @@ class Pandat69_Ajax {
         $comment = Pandat69_DB::add_comment($task_id, $user_id, $comment_text);
     
         if ($comment) {
+            // Get task to find assigned users for notifications
+            $task = Pandat69_DB::get_task($task_id);
+            
+            // Send email notifications to assigned users
+            if (class_exists('Pandat69_Email')) {
+                Pandat69_Email::send_comment_notification($task_id, $user_id, $comment_text);
+            }
+            
+            // Add BuddyPress notifications
+            if (class_exists('Pandat69_Notifications') && $task) {
+                // 1. Send comment notifications to assigned users
+                if (!empty($task->assigned_user_ids)) {
+                    foreach ($task->assigned_user_ids as $assigned_id) {
+                        // Skip sending to the commenter themselves
+                        if ($assigned_id != $user_id) {
+                            Pandat69_Notifications::add_comment_notification($task_id, $assigned_id, $user_id);
+                        }
+                    }
+                }
+                
+                // 2. Send mention notifications
+                foreach ($mentioned_users as $mentioned_id) {
+                    // Skip if mentioning yourself
+                    if ($mentioned_id != $user_id) {
+                        Pandat69_Notifications::add_mention_notification($task_id, $mentioned_id, $user_id);
+                    }
+                }
+            }
+            
             wp_send_json_success(array('message' => 'Comment added successfully.', 'comment' => $comment));
         } else {
             wp_send_json_error(array('message' => 'Failed to add comment.'));
