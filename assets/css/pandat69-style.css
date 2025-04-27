@@ -1348,3 +1348,70 @@ div.pandat69-container,
         gap: 5px;
     }
 }
+
+/* Archive Tab */
+.pandat69-container .pandat69-tab-archive .pandat69-archive-info {
+    background-color: #f0f4f8;
+    padding: 10px 15px;
+    border-left: 4px solid #384D68;
+    margin-bottom: 20px;
+    font-size: 0.95em;
+    color: #5d6b7b;
+}
+
+.pandat69-container .pandat69-archive-task-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pandat69-container .pandat69-task-item.pandat69-archived-task {
+    background-color: #f9f9f9;
+    border-left: 3px solid #9e9e9e;
+    opacity: 0.85;
+}
+
+.pandat69-container .pandat69-unarchive-task-btn,
+.pandat69-container .pandat69-unarchive-task-detail-btn {
+    color: #0073aa;
+}
+
+.pandat69-container .pandat69-archive-task-btn,
+.pandat69-container .pandat69-archive-task-detail-btn {
+    color: #9e9e9e;
+}
+
+.pandat69-container .pandat69-unarchive-task-detail-btn {
+    background-color: #f0f4f8;
+    border-color: #0073aa;
+}
+
+.pandat69-container .pandat69-unarchive-task-detail-btn:hover {
+    background-color: #0073aa;
+    color: #fff;
+}
+
+.pandat69-container .pandat69-no-tasks {
+    padding: 15px;
+    color: #5d6b7b;
+    text-align: center;
+    font-style: italic;
+    background-color: #f9f9f9;
+    border: 1px dashed #e0e5eb;
+    margin: 10px 0;
+}
+
+/* Add a subtle visual indicator for archived tasks */
+.pandat69-tab-archive .pandat69-task-item {
+    border-left-color: #9e9e9e;
+    background-color: #f9f9f9;
+}
+
+.pandat69-tab-archive .pandat69-task-item::before {
+    content: "📥";
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    opacity: 0.3;
+    font-size: 1.2em;
+}

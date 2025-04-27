@@ -10,56 +10,49 @@ class Pandat69_Email {
      * 
      * @param int $task_id The task ID
      * @param array $new_user_ids Array of newly assigned user IDs
+     * @param string $role The role of the assignment ('assignee' or 'supervisor')
      * @return void
      */
-    public static function send_assignment_notification($task_id, $new_user_ids) {
-        // Removed log_message call
-        
+    public static function send_assignment_notification($task_id, $new_user_ids, $role = 'assignee') {
         if (empty($new_user_ids)) {
-            // Removed log_message call
             return;
         }
         
         // Get task details
         $task = Pandat69_DB::get_task($task_id);
         if (!$task) {
-            // Removed log_message call
             return;
         }
-        
-        // Removed log_message call
         
         $admin_email = get_option('admin_email'); // Used for 'From' address fallback
         $site_name = get_bloginfo('name');
         $site_url = home_url();
+        $role_display = ($role === 'supervisor') ? 'supervisor for' : 'to';
         
         // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name);
-        // Removed log_message call
         
         foreach ($new_user_ids as $user_id) {
             $user = get_userdata($user_id);
             if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
-                // Removed log_message call
                 continue;
             }
             
-            // Removed log_message call
-            
-            // translators: %s: Site name.
-            $subject = sprintf(__('You have been assigned to a task on %s', 'pandatask'), $site_name);
+            // translators: %1$s: role (to/supervisor for), %2$s: Site name.
+            $subject = sprintf(__('You have been assigned as %1$s a task on %2$s', 'pandatask'), $role_display, $site_name);
             
             // --- Plain text email ---
             // translators: %s: User display name.
             $greeting = sprintf( __('Hello %s,', 'pandatask'), $user->display_name );
-            $assignment_intro = __('You have been assigned to the following task:', 'pandatask');
+            // translators: %s: role (to/supervisor for)
+            $assignment_intro = sprintf( __('You have been assigned as %s the following task:', 'pandatask'), $role_display );
             // translators: %s: Task name.
             $task_line = sprintf( __('Task: %s', 'pandatask'), $task->name );
-             // translators: %s: Task status (e.g., "Pending", "In Progress").
+            // translators: %s: Task status (e.g., "Pending", "In Progress").
             $status_line = sprintf( __('Status: %s', 'pandatask'), ucfirst(str_replace('-', ' ', $task->status)) );
-             // translators: %s: Task priority number (1-10).
+            // translators: %s: Task priority number (1-10).
             $priority_line = sprintf( __('Priority: %s', 'pandatask'), $task->priority );
-             // translators: %s: Task deadline string (e.g., "YYYY-MM-DD" or "No deadline").
+            // translators: %s: Task deadline string (e.g., "YYYY-MM-DD" or "No deadline").
             $deadline_line = sprintf( __('Deadline: %s', 'pandatask'), $task->deadline ?: __('No deadline', 'pandatask') );
             $instructions = __('Please login to view the task details and update its status as needed.', 'pandatask');
             $task_link_line = '';
@@ -68,7 +61,6 @@ class Pandat69_Email {
                 $task_link_line = sprintf( __('View Task Board: %s', 'pandatask'), $task_url ) . "\n\n";
             }
             $regards = __('Regards,', 'pandatask');
-             // FIX: Directly use the site name variable, don't try to translate '%s'.
             $signature = $site_name; 
 
             $text_message = $greeting . "\n\n" .
@@ -83,7 +75,6 @@ class Pandat69_Email {
                             $signature; // Use the variable directly
             
             // --- HTML email ---
-            // Note: The HTML version correctly uses esc_html($site_name) directly, no change needed here.
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($assignment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
@@ -109,60 +100,68 @@ class Pandat69_Email {
      * @return void
      */
     public static function send_comment_notification($task_id, $comment_user_id, $comment_text) {
-        // Removed log_message call
-        
         // Get task details
         $task = Pandat69_DB::get_task($task_id);
-        if (!$task || empty($task->assigned_user_ids)) {
-            // Removed log_message call
+        if (!$task) {
             return;
         }
         
-        // Removed log_message call
+        // Collect all notification recipients (assignees and supervisors)
+        $notification_recipients = array();
+
+        // Add assignees
+        if (!empty($task->assigned_user_ids)) {
+            $notification_recipients = array_merge($notification_recipients, $task->assigned_user_ids);
+        }
+
+        // Add supervisors
+        if (!empty($task->supervisor_user_ids)) {
+            $notification_recipients = array_merge($notification_recipients, $task->supervisor_user_ids);
+        }
+
+        // Remove duplicates
+        $notification_recipients = array_unique($notification_recipients);
+
+        // If no recipients, exit
+        if (empty($notification_recipients)) {
+            return;
+        }
         
         $admin_email = get_option('admin_email'); // Used for 'From' address fallback
         $site_name = get_bloginfo('name');
         $commenter = get_userdata($comment_user_id);
         
         if (!$commenter || !is_a($commenter, 'WP_User')) {
-             // translators: Fallback name if the user who commented cannot be found.
+            // translators: Fallback name if the user who commented cannot be found.
             $commenter_name = __('A user', 'pandatask');
-            // Removed log_message call
         } else {
             $commenter_name = $commenter->display_name;
-            // Removed log_message call
         }
         
         // Clean up comment text for *plain text* email (keep HTML for HTML version)
         $plain_text_comment = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="pandat69-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $comment_text));
-        // Removed log_message call
         
         // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name);
-        // Removed log_message call
         
-        foreach ($task->assigned_user_ids as $user_id) {
+        foreach ($notification_recipients as $user_id) {
             // Skip sending notification to the commenter themselves
             if ($user_id == $comment_user_id) {
-                // Removed log_message call
                 continue;
             }
             
             $user = get_userdata($user_id);
             if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
-                // Removed log_message call
                 continue;
             }
             
-            // Removed log_message call
-            
-             // translators: %s: Task name.
+            // translators: %s: Task name.
             $subject = sprintf(__('New comment on task: %s', 'pandatask'), $task->name);
             
             // --- Plain text email ---
             // translators: %s: User display name.
             $greeting = sprintf( __('Hello %s,', 'pandatask'), $user->display_name );
-             // translators: %s: Name of the user who added the comment.
+            // translators: %s: Name of the user who added the comment.
             $comment_intro = sprintf( __('%s has commented on a task you are assigned to:', 'pandatask'), $commenter_name );
             // translators: %s: Task name.
             $task_line = sprintf( __('Task: %s', 'pandatask'), $task->name );
@@ -175,7 +174,6 @@ class Pandat69_Email {
                 $task_link_line = sprintf( __('View Task Board: %s', 'pandatask'), $task_url ) . "\n\n";
             }
             $regards = __('Regards,', 'pandatask');
-             // FIX: Directly use the site name variable, don't try to translate '%s'.
             $signature = $site_name;
 
             $text_message = $greeting . "\n\n" .
@@ -188,7 +186,6 @@ class Pandat69_Email {
                             $signature; // Use the variable directly
             
             // --- HTML email ---
-            // Note: The HTML version correctly uses esc_html($site_name) directly, no change needed here.
             $html_message = '<p>' . esc_html($greeting) . '</p>' .
                             '<p>' . esc_html($comment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .

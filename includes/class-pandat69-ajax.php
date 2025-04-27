@@ -18,6 +18,7 @@ class Pandat69_Ajax {
             'add_comment',
             'fetch_users',
             'quick_update_status',
+            'toggle_archive_task', 
         );
 
         foreach ($ajax_actions as $action) {
@@ -58,6 +59,9 @@ class Pandat69_Ajax {
         $start_date = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
         $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
         
+        // Add archived parameter (default to 0 - unarchived)
+        $archived = isset($_POST['archived']) ? intval($_POST['archived']) : 0;
+        
         // Validate date format if provided (YYYY-MM-DD)
         if (!empty($start_date) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
             $start_date = ''; // Invalid format
@@ -74,7 +78,7 @@ class Pandat69_Ajax {
             wp_send_json_error(array('message' => 'Board name is required.'));
         }
     
-        $tasks = Pandat69_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date);
+        $tasks = Pandat69_DB::get_tasks($board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived);
     
         if (is_array($tasks)) {
             wp_send_json_success(array('tasks' => $tasks));
@@ -107,7 +111,7 @@ class Pandat69_Ajax {
     public function add_task() {
         $this->verify_nonce();
         $this->check_permissions();
-
+    
         // Basic validation
         $required_fields = ['board_name', 'name', 'status', 'priority'];
         foreach($required_fields as $field) {
@@ -115,7 +119,7 @@ class Pandat69_Ajax {
                  wp_send_json_error(array('message' => 'Missing required field: ' . $field));
             }
         }
-
+    
         // Process assigned users - handle both array and comma-separated string
         $assigned_persons = [];
         if (!empty($_POST['assigned_persons'])) {
@@ -126,7 +130,18 @@ class Pandat69_Ajax {
                 $assigned_persons = array_map('absint', explode(',', $_POST['assigned_persons']));
             }
         }
-
+        
+        // Process supervisor users - handle both array and comma-separated string
+        $supervisor_persons = [];
+        if (!empty($_POST['supervisor_persons'])) {
+            if (is_array($_POST['supervisor_persons'])) {
+                $supervisor_persons = array_map('absint', $_POST['supervisor_persons']);
+            } elseif (is_string($_POST['supervisor_persons'])) {
+                // Handle comma-separated string format from our autocomplete UI
+                $supervisor_persons = array_map('absint', explode(',', $_POST['supervisor_persons']));
+            }
+        }
+    
         $data = array(
              'board_name' => sanitize_key($_POST['board_name']),
              'name' => sanitize_text_field($_POST['name']),
@@ -136,17 +151,18 @@ class Pandat69_Ajax {
              'priority' => absint($_POST['priority']),
              'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
              'assigned_persons' => $assigned_persons,
+             'supervisor_persons' => $supervisor_persons, // Add supervisor persons
              'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
              'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
         );
-
+    
          // Validate deadline format if provided
          if ($data['deadline'] && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['deadline'])) {
               wp_send_json_error(array('message' => 'Invalid deadline format. Use YYYY-MM-DD.'));
          }
-
+    
         $task_id = Pandat69_DB::add_task($data);
-
+    
         if ($task_id) {
             // Optionally fetch the newly added task to return full data
             $new_task = Pandat69_DB::get_task($task_id);
@@ -156,16 +172,16 @@ class Pandat69_Ajax {
         }
     }
 
-     public function update_task() {
+    public function update_task() {
         $this->verify_nonce();
         $this->check_permissions();
-
+    
         $task_id = isset($_POST['task_id']) ? absint($_POST['task_id']) : 0;
-
+    
         if (!$task_id) {
              wp_send_json_error(array('message' => 'Invalid Task ID.'));
         }
-
+    
          // Basic validation
         $required_fields = ['name', 'status', 'priority'];
         foreach($required_fields as $field) {
@@ -173,7 +189,7 @@ class Pandat69_Ajax {
                  wp_send_json_error(array('message' => 'Missing required field: ' . $field));
             }
         }
-
+    
         // Process assigned users - handle both array and comma-separated string
         $assigned_persons = [];
         if (!empty($_POST['assigned_persons'])) {
@@ -184,7 +200,18 @@ class Pandat69_Ajax {
                 $assigned_persons = array_map('absint', explode(',', $_POST['assigned_persons']));
             }
         }
-
+        
+        // Process supervisor users - handle both array and comma-separated string
+        $supervisor_persons = [];
+        if (!empty($_POST['supervisor_persons'])) {
+            if (is_array($_POST['supervisor_persons'])) {
+                $supervisor_persons = array_map('absint', $_POST['supervisor_persons']);
+            } elseif (is_string($_POST['supervisor_persons'])) {
+                // Handle comma-separated string format from our autocomplete UI
+                $supervisor_persons = array_map('absint', explode(',', $_POST['supervisor_persons']));
+            }
+        }
+    
         $data = array(
              'name' => sanitize_text_field($_POST['name']),
              'description' => isset($_POST['description']) ? wp_kses_post($_POST['description']) : '',
@@ -193,17 +220,18 @@ class Pandat69_Ajax {
              'priority' => absint($_POST['priority']),
              'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
              'assigned_persons' => $assigned_persons,
+             'supervisor_persons' => $supervisor_persons, // Add supervisor persons
              'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
              'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
         );
-
+    
          // Validate deadline format if provided
          if ($data['deadline'] && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['deadline'])) {
               wp_send_json_error(array('message' => 'Invalid deadline format. Use YYYY-MM-DD.'));
          }
-
+    
         $result = Pandat69_DB::update_task($task_id, $data);
-
+    
         if ($result) {
              // Optionally fetch the updated task to return full data
             $updated_task = Pandat69_DB::get_task($task_id);
@@ -367,6 +395,33 @@ class Pandat69_Ajax {
             wp_send_json_success(array('message' => 'Comment added successfully.', 'comment' => $comment));
         } else {
             wp_send_json_error(array('message' => 'Failed to add comment.'));
+        }
+    }
+
+    public function toggle_archive_task() {
+        $this->verify_nonce();
+        $this->check_permissions();
+    
+        $task_id = isset($_POST['task_id']) ? absint($_POST['task_id']) : 0;
+        $archive = isset($_POST['archive']) ? absint($_POST['archive']) : 1; // Default to archive
+    
+        if (!$task_id) {
+            wp_send_json_error(array('message' => 'Invalid Task ID.'));
+        }
+    
+        // Only update the archived field
+        $data = array(
+            'archived' => $archive
+        );
+    
+        $result = Pandat69_DB::update_task($task_id, $data);
+    
+        if ($result) {
+            wp_send_json_success(array(
+                'message' => $archive ? 'Task archived successfully.' : 'Task restored from archive.'
+            ));
+        } else {
+            wp_send_json_error(array('message' => 'Failed to update archive status.'));
         }
     }
 

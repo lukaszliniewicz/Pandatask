@@ -47,6 +47,7 @@ class Pandat69_Shortcode {
                     <li class="pandat69-tab-item active" data-tab="all">Task List</li>
                     <li class="pandat69-tab-item" data-tab="week">Week Overview</li>
                     <li class="pandat69-tab-item" data-tab="month">Month Overview</li>
+                    <li class="pandat69-tab-item" data-tab="archive">Archive</li>
                 </ul>
                 
                 <!-- "All" tab - existing content -->
@@ -103,6 +104,18 @@ class Pandat69_Shortcode {
                     </div>
                     <div class="pandat69-month-task-container">
                         <!-- Month tasks will be loaded here -->
+                    </div>
+                </div>
+                <!-- Archive tab -->
+                <div class="pandat69-tab-content pandat69-tab-archive">
+                    <div class="pandat69-controls">
+                        <p class="pandat69-archive-info">Archived tasks are stored here. They can be restored or permanently deleted.</p>
+                    </div>
+                    <div class="pandat69-archive-container">
+                        <div class="pandat69-loading" style="display: none;">Loading archived tasks...</div>
+                        <ul class="pandat69-archive-task-list">
+                            <!-- Archived tasks will be loaded here by JavaScript -->
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -188,7 +201,16 @@ class Pandat69_Shortcode {
                                 <!-- Hidden field to store the actual user IDs -->
                                 <input type="hidden" id="pandat69-task-assigned" name="assigned_persons" value="">
                             </div>
-                        </div>
+                        <div class="pandat69-form-field pandat69-supervisor-container">
+                            <label for="pandat69-task-supervisor-search">Task Supervisors:</label>
+                            <div class="pandat69-user-autocomplete-container">
+                                <input type="text" id="pandat69-task-supervisor-search" class="pandat69-input pandat69-user-search-input" placeholder="Type to search users...">
+                                <div class="pandat69-user-suggestions" style="display: none;"></div>
+                                <div class="pandat69-selected-users-container"></div>
+                                <!-- Hidden field to store the supervisor IDs -->
+                                <input type="hidden" id="pandat69-task-supervisor" name="supervisor_persons" value="">
+                            </div>
+                        </div>`
     
                         <div class="pandat69-form-actions">
                             <button type="submit" class="pandat69-button pandat69-submit-task-btn">Save Task</button>

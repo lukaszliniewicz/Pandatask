@@ -147,6 +147,25 @@ class Pandat69_Notifications {
                 // Generate the link to the task board
                 $link = self::get_task_board_url($task->board_name);
                 break;
+            case 'task_supervision':
+                // Get the task details
+                $task = Pandat69_DB::get_task($item_id);
+                if (!$task) return $action;
+                
+                // Get the assigner's details
+                $assigner = get_userdata($secondary_item_id);
+                $assigner_name = $assigner ? $assigner->display_name : __('Someone', 'pandatask');
+                
+                // Create the notification text
+                $title = sprintf(
+                    __('%s assigned you as supervisor to task: %s', 'pandatask'),
+                    $assigner_name,
+                    $task->name
+                );
+                
+                // Generate the link to the task board
+                $link = self::get_task_board_url($task->board_name);
+                break;
                 
             default:
                 return $action;
@@ -202,16 +221,6 @@ class Pandat69_Notifications {
             array('is_new' => 0),
             array('id' => $notification_id)
         );
-        
-        // Optionally, redirect to clean URL (removes notification parameters)
-        // Uncomment if you want to clean the URL after processing
-        /*
-        $redirect_url = remove_query_arg(
-            array('pandat69_notification_id', 'pandat69_notification_action')
-        );
-        wp_redirect($redirect_url);
-        exit;
-        */
     }
     
     /**
@@ -222,17 +231,19 @@ class Pandat69_Notifications {
      * @param int $assigner_id The user who made the assignment
      * @return bool|int False on failure, notification ID on success
      */
-    public static function add_assignment_notification($task_id, $user_id, $assigner_id) {
+    public static function add_assignment_notification($task_id, $user_id, $assigner_id, $role = 'assignee') {
         if (!self::is_bp_notifications_active()) {
             return false;
         }
+        
+        $component_action = ($role === 'supervisor') ? 'task_supervision' : 'task_assignment';
         
         return bp_notifications_add_notification(array(
             'user_id'           => $user_id,
             'item_id'           => $task_id,
             'secondary_item_id' => $assigner_id,
             'component_name'    => 'pandatask',
-            'component_action'  => 'task_assignment',
+            'component_action'  => $component_action,
             'date_notified'     => bp_core_current_time(),
             'is_new'            => 1,
         ));

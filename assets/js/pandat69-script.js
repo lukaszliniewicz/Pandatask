@@ -105,6 +105,7 @@ jQuery(document).ready(function($) {
 
         // User search input
         setupUserAutocomplete();
+        setupSupervisorAutocomplete();
 
         // Week navigation buttons
         $('.pandat69-prev-week').on('click', function() {
@@ -229,20 +230,22 @@ jQuery(document).ready(function($) {
     function setupTabs() {
         $('.pandat69-tab-item').on('click', function() {
             const tabId = $(this).data('tab');
-
+    
             // Update active state
             $('.pandat69-tab-item').removeClass('active');
             $(this).addClass('active');
-
+    
             // Show selected tab content
             $('.pandat69-tab-content').removeClass('active');
             $(`.pandat69-tab-${tabId}`).addClass('active');
-
+    
             // Load data if needed
             if (tabId === 'week') {
                 loadWeekTasks();
             } else if (tabId === 'month') {
                 loadMonthTasks();
+            } else if (tabId === 'archive') {
+                loadArchivedTasks();
             }
         });
     }
@@ -299,10 +302,10 @@ jQuery(document).ready(function($) {
         const searchTerm = $('.pandat69-search-input').val();
         const sortValue = $('.pandat69-sort-select').val();
         const statusFilter = $('.pandat69-status-filter-select').val();
-
+    
         $('.pandat69-loading').show();
         $('.pandat69-task-list').first().hide();
-
+    
         $.ajax({
             url: pandat69_ajax_object.ajax_url,
             type: 'POST',
@@ -312,7 +315,8 @@ jQuery(document).ready(function($) {
                 board_name: boardName,
                 search: searchTerm,
                 sort: sortValue,
-                status_filter: statusFilter
+                status_filter: statusFilter,
+                archived: 0 
             },
             success: function(response) {
                 if (response.success && response.data.tasks) {
@@ -334,13 +338,13 @@ jQuery(document).ready(function($) {
     function loadWeekTasks() {
         const $container = $('.pandat69-container');
         const boardName = $container.data('board-name');
-
+    
         // Format dates for API
         const weekStart = formatDate(currentWeekStart);
         const weekEnd = formatDate(new Date(currentWeekStart.getTime() + (6 * 24 * 60 * 60 * 1000)));
-
+    
         $('.pandat69-week-task-container').html('<div class="pandat69-loading">Loading...</div>');
-
+    
         $.ajax({
             url: pandat69_ajax_object.ajax_url,
             type: 'POST',
@@ -350,7 +354,8 @@ jQuery(document).ready(function($) {
                 board_name: boardName,
                 date_filter: 'range',
                 start_date: weekStart,
-                end_date: weekEnd
+                end_date: weekEnd,
+                archived: 0 
             },
             success: function(response) {
                 if (response.success && response.data.tasks) {
@@ -370,18 +375,18 @@ jQuery(document).ready(function($) {
     function loadMonthTasks() {
         const $container = $('.pandat69-container');
         const boardName = $container.data('board-name');
-
+    
         // Get first and last day of month
         const year = currentMonthDate.getFullYear();
         const month = currentMonthDate.getMonth();
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
-
+    
         const monthStart = formatDate(firstDay);
         const monthEnd = formatDate(lastDay);
-
+    
         $('.pandat69-month-task-container').html('<div class="pandat69-loading">Loading...</div>');
-
+    
         $.ajax({
             url: pandat69_ajax_object.ajax_url,
             type: 'POST',
@@ -391,7 +396,8 @@ jQuery(document).ready(function($) {
                 board_name: boardName,
                 date_filter: 'range',
                 start_date: monthStart,
-                end_date: monthEnd
+                end_date: monthEnd,
+                archived: 0 
             },
             success: function(response) {
                 if (response.success && response.data.tasks) {
@@ -408,10 +414,9 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // Create a reusable function to render task items consistently
-    function renderTaskItem(task) {
+    function renderTaskItem(task, isArchived = false) {
         return `
-        <li class="pandat69-task-item" data-task-id="${task.id}">
+        <li class="pandat69-task-item ${isArchived ? 'pandat69-archived-task' : ''}" data-task-id="${task.id}">
             <div class="pandat69-task-item-details">
                 <div class="pandat69-task-item-name">${task.name}</div>
                 <div class="pandat69-task-item-meta">
@@ -420,13 +425,126 @@ jQuery(document).ready(function($) {
                     ${task.deadline ? `<span><strong>Deadline:</strong> ${task.deadline}</span>` : ''}
                     <span><strong>Category:</strong> ${task.category_name}</span>
                     <span><strong>Assigned to:</strong> ${task.assigned_user_names}</span>
+                    <span><strong>Supervisors:</strong> ${task.supervisor_user_names}</span>
                 </div>
             </div>
             <div class="pandat69-task-item-actions">
                 <button type="button" class="pandat69-icon-button pandat69-edit-task-btn" title="Edit Task">✏️</button>
                 <button type="button" class="pandat69-icon-button pandat69-delete-task-btn" title="Delete Task">🗑️</button>
+                ${isArchived ? 
+                    `<button type="button" class="pandat69-icon-button pandat69-unarchive-task-btn" title="Restore from Archive">🔄</button>` : 
+                    `<button type="button" class="pandat69-icon-button pandat69-archive-task-btn" title="Archive Task">📥</button>`
+                }
             </div>
         </li>`;
+    }
+
+    function loadArchivedTasks() {
+        const $container = $('.pandat69-container');
+        const boardName = $container.data('board-name');
+        
+        $('.pandat69-archive-task-list').hide();
+        $('.pandat69-tab-archive .pandat69-loading').show();
+        
+        $.ajax({
+            url: pandat69_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'pandat69_fetch_tasks',
+                nonce: pandat69_ajax_object.nonce,
+                board_name: boardName,
+                archived: 1 // Explicitly request archived tasks
+            },
+            success: function(response) {
+                if (response.success && response.data.tasks) {
+                    renderArchivedTasks(response.data.tasks);
+                } else {
+                    console.error('Error loading archived tasks:', response.data?.message || 'Unknown error');
+                    $('.pandat69-archive-task-list').html('<li class="pandat69-no-tasks">No archived tasks found.</li>').show();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', error);
+                $('.pandat69-archive-task-list').html('<li class="pandat69-no-tasks">Error loading archived tasks.</li>').show();
+            },
+            complete: function() {
+                $('.pandat69-tab-archive .pandat69-loading').hide();
+            }
+        });
+    }
+    
+    function renderArchivedTasks(tasks) {
+        const $taskList = $('.pandat69-archive-task-list');
+        $taskList.empty();
+    
+        if (tasks.length === 0) {
+            $taskList.html('<li class="pandat69-no-tasks">No archived tasks found.</li>');
+            return;
+        }
+    
+        tasks.forEach(task => {
+            $taskList.append(renderTaskItem(task, true)); // Pass true to indicate these are archived tasks
+        });
+    
+        // Reattach event handlers
+        attachTaskEventHandlers();
+        
+        // Show the task list
+        $taskList.show();
+    }
+    
+    function archiveTask(taskId) {
+        if (!confirm('Are you sure you want to archive this task?')) {
+            return;
+        }
+    
+        toggleArchiveTask(taskId, true);
+    }
+    
+    function unarchiveTask(taskId) {
+        toggleArchiveTask(taskId, false);
+    }
+    
+    function toggleArchiveTask(taskId, archive = true) {
+        $.ajax({
+            url: pandat69_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'pandat69_toggle_archive_task',
+                nonce: pandat69_ajax_object.nonce,
+                task_id: taskId,
+                archive: archive ? 1 : 0
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Reload appropriate task list based on current tab
+                    if ($('.pandat69-tab-archive').hasClass('active')) {
+                        loadArchivedTasks();
+                    } else {
+                        loadTasks();
+                    }
+                    
+                    // Close any open task details
+                    $('.pandat69-task-details-expandable').slideUp(function() {
+                        $(this).remove();
+                    });
+                    
+                    // Also reload calendar views if needed
+                    if ($('.pandat69-tab-week').hasClass('active')) {
+                        loadWeekTasks();
+                    } else if ($('.pandat69-tab-month').hasClass('active')) {
+                        loadMonthTasks();
+                    }
+                } else {
+                    console.error('Error toggling archive status:', response.data?.message || 'Unknown error');
+                    alert('Failed to update archive status. Please try again.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', error);
+                alert('Failed to update archive status. Please try again.');
+            }
+        });
     }
 
     function renderTasks(tasks) {
@@ -579,14 +697,28 @@ jQuery(document).ready(function($) {
             const taskId = $(this).closest('.pandat69-task-item').data('task-id');
             editTask(taskId);
         });
-
+    
         // Delete task button
         $('.pandat69-delete-task-btn').off('click').on('click', function(e) {
             e.stopPropagation();
             const taskId = $(this).closest('.pandat69-task-item').data('task-id');
             deleteTask(taskId);
         });
-
+    
+        // Archive task button
+        $('.pandat69-archive-task-btn').off('click').on('click', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
+            archiveTask(taskId);
+        });
+        
+        // Unarchive task button
+        $('.pandat69-unarchive-task-btn').off('click').on('click', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
+            unarchiveTask(taskId);
+        });
+    
         // Task item click (show details)
         $('.pandat69-task-item').off('click').on('click', function() {
             const taskId = $(this).data('task-id');
@@ -686,6 +818,9 @@ jQuery(document).ready(function($) {
     }
 
     function renderTaskDetails(task, container) {
+        // Check if we're in archive tab directly via the task DOM context
+        const isInArchiveTab = container.closest('.pandat69-tab-archive').length > 0;
+        
         // Create HTML for task details
         let html = `
             <div class="pandat69-task-details-content">
@@ -709,29 +844,37 @@ jQuery(document).ready(function($) {
                 <div class="pandat69-detail-item">
                     <span class="pandat69-detail-label">Assigned to:</span>
                     <span class="pandat69-detail-value">${task.assigned_user_names}</span>
+                </div>
+                <div class="pandat69-detail-item">
+                    <span class="pandat69-detail-label">Supervisors:</span>
+                    <span class="pandat69-detail-value">${task.supervisor_user_names}</span>
                 </div>`;
-
+    
         if (task.description) {
             html += `
                 <div class="pandat69-task-details-description">
                     ${task.description}
                 </div>`;
         }
-
+    
         html += `
                 <div class="pandat69-task-details-actions">
                     <button type="button" class="pandat69-button pandat69-edit-task-detail-btn" data-task-id="${task.id}">Edit Task</button>
                     <button type="button" class="pandat69-button pandat69-button-danger pandat69-delete-task-detail-btn" data-task-id="${task.id}">Delete Task</button>
                     <button type="button" class="pandat69-button pandat69-change-status-btn" data-task-id="${task.id}" data-current-status="${task.status}">Change Status</button>
+                    ${isInArchiveTab ? 
+                        `<button type="button" class="pandat69-button pandat69-unarchive-task-detail-btn" data-task-id="${task.id}">Restore from Archive</button>` :
+                        `<button type="button" class="pandat69-button pandat69-archive-task-detail-btn" data-task-id="${task.id}">Archive Task</button>`
+                    }
                 </div>
             </div>`;
-
+    
         // Comments section
         html += `
             <div class="pandat69-task-comments">
                 <h4>Comments</h4>
                 <ul class="pandat69-comment-list">`;
-
+    
         if (task.comments && task.comments.length > 0) {
             task.comments.forEach(function(comment) {
                 html += `
@@ -746,7 +889,7 @@ jQuery(document).ready(function($) {
         } else {
             html += '<li class="pandat69-no-comments">No comments yet.</li>';
         }
-
+    
         html += `
                 </ul>
                 <div class="pandat69-add-comment-form">
@@ -757,25 +900,34 @@ jQuery(document).ready(function($) {
                     </div>
                 </div>
             </div>`;
-
+    
         // Update container and attach event handlers
         container.html(html);
-
+    
         // Add event handlers
         container.find('.pandat69-edit-task-detail-btn').on('click', function() {
             editTask(task.id);
         });
-
+    
         container.find('.pandat69-delete-task-detail-btn').on('click', function() {
             deleteTask(task.id);
         });
-
+    
         container.find('.pandat69-add-comment-btn').on('click', function() {
             addComment(task.id, container);
         });
-
+    
         container.find('.pandat69-change-status-btn').on('click', function() {
             showStatusDropdown($(this), task.id, task.status);
+        });
+    
+        // Archive/Unarchive buttons
+        container.find('.pandat69-archive-task-detail-btn').on('click', function() {
+            archiveTask(task.id);
+        });
+    
+        container.find('.pandat69-unarchive-task-detail-btn').on('click', function() {
+            unarchiveTask(task.id);
         });
     }
 
@@ -980,6 +1132,8 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-category').val('');
         $form.find('#pandat69-task-assigned').val('');
         $form.find('.pandat69-selected-users-container').empty();
+        $form.find('#pandat69-task-supervisor').val('');
+        $form.find('.pandat69-supervisor-container .pandat69-selected-users-container').empty();
 
         // Reset TinyMCE if active
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
@@ -998,11 +1152,9 @@ jQuery(document).ready(function($) {
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Add New Task');
     }
 
-    // ---- MODIFIED Function ----
-    // NOTE: The original function was `fillTaskForm`, using that name instead of `populateTaskForm`
     function fillTaskForm(task) {
         const $form = $('.pandat69-task-form');
-
+    
         // Set basic fields
         $form.find('#pandat69-task-id').val(task.id);
         $form.find('#pandat69-task-name').val(task.name);
@@ -1010,22 +1162,23 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-priority').val(task.priority);
         $form.find('#pandat69-task-category').val(task.category_id || '');
         $form.find('#pandat69-task-deadline').val(task.deadline || '');
-
+    
         // Set description in TinyMCE or textarea
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
             tinymce.get('pandat69-task-description').setContent(task.description || '');
         } else {
             $form.find('#pandat69-task-description').val(task.description || '');
         }
-
+    
+        // --- ASSIGNEES ---
         // Set assigned users
         const userIds = task.assigned_user_ids || [];
         $form.find('#pandat69-task-assigned').val(userIds.join(','));
-
+    
         // Clear and rebuild selected users UI
-        const $selectedUsers = $form.find('.pandat69-selected-users-container');
+        const $selectedUsers = $form.find('.pandat69-selected-users-container').first(); // Target the assignees container
         $selectedUsers.empty();
-
+    
         if (task.assigned_user_ids && task.assigned_user_ids.length > 0) {
             const userNames = task.assigned_user_names.split(', ');
             for (let i = 0; i < task.assigned_user_ids.length; i++) {
@@ -1034,24 +1187,39 @@ jQuery(document).ready(function($) {
                 }
             }
         }
-
-        // ---- NEW ----
+        
+        // --- SUPERVISORS ---
+        // Set supervisor users
+        const supervisorIds = task.supervisor_user_ids || [];
+        $form.find('#pandat69-task-supervisor').val(supervisorIds.join(','));
+    
+        // Clear and rebuild selected supervisors UI
+        const $selectedSupervisors = $form.find('.pandat69-supervisor-container .pandat69-selected-users-container');
+        $selectedSupervisors.empty();
+    
+        if (task.supervisor_user_ids && task.supervisor_user_ids.length > 0) {
+            const supervisorNames = task.supervisor_user_names.split(', ');
+            for (let i = 0; i < task.supervisor_user_ids.length; i++) {
+                if (i < supervisorNames.length) {
+                    addSelectedUserUI($selectedSupervisors, task.supervisor_user_ids[i], supervisorNames[i]);
+                }
+            }
+        }
+    
         // Set notification fields
         $('#pandat69-notify-deadline').prop('checked', task.notify_deadline == 1);
         $('#pandat69-notify-days-before').val(task.notify_days_before || 3); // Default to 3 if null/undefined
-
+    
         // Show/hide days field based on checkbox state from task data
         if(task.notify_deadline == 1) {
             $('.pandat69-deadline-notification-days').show();
         } else {
             $('.pandat69-deadline-notification-days').hide();
         }
-        // ---- END NEW ----
-
+    
         // Update form title
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Edit Task');
     }
-    // ---- END MODIFIED Function ----
 
 
     function submitTaskForm() {
@@ -1081,6 +1249,7 @@ jQuery(document).ready(function($) {
             priority: $form.find('#pandat69-task-priority').val(),
             deadline: $form.find('#pandat69-task-deadline').val(),
             assigned_persons: $form.find('#pandat69-task-assigned').val(),
+            supervisor_persons: $form.find('#pandat69-task-supervisor').val(),
             // Add notification fields to formData
             notify_deadline: $form.find('#pandat69-notify-deadline').is(':checked') ? 1 : 0,
             notify_days_before: $form.find('#pandat69-notify-days-before').val()
@@ -1165,6 +1334,67 @@ jQuery(document).ready(function($) {
             }, 3000);
         }
     }
+
+function setupSupervisorAutocomplete() {
+    const $container = $('.pandat69-supervisor-container');
+    const $input = $container.find('.pandat69-user-search-input');
+    const $suggestions = $container.find('.pandat69-user-suggestions');
+    const $selectedContainer = $container.find('.pandat69-selected-users-container');
+    const $hiddenInput = $('#pandat69-task-supervisor');
+
+    let searchTimeout;
+
+    $input.on('input', function() {
+        const searchTerm = $(this).val().trim();
+
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+
+        if (searchTerm.length < 2) {
+            $suggestions.hide();
+            return;
+        }
+
+        // Set a delay before searching
+        searchTimeout = setTimeout(function() {
+            $suggestions.html('<div class="pandat69-searching">' + pandat69_ajax_object.text.searching + '</div>').show();
+
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_fetch_users',
+                    nonce: pandat69_ajax_object.nonce,
+                    search: searchTerm
+                },
+                success: function(response) {
+                    if (response.success && response.data.users) {
+                        renderUserSuggestions(response.data.users, $suggestions, $input, $selectedContainer, $hiddenInput);
+                    } else {
+                        $suggestions.html('<div class="pandat69-no-results">' + pandat69_ajax_object.text.no_results_found + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                    $suggestions.html('<div class="pandat69-error">' + pandat69_ajax_object.text.error_general + '</div>');
+                }
+            });
+        }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.pandat69-supervisor-container').length) {
+            $suggestions.hide();
+        }
+    });
+
+    // Initialize remove user handlers
+    $selectedContainer.on('click', '.pandat69-remove-user', function() {
+        const userId = $(this).parent().data('user-id');
+        removeSelectedUser(userId, $selectedContainer, $hiddenInput);
+    });
+}
 
     // Category Management
 
@@ -1374,32 +1604,27 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // User Autocomplete
-
     function setupUserAutocomplete() {
-        const $container = $('.pandat69-user-autocomplete-container');
-        const $input = $container.find('.pandat69-user-search-input');
+        const $input = $('#pandat69-task-assigned-search');
+        const $container = $input.closest('.pandat69-user-autocomplete-container');
         const $suggestions = $container.find('.pandat69-user-suggestions');
         const $selectedContainer = $container.find('.pandat69-selected-users-container');
         const $hiddenInput = $('#pandat69-task-assigned');
-
+        
         let searchTimeout;
-
+        
         $input.on('input', function() {
             const searchTerm = $(this).val().trim();
-
-            // Clear previous timeout
             clearTimeout(searchTimeout);
-
+            
             if (searchTerm.length < 2) {
                 $suggestions.hide();
                 return;
             }
-
-            // Set a delay before searching
+            
             searchTimeout = setTimeout(function() {
                 $suggestions.html('<div class="pandat69-searching">' + pandat69_ajax_object.text.searching + '</div>').show();
-
+                
                 $.ajax({
                     url: pandat69_ajax_object.ajax_url,
                     type: 'POST',
@@ -1422,102 +1647,433 @@ jQuery(document).ready(function($) {
                 });
             }, 300);
         });
-
-        // Hide suggestions when clicking outside
-        $(document).on('click', function(e) {
-            if (!$(e.target).closest('.pandat69-user-autocomplete-container').length) {
+        
+        // Use namespaced event to avoid conflicts
+        $(document).off('click.assigneeAutocomplete').on('click.assigneeAutocomplete', function(e) {
+            if (!$(e.target).closest($container).length) {
                 $suggestions.hide();
             }
         });
-
+        
         // Initialize remove user handlers
         $selectedContainer.on('click', '.pandat69-remove-user', function() {
             const userId = $(this).parent().data('user-id');
             removeSelectedUser(userId, $selectedContainer, $hiddenInput);
         });
     }
-
-    function renderUserSuggestions(users, $suggestions, $input, $selectedContainer, $hiddenInput) {
-        $suggestions.empty();
-
-        if (users.length === 0) {
-            $suggestions.html('<div class="pandat69-no-results">' + pandat69_ajax_object.text.no_results_found + '</div>');
-            return;
-        }
-
-        // Get currently selected user IDs
-        const selectedUserIds = $hiddenInput.val() ? $hiddenInput.val().split(',').map(Number) : [];
-
-        // Filter out already selected users
-        const filteredUsers = users.filter(user => !selectedUserIds.includes(parseInt(user.id)));
-
-        if (filteredUsers.length === 0) {
-            $suggestions.html('<div class="pandat69-no-results">All matching users already selected</div>');
-            return;
-        }
-
-        filteredUsers.forEach(function(user) {
-            const $item = $('<div class="pandat69-user-suggestion-item" data-user-id="' + user.id + '">' + user.name + '</div>');
-
-            $item.on('click', function() {
-                // Add to selected users
-                addSelectedUser(user.id, user.name, $selectedContainer, $hiddenInput);
-
-                // Clear input and hide suggestions
-                $input.val('');
+    
+    function setupSupervisorAutocomplete() {
+        const $input = $('#pandat69-task-supervisor-search');
+        const $container = $input.closest('.pandat69-user-autocomplete-container');
+        const $suggestions = $container.find('.pandat69-user-suggestions');
+        const $selectedContainer = $container.find('.pandat69-selected-users-container');
+        const $hiddenInput = $('#pandat69-task-supervisor');
+        
+        let searchTimeout;
+        
+        $input.on('input', function() {
+            const searchTerm = $(this).val().trim();
+            clearTimeout(searchTimeout);
+            
+            if (searchTerm.length < 2) {
                 $suggestions.hide();
+                return;
+            }
+            
+            searchTimeout = setTimeout(function() {
+                $suggestions.html('<div class="pandat69-searching">' + pandat69_ajax_object.text.searching + '</div>').show();
+                
+                $.ajax({
+                    url: pandat69_ajax_object.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'pandat69_fetch_users',
+                        nonce: pandat69_ajax_object.nonce,
+                        search: searchTerm
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.users) {
+                            renderUserSuggestions(response.data.users, $suggestions, $input, $selectedContainer, $hiddenInput);
+                        } else {
+                            $suggestions.html('<div class="pandat69-no-results">' + pandat69_ajax_object.text.no_results_found + '</div>');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX error:', error);
+                        $suggestions.html('<div class="pandat69-error">' + pandat69_ajax_object.text.error_general + '</div>');
+                    }
+                });
+            }, 300);
+        });
+        
+        // Use namespaced event to avoid conflicts
+        $(document).off('click.supervisorAutocomplete').on('click.supervisorAutocomplete', function(e) {
+            if (!$(e.target).closest($container).length) {
+                $suggestions.hide();
+            }
+        });
+        
+        // Initialize remove user handlers
+        $selectedContainer.on('click', '.pandat69-remove-user', function() {
+            const userId = $(this).parent().data('user-id');
+            removeSelectedUser(userId, $selectedContainer, $hiddenInput);
+        });
+    }
+    
+        // Category Management
+    
+        function loadCategories() {
+            const $container = $('.pandat69-container');
+            const boardName = $container.data('board-name');
+    
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_fetch_categories',
+                    nonce: pandat69_ajax_object.nonce,
+                    board_name: boardName
+                },
+                success: function(response) {
+                    if (response.success && response.data.categories) {
+                        updateCategoryLists(response.data.categories);
+                    } else {
+                        console.error('Error loading categories:', response.data?.message || 'Unknown error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                }
             });
-
-            $suggestions.append($item);
-        });
-    }
-
-    function addSelectedUser(userId, userName, $container, $hiddenInput) {
-        // Check if already selected
-        if ($container.find('.pandat69-selected-user[data-user-id="' + userId + '"]').length > 0) {
-            return;
         }
-
-        // Create selected user element
-        const $selectedUser = $('<div class="pandat69-selected-user" data-user-id="' + userId + '">' + userName + '<span class="pandat69-remove-user">×</span></div>');
-
-        // Add to container
-        $container.append($selectedUser);
-
-        // Update hidden input
-        let currentVal = $hiddenInput.val();
-        let userIds = currentVal ? currentVal.split(',') : [];
-        userIds.push(userId);
-        $hiddenInput.val(userIds.join(','));
-
-        // Add remove event handler
-        $selectedUser.find('.pandat69-remove-user').on('click', function() {
-            removeSelectedUser(userId, $container, $hiddenInput);
-        });
-    }
-
-    function removeSelectedUser(userId, $container, $hiddenInput) {
-        // Remove from DOM
-        $container.find('.pandat69-selected-user[data-user-id="' + userId + '"]').remove();
-
-        // Update hidden input
-        let currentVal = $hiddenInput.val();
-        let userIds = currentVal ? currentVal.split(',') : [];
-        userIds = userIds.filter(id => parseInt(id) !== parseInt(userId));
-        $hiddenInput.val(userIds.join(','));
-    }
-
-    function addSelectedUserUI($container, userId, userName) {
-        // Create selected user element
-        const $selectedUser = $('<div class="pandat69-selected-user" data-user-id="' + userId + '">' + userName + '<span class="pandat69-remove-user">×</span></div>');
-
-        // Add to container
-        $container.append($selectedUser);
-
-        // Add remove event handler
-        $selectedUser.find('.pandat69-remove-user').on('click', function() {
+    
+        function updateCategoryLists(categories) {
+            // Clear current options first, preserving the default "Select Category" option
+            const $categorySelect = $('#pandat69-task-category');
+            $categorySelect.find('option:not(:first)').remove();
+    
+            // Add category options to select dropdown
+            categories.forEach(function(category) {
+                $categorySelect.append(`<option value="${category.id}">${category.name}</option>`);
+            });
+    
+            // Update category list for management
+            const $categoryList = $('.pandat69-category-list');
+            $categoryList.empty();
+    
+            if (categories.length === 0) {
+                $categoryList.html('<li class="pandat69-no-categories">No categories found.</li>');
+                return;
+            }
+    
+            categories.forEach(function(category) {
+                $categoryList.append(`
+                    <li class="pandat69-category-item">
+                        <span class="pandat69-category-name">${category.name}</span>
+                        <button type="button" class="pandat69-icon-button pandat69-delete-category-btn" data-category-id="${category.id}" title="Delete Category">×</button>
+                    </li>
+                `);
+            });
+    
+            // Add event handler for delete buttons
+            $('.pandat69-delete-category-btn').on('click', function() {
+                const categoryId = $(this).data('category-id');
+                deleteCategory(categoryId);
+            });
+        }
+    
+        function addCategory() {
+            const $form = $('.pandat69-add-category-form');
+            const $nameInput = $form.find('#pandat69-new-category-name');
+            const categoryName = $nameInput.val().trim();
+            const $message = $form.find('.pandat69-category-form-message');
+    
+            if (!categoryName) {
+                $message.text('Category name is required.').addClass('pandat69-error').fadeIn();
+                return;
+            }
+    
+            // Disable form while submitting
+            $form.find('input, button').prop('disabled', true);
+    
+            const $container = $('.pandat69-container');
+            const boardName = $container.data('board-name');
+    
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_add_category',
+                    nonce: pandat69_ajax_object.nonce,
+                    board_name: boardName,
+                    name: categoryName
+                },
+                success: function(response) {
+                    if (response.success && response.data.category) {
+                        $message.text('Category added successfully.').removeClass('pandat69-error').addClass('pandat69-success').fadeIn();
+                        $nameInput.val('');
+    
+                        // Reload categories
+                        loadCategories();
+    
+                        // Auto-hide message after delay
+                        setTimeout(function() {
+                            $message.fadeOut();
+                        }, 3000);
+                    } else {
+                        console.error('Error adding category:', response.data?.message || 'Unknown error');
+                        $message.text(response.data?.message || 'Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                    $message.text('Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
+                },
+                complete: function() {
+                    $form.find('input, button').prop('disabled', false);
+                }
+            });
+        }
+    
+        function addCategoryInline() {
+            const $container = $('.pandat69-inline-category-form');
+            const $nameInput = $container.find('.pandat69-new-category-name-inline');
+            const categoryName = $nameInput.val().trim();
+            const $message = $container.find('.pandat69-inline-form-message');
+    
+            if (!categoryName) {
+                $message.text('Category name is required.').addClass('pandat69-error').fadeIn();
+                return;
+            }
+    
+            // Disable form while submitting
+            $container.find('input, button').prop('disabled', true);
+    
+            const boardName = $('.pandat69-container').data('board-name');
+    
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_add_category',
+                    nonce: pandat69_ajax_object.nonce,
+                    board_name: boardName,
+                    name: categoryName
+                },
+                success: function(response) {
+                    if (response.success && response.data.category) {
+                        $message.text('Category added successfully.').removeClass('pandat69-error').addClass('pandat69-success').fadeIn();
+                        $nameInput.val('');
+    
+                        // Add to select and select it
+                        const newOption = $(`<option value="${response.data.category.id}">${response.data.category.name}</option>`);
+                        $('#pandat69-task-category').append(newOption).val(response.data.category.id);
+    
+                        // Reload all categories to ensure lists are in sync
+                        loadCategories();
+    
+                        // Hide the form after a delay
+                        setTimeout(function() {
+                            $container.slideUp();
+                            $message.hide();
+                        }, 1500);
+                    } else {
+                        console.error('Error adding category:', response.data?.message || 'Unknown error');
+                        $message.text(response.data?.message || 'Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                    $message.text('Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
+                },
+                complete: function() {
+                    $container.find('input, button').prop('disabled', false);
+                }
+            });
+        }
+    
+        function deleteCategory(categoryId) {
+            if (!confirm(pandat69_ajax_object.text.confirm_delete_category)) {
+                return;
+            }
+    
+            const $container = $('.pandat69-container');
+            const boardName = $container.data('board-name');
+    
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_delete_category',
+                    nonce: pandat69_ajax_object.nonce,
+                    board_name: boardName,
+                    category_id: categoryId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Reload categories
+                        loadCategories();
+    
+                        // Also reload tasks as they may have had this category
+                        loadTasks();
+                    } else {
+                        console.error('Error deleting category:', response.data?.message || 'Unknown error');
+                        alert('Failed to delete category. Please try again.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                    alert('Failed to delete category. Please try again.');
+                }
+            });
+        }
+    
+        function setupUserAutocomplete() {
+            // Target specifically the first (assignee) autocomplete container
+            const $input = $('#pandat69-task-assigned-search');
+            const $container = $input.closest('.pandat69-user-autocomplete-container');
+            const $suggestions = $container.find('.pandat69-user-suggestions');
+            const $selectedContainer = $container.find('.pandat69-selected-users-container');
             const $hiddenInput = $('#pandat69-task-assigned');
-            removeSelectedUser(userId, $container, $hiddenInput);
-        });
-    }
-});
+        
+            let searchTimeout;
+        
+            $input.on('input', function() {
+                const searchTerm = $(this).val().trim();
+        
+                // Clear previous timeout
+                clearTimeout(searchTimeout);
+        
+                if (searchTerm.length < 2) {
+                    $suggestions.hide();
+                    return;
+                }
+        
+                // Set a delay before searching
+                searchTimeout = setTimeout(function() {
+                    $suggestions.html('<div class="pandat69-searching">' + pandat69_ajax_object.text.searching + '</div>').show();
+        
+                    $.ajax({
+                        url: pandat69_ajax_object.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'pandat69_fetch_users',
+                            nonce: pandat69_ajax_object.nonce,
+                            search: searchTerm
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.users) {
+                                renderUserSuggestions(response.data.users, $suggestions, $input, $selectedContainer, $hiddenInput);
+                            } else {
+                                $suggestions.html('<div class="pandat69-no-results">' + pandat69_ajax_object.text.no_results_found + '</div>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('AJAX error:', error);
+                            $suggestions.html('<div class="pandat69-error">' + pandat69_ajax_object.text.error_general + '</div>');
+                        }
+                    });
+                }, 300);
+            });
+        
+            // Hide suggestions when clicking outside - use namespaced handler 
+            $(document).off('click.assigneeAutocomplete').on('click.assigneeAutocomplete', function(e) {
+                if (!$(e.target).closest($container).length) {
+                    $suggestions.hide();
+                }
+            });
+        
+            // Initialize remove user handlers for assignees only
+            $selectedContainer.on('click', '.pandat69-remove-user', function() {
+                const userId = $(this).parent().data('user-id');
+                removeSelectedUser(userId, $selectedContainer, $hiddenInput);
+            });
+        }
+    
+        function renderUserSuggestions(users, $suggestions, $input, $selectedContainer, $hiddenInput) {
+            $suggestions.empty();
+    
+            if (users.length === 0) {
+                $suggestions.html('<div class="pandat69-no-results">' + pandat69_ajax_object.text.no_results_found + '</div>');
+                return;
+            }
+    
+            // Get currently selected user IDs
+            const selectedUserIds = $hiddenInput.val() ? $hiddenInput.val().split(',').map(Number) : [];
+    
+            // Filter out already selected users
+            const filteredUsers = users.filter(user => !selectedUserIds.includes(parseInt(user.id)));
+    
+            if (filteredUsers.length === 0) {
+                $suggestions.html('<div class="pandat69-no-results">All matching users already selected</div>');
+                return;
+            }
+    
+            filteredUsers.forEach(function(user) {
+                const $item = $('<div class="pandat69-user-suggestion-item" data-user-id="' + user.id + '">' + user.name + '</div>');
+    
+                $item.on('click', function() {
+                    // Add to selected users
+                    addSelectedUser(user.id, user.name, $selectedContainer, $hiddenInput);
+    
+                    // Clear input and hide suggestions
+                    $input.val('');
+                    $suggestions.hide();
+                });
+    
+                $suggestions.append($item);
+            });
+        }
+    
+        function addSelectedUser(userId, userName, $container, $hiddenInput) {
+            // Check if already selected
+            if ($container.find('.pandat69-selected-user[data-user-id="' + userId + '"]').length > 0) {
+                return;
+            }
+    
+            // Create selected user element
+            const $selectedUser = $('<div class="pandat69-selected-user" data-user-id="' + userId + '">' + userName + '<span class="pandat69-remove-user">×</span></div>');
+    
+            // Add to container
+            $container.append($selectedUser);
+    
+            // Update hidden input
+            let currentVal = $hiddenInput.val();
+            let userIds = currentVal ? currentVal.split(',') : [];
+            userIds.push(userId);
+            $hiddenInput.val(userIds.join(','));
+    
+            // Add remove event handler
+            $selectedUser.find('.pandat69-remove-user').on('click', function() {
+                removeSelectedUser(userId, $container, $hiddenInput);
+            });
+        }
+    
+        function removeSelectedUser(userId, $container, $hiddenInput) {
+            // Remove from DOM
+            $container.find('.pandat69-selected-user[data-user-id="' + userId + '"]').remove();
+    
+            // Update hidden input
+            let currentVal = $hiddenInput.val();
+            let userIds = currentVal ? currentVal.split(',') : [];
+            userIds = userIds.filter(id => parseInt(id) !== parseInt(userId));
+            $hiddenInput.val(userIds.join(','));
+        }
+    
+        function addSelectedUserUI($container, userId, userName) {
+            // Create selected user element
+            const $selectedUser = $('<div class="pandat69-selected-user" data-user-id="' + userId + '">' + userName + '<span class="pandat69-remove-user">×</span></div>');
+        
+            // Add to container
+            $container.append($selectedUser);
+            
+            // Determine which hidden input to use based on the container
+            const isSupervisor = $container.closest('.pandat69-supervisor-container').length > 0;
+            const $hiddenInput = isSupervisor ? $('#pandat69-task-supervisor') : $('#pandat69-task-assigned');
+        
+            // Add remove event handler
+            $selectedUser.find('.pandat69-remove-user').on('click', function() {
+                removeSelectedUser(userId, $container, $hiddenInput);
+            });
+        }
+    });
