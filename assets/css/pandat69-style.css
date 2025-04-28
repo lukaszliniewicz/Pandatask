@@ -1128,7 +1128,6 @@ div.pandat69-container,
 .pandat69-container .pandat69-task-item-meta span {
     display: inline-flex;
     align-items: center;
-    margin-right: 15px;
 }
 
 /* Tab Navigation */
@@ -1414,4 +1413,31 @@ div.pandat69-container,
     top: 10px;
     opacity: 0.3;
     font-size: 1.2em;
+}
+
+/* Subtask styling */
+.pandat69-container .pandat69-subtask {
+    margin-left: 30px;
+    position: relative;
+}
+
+.pandat69-container .pandat69-subtask::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 0;
+    height: 50%;
+    width: 10px;
+}
+
+.pandat69-container .pandat69-subtask-indicator {
+    position: absolute;
+    left: -33px;
+    color: #384D68;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.pandat69-container .pandat69-task-item-details {
+    position: relative;
 }

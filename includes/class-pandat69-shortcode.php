@@ -177,6 +177,13 @@ class Pandat69_Shortcode {
                                 </div>
                             </div>
                             <div class="pandat69-form-field pandat69-form-field-half">
+                                <label for="pandat69-parent-task">Parent Task:</label>
+                                <select id="pandat69-parent-task" name="parent_task_id" class="pandat69-select">
+                                    <option value="">-- None (Main Task) --</option>
+                                    <!-- Parent tasks loaded by JS -->
+                                </select>
+                            </div>
+                            <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-deadline">Deadline:</label>
                                 <input type="text" id="pandat69-task-deadline" name="deadline" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
                             </div>

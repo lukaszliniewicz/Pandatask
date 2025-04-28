@@ -129,8 +129,9 @@ function pandat69_enqueue_scripts() {
         'pandat69-script',
         'pandat69_ajax_object',
         array(
-            'ajax_url' => admin_url( 'admin-ajax.php' ),
-            'nonce'    => wp_create_nonce( 'pandat69_ajax_nonce' ),
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('pandat69_ajax_nonce'),
+            'pandat69_nonce' => wp_create_nonce('pandat69_ajax_nonce'),
             'current_user_id' => get_current_user_id(),
             // Get display name safely
             'current_user_display_name' => ( is_user_logged_in() ? wp_get_current_user()->display_name : '' ),

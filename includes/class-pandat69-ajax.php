@@ -18,7 +18,8 @@ class Pandat69_Ajax {
             'add_comment',
             'fetch_users',
             'quick_update_status',
-            'toggle_archive_task', 
+            'toggle_archive_task',
+            'fetch_potential_parent_tasks', 
         );
 
         foreach ($ajax_actions as $action) {
@@ -28,9 +29,18 @@ class Pandat69_Ajax {
     }
 
     private function verify_nonce($action = 'pandat69_ajax_nonce') {
-         if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field($_POST['nonce']), $action)) {
-            wp_send_json_error(array('message' => 'Nonce verification failed.'), 403);
+        // Try standard nonce parameter
+        if (isset($_POST['nonce']) && wp_verify_nonce(sanitize_text_field($_POST['nonce']), $action)) {
+            return true;
         }
+        
+        // More strictly named nonce - better practice going forward
+        if (isset($_POST['pandat69_nonce']) && wp_verify_nonce(sanitize_text_field($_POST['pandat69_nonce']), $action)) {
+            return true;
+        }
+        
+        // If nonce verification fails, send error response
+        wp_send_json_error(array('message' => 'Nonce verification failed.'), 403);
     }
 
      private function check_permissions() {
@@ -151,9 +161,11 @@ class Pandat69_Ajax {
              'priority' => absint($_POST['priority']),
              'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
              'assigned_persons' => $assigned_persons,
-             'supervisor_persons' => $supervisor_persons, // Add supervisor persons
+             'supervisor_persons' => $supervisor_persons,
              'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
              'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
+             'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
+
         );
     
          // Validate deadline format if provided
@@ -223,6 +235,8 @@ class Pandat69_Ajax {
              'supervisor_persons' => $supervisor_persons, // Add supervisor persons
              'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
              'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
+             'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
+
         );
     
          // Validate deadline format if provided
@@ -426,8 +440,7 @@ class Pandat69_Ajax {
     }
 
      public function fetch_users() {
-        // No nonce check here usually, as it might be called via GET for typeaheads,
-        // but ensure it only returns public data (ID, name).
+
          $this->verify_nonce(); // Add if needed for security context
          $this->check_permissions(); // Still check login status
 
@@ -440,6 +453,29 @@ class Pandat69_Ajax {
         }
 
         wp_send_json_success(array('users' => $users));
+    }
+
+    /**
+     * Fetch potential parent tasks for the task form
+     */
+    public function fetch_potential_parent_tasks() {
+        $this->verify_nonce();
+        $this->check_permissions();
+
+        $board_name = isset($_POST['board_name']) ? sanitize_key($_POST['board_name']) : '';
+        $current_task_id = isset($_POST['current_task_id']) ? absint($_POST['current_task_id']) : 0;
+
+        if (empty($board_name)) {
+            wp_send_json_error(array('message' => 'Board name is required.'));
+        }
+
+        $parent_tasks = Pandat69_DB::get_potential_parent_tasks($board_name, $current_task_id);
+
+        if (is_array($parent_tasks)) {
+            wp_send_json_success(array('parent_tasks' => $parent_tasks));
+        } else {
+            wp_send_json_error(array('message' => 'Failed to fetch potential parent tasks.'));
+        }
     }
 
     public function quick_update_status() {

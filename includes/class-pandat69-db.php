@@ -26,28 +26,30 @@ class Pandat69_DB {
 
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 
-    $sql_tasks = "CREATE TABLE $table_tasks (
-        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-        board_name VARCHAR(100) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        description LONGTEXT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        category_id BIGINT(20) UNSIGNED NULL,
-        priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
-        deadline DATE NULL,
-        notify_deadline TINYINT(1) NOT NULL DEFAULT 0,
-        notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
-        archived TINYINT(1) NOT NULL DEFAULT 0, 
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY board_name (board_name),
-        KEY status (status),
-        KEY priority (priority),
-        KEY deadline (deadline),
-        KEY category_id (category_id),
-        KEY archived (archived) 
-    ) $charset_collate;";
+        $sql_tasks = "CREATE TABLE $table_tasks (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            board_name VARCHAR(100) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            description LONGTEXT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            category_id BIGINT(20) UNSIGNED NULL,
+            priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
+            deadline DATE NULL,
+            notify_deadline TINYINT(1) NOT NULL DEFAULT 0,
+            notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
+            archived TINYINT(1) NOT NULL DEFAULT 0, 
+            parent_task_id BIGINT(20) UNSIGNED NULL, /* New column for subtasks */
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY board_name (board_name),
+            KEY status (status),
+            KEY priority (priority),
+            KEY deadline (deadline),
+            KEY category_id (category_id),
+            KEY archived (archived),
+            KEY parent_task_id (parent_task_id) /* New index */
+        ) $charset_collate;";
         dbDelta( $sql_tasks );
 
         $sql_categories = "CREATE TABLE $table_categories (
@@ -100,11 +102,13 @@ class Pandat69_DB {
              GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.ID END) as assigned_user_ids, 
              GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.display_name END SEPARATOR ', ') as assigned_user_names,
              GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.ID END) as supervisor_user_ids, 
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.display_name END SEPARATOR ', ') as supervisor_user_names
+             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.display_name END SEPARATOR ', ') as supervisor_user_names,
+             parent.name as parent_task_name
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$assignments_table} a ON t.id = a.task_id
              LEFT JOIN {$users_table} u ON a.user_id = u.ID
+             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
              WHERE t.board_name = %s AND t.archived = %d",
             $board_name, $archived
         );
@@ -311,6 +315,7 @@ class Pandat69_DB {
             'deadline'      => !empty($data['deadline']) ? sanitize_text_field($data['deadline']) : null,
             'notify_deadline' => isset($data['notify_deadline']) ? absint($data['notify_deadline']) : 0,
             'notify_days_before' => isset($data['notify_days_before']) ? max(1, min(30, absint($data['notify_days_before']))) : 3,
+            'parent_task_id' => !empty($data['parent_task_id']) ? absint($data['parent_task_id']) : null,
             'created_at'    => current_time('mysql', 1),
             'updated_at'    => current_time('mysql', 1),
         );
@@ -357,7 +362,8 @@ class Pandat69_DB {
 
         // Whitelist of allowed fields in the 'tasks' table that can be updated this way
         $allowed_task_fields = [
-            'name', 'description', 'status', 'category_id', 'priority', 'deadline', 'archived', 'notify_deadline', 'notify_days_before'
+            'name', 'description', 'status', 'category_id', 'priority', 'deadline', 
+            'archived', 'notify_deadline', 'notify_days_before', 'parent_task_id'
         ];
 
         $update_data = []; // Array to hold columns to be updated in the DB
@@ -404,6 +410,11 @@ class Pandat69_DB {
             } elseif ($key === 'archived') {
                 $update_data['archived'] = absint($value) ? 1 : 0;
                 $format[] = '%d';
+
+            } elseif ($key === 'parent_task_id') {
+                $update_data['parent_task_id'] = !empty($value) ? absint($value) : null;
+                $format[] = ($update_data['parent_task_id'] === null) ? '%s' : '%d';
+
             } elseif ($key === 'notify_deadline') {
                 $update_data['notify_deadline'] = absint($value) ? 1 : 0;
                 $format[] = '%d';
@@ -627,6 +638,37 @@ class Pandat69_DB {
             return array();
         endif;
 
+    }
+
+    /**
+     * Get potential parent tasks for a board
+     *
+     * @param string $board_name The board name
+     * @param int $current_task_id Current task ID to exclude (when editing)
+     * @return array List of tasks that can be parents
+     */
+    public static function get_potential_parent_tasks($board_name, $current_task_id = 0) {
+        global $wpdb;
+        $prefix = self::get_db_prefix();
+        $tasks_table = $prefix . 'tasks';
+        
+        $sql = $wpdb->prepare(
+            "SELECT id, name FROM {$tasks_table} 
+            WHERE board_name = %s AND archived = 0",
+            $board_name
+        );
+        
+        // If editing a task, exclude current task and its children
+        if ($current_task_id > 0) {
+            $sql .= $wpdb->prepare(" AND id != %d", $current_task_id);
+            
+            // Also exclude tasks that have this task as their parent (direct children)
+            $sql .= $wpdb->prepare(" AND id NOT IN (SELECT id FROM {$tasks_table} WHERE parent_task_id = %d)", $current_task_id);
+        }
+        
+        $sql .= " ORDER BY name ASC";
+        
+        return $wpdb->get_results($sql);
     }
 
      public static function get_wp_users($search = '') {

@@ -1,6 +1,111 @@
 jQuery(document).ready(function($) {
     'use strict';
-
+    function preventNiceSelectConflict() {
+        // Add CSS to ensure our selects remain visible and override NiceSelect styles
+        $('head').append(`
+            <style>
+                .pandat69-container select.pandat69-select {
+                    display: block !important;
+                    opacity: 1 !important;
+                    visibility: visible !important;
+                    position: static !important;
+                    z-index: 100 !important;
+                    width: 100% !important;
+                    height: auto !important;
+                    padding: 8px 10px !important;
+                    margin: 0 !important;
+                    border: 1px solid #ccc !important;
+                    border-radius: 3px !important;
+                    background-color: #fff !important;
+                    font-size: 14px !important;
+                    line-height: 1.5 !important;
+                    color: #384D68 !important;
+                    cursor: pointer !important;
+                }
+                .pandat69-container select.pandat69-select:focus {
+                    border-color: #384D68 !important;
+                    outline: none !important;
+                    box-shadow: 0 0 0 1px #384D68 !important;
+                }
+                .pandat69-container .nice-select,
+                .pandat69-container .nice-select.open {
+                    display: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
+                    opacity: 0 !important;
+                    overflow: hidden !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+            </style>
+        `);
+        
+        // Destroy NiceSelect on our elements if it exists
+        setTimeout(function() {
+            if (typeof $.fn.niceSelect !== 'undefined') {
+                try {
+                    $('.pandat69-select').niceSelect('destroy');
+                } catch(e) {
+                    console.log('Could not destroy niceSelect', e);
+                }
+                
+                // Remove any existing nice-select elements next to our selects
+                $('.pandat69-select').next('.nice-select').remove();
+            }
+        }, 10);
+        
+        // Watch for NiceSelect being applied later
+        const observer = new MutationObserver(function(mutations) {
+            let needsCheck = false;
+            
+            // Quick check if any relevant elements were added
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes && mutation.addedNodes.length) {
+                    for (let i = 0; i < mutation.addedNodes.length; i++) {
+                        if (mutation.addedNodes[i].classList && 
+                            (mutation.addedNodes[i].classList.contains('nice-select') || 
+                             mutation.addedNodes[i].querySelector('.nice-select'))) {
+                            needsCheck = true;
+                            break;
+                        }
+                    }
+                }
+            });
+            
+            // Only do the expensive operation if needed
+            if (needsCheck) {
+                $('.pandat69-select').each(function() {
+                    const $niceSelect = $(this).next('.nice-select');
+                    if ($niceSelect.length) {
+                        $niceSelect.remove();
+                        if (typeof $.fn.niceSelect !== 'undefined') {
+                            try {
+                                $(this).niceSelect('destroy');
+                            } catch(e) {}
+                        }
+                    }
+                });
+            }
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+        
+        // Also handle our selects when they're created later
+        $(document).on('DOMNodeInserted', '.pandat69-select', function() {
+            const $select = $(this);
+            setTimeout(function() {
+                const $niceSelect = $select.next('.nice-select');
+                if ($niceSelect.length) {
+                    $niceSelect.remove();
+                    if (typeof $.fn.niceSelect !== 'undefined') {
+                        try {
+                            $select.niceSelect('destroy');
+                        } catch(e) {}
+                    }
+                }
+            }, 50);
+        });
+    }    
     // Global variables
     let currentWeekStart = new Date();
     let currentMonthDate = new Date();
@@ -11,22 +116,25 @@ jQuery(document).ready(function($) {
     function initTaskBoard() {
         const $container = $('.pandat69-container');
         const boardName = $container.data('board-name');
-
+    
         if (!boardName) {
             console.error('Error: No board name specified');
             return;
         }
-
+    
+        // Call the function to prevent NiceSelect conflicts
+        preventNiceSelectConflict();
+    
         // Load initial data
         loadTasks();
         loadCategories();
-
+    
         // Set up event handlers
         setupEventHandlers();
-
+    
         // Initialize tabs
         setupTabs();
-
+    
         // Initialize datepicker
         $('.pandat69-datepicker').datepicker({
             dateFormat: 'yy-mm-dd',
@@ -34,9 +142,26 @@ jQuery(document).ready(function($) {
             changeYear: true,
             yearRange: 'c-5:c+5'
         });
-
+    
         // Initialize current week and month for calendar views
         setupCalendarDates();
+    }
+
+    function fixSelects() {
+        setTimeout(function() {
+            // Find any NiceSelect elements that might have been created
+            $('.pandat69-select').each(function() {
+                const $niceSelect = $(this).next('.nice-select');
+                if ($niceSelect.length) {
+                    $niceSelect.remove();
+                    if (typeof $.fn.niceSelect !== 'undefined') {
+                        try {
+                            $(this).niceSelect('destroy');
+                        } catch(e) {}
+                    }
+                }
+            });
+        }, 50);
     }
 
     function setupEventHandlers() {
@@ -415,9 +540,15 @@ jQuery(document).ready(function($) {
     }
 
     function renderTaskItem(task, isArchived = false) {
+        const isSubtask = task.parent_task_id ? true : false;
+        
         return `
-        <li class="pandat69-task-item ${isArchived ? 'pandat69-archived-task' : ''}" data-task-id="${task.id}">
+        <li class="pandat69-task-item ${isArchived ? 'pandat69-archived-task' : ''} ${isSubtask ? 'pandat69-subtask' : ''}" 
+            data-task-id="${task.id}" 
+            data-parent-id="${task.parent_task_id || ''}"
+            data-is-subtask="${isSubtask ? '1' : '0'}">
             <div class="pandat69-task-item-details">
+                ${isSubtask ? '<div class="pandat69-subtask-indicator">↳</div>' : ''}
                 <div class="pandat69-task-item-name">${task.name}</div>
                 <div class="pandat69-task-item-meta">
                     <span><span class="pandat69-task-status pandat69-status-${task.status}" data-status="${task.status}">${task.status.replace('-', ' ')}</span></span>
@@ -426,6 +557,7 @@ jQuery(document).ready(function($) {
                     <span><strong>Category:</strong> ${task.category_name}</span>
                     <span><strong>Assigned to:</strong> ${task.assigned_user_names}</span>
                     <span><strong>Supervisors:</strong> ${task.supervisor_user_names}</span>
+                    ${task.parent_task_name ? `<span><strong>Parent:</strong> ${task.parent_task_name}</span>` : ''}
                 </div>
             </div>
             <div class="pandat69-task-item-actions">
@@ -437,7 +569,7 @@ jQuery(document).ready(function($) {
                 }
             </div>
         </li>`;
-    }
+    }   
 
     function loadArchivedTasks() {
         const $container = $('.pandat69-container');
@@ -550,16 +682,44 @@ jQuery(document).ready(function($) {
     function renderTasks(tasks) {
         const $taskList = $('.pandat69-task-list').first(); // Only target the main task list
         $taskList.empty();
-
+    
         if (tasks.length === 0) {
             $taskList.html('<li class="pandat69-no-tasks">No tasks found.</li>');
             return;
         }
-
+    
+        // Create a map of tasks by ID for quick lookup
+        const taskMap = {};
         tasks.forEach(task => {
-            $taskList.append(renderTaskItem(task));
+            taskMap[task.id] = task;
+            task.children = []; // Initialize children array
         });
-
+    
+        // Identify parent-child relationships
+        const mainTasks = [];
+        tasks.forEach(task => {
+            if (task.parent_task_id && taskMap[task.parent_task_id]) {
+                // This is a subtask with a valid parent
+                taskMap[task.parent_task_id].children.push(task);
+            } else {
+                // This is a main task or orphaned subtask (parent not in result set)
+                mainTasks.push(task);
+            }
+        });
+    
+        // Render main tasks and their children
+        mainTasks.forEach(task => {
+            // Render the main task
+            $taskList.append(renderTaskItem(task));
+            
+            // Render its children
+            if (task.children && task.children.length > 0) {
+                task.children.forEach(childTask => {
+                    $taskList.append(renderTaskItem(childTask));
+                });
+            }
+        });
+    
         // Reattach event handlers
         attachTaskEventHandlers();
     }
@@ -849,6 +1009,15 @@ jQuery(document).ready(function($) {
                     <span class="pandat69-detail-label">Supervisors:</span>
                     <span class="pandat69-detail-value">${task.supervisor_user_names}</span>
                 </div>`;
+                
+        // Add parent task information if this is a subtask
+        if (task.parent_task_id && task.parent_task_name) {
+            html += `
+                <div class="pandat69-detail-item">
+                    <span class="pandat69-detail-label">Parent Task:</span>
+                    <span class="pandat69-detail-value">${task.parent_task_name}</span>
+                </div>`;
+        }
     
         if (task.description) {
             html += `
@@ -1130,31 +1299,37 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-status').val('pending');
         $form.find('#pandat69-task-priority').val('5');
         $form.find('#pandat69-task-category').val('');
+        $form.find('#pandat69-task-deadline').val('');
         $form.find('#pandat69-task-assigned').val('');
         $form.find('.pandat69-selected-users-container').empty();
         $form.find('#pandat69-task-supervisor').val('');
         $form.find('.pandat69-supervisor-container .pandat69-selected-users-container').empty();
-
+    
         // Reset TinyMCE if active
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
             tinymce.get('pandat69-task-description').setContent('');
         }
-
-        // Reset notification fields (assuming default is unchecked/hidden/default value)
+    
+        // Reset notification fields
         $('#pandat69-notify-deadline').prop('checked', false);
-        $('#pandat69-notify-days-before').val(3); // Set to default value (e.g., 3)
+        $('#pandat69-notify-days-before').val(3); // Set to default value
         $('.pandat69-deadline-notification-days').hide();
-
+    
+        // Load potential parent tasks (for the dropdown)
+        loadPotentialParentTasks();
+        // Reset parent task dropdown to "None"
+        $('#pandat69-parent-task').val('');
+    
         // Ensure form message is hidden
         $form.find('.pandat69-form-message').hide().removeClass('pandat69-success pandat69-error');
-
+    
         // Update form title
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Add New Task');
     }
 
     function fillTaskForm(task) {
         const $form = $('.pandat69-task-form');
-    
+        
         // Set basic fields
         $form.find('#pandat69-task-id').val(task.id);
         $form.find('#pandat69-task-name').val(task.name);
@@ -1162,23 +1337,23 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-priority').val(task.priority);
         $form.find('#pandat69-task-category').val(task.category_id || '');
         $form.find('#pandat69-task-deadline').val(task.deadline || '');
-    
+        
         // Set description in TinyMCE or textarea
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
             tinymce.get('pandat69-task-description').setContent(task.description || '');
         } else {
             $form.find('#pandat69-task-description').val(task.description || '');
         }
-    
+        
         // --- ASSIGNEES ---
         // Set assigned users
         const userIds = task.assigned_user_ids || [];
         $form.find('#pandat69-task-assigned').val(userIds.join(','));
-    
+        
         // Clear and rebuild selected users UI
         const $selectedUsers = $form.find('.pandat69-selected-users-container').first(); // Target the assignees container
         $selectedUsers.empty();
-    
+        
         if (task.assigned_user_ids && task.assigned_user_ids.length > 0) {
             const userNames = task.assigned_user_names.split(', ');
             for (let i = 0; i < task.assigned_user_ids.length; i++) {
@@ -1192,11 +1367,11 @@ jQuery(document).ready(function($) {
         // Set supervisor users
         const supervisorIds = task.supervisor_user_ids || [];
         $form.find('#pandat69-task-supervisor').val(supervisorIds.join(','));
-    
+        
         // Clear and rebuild selected supervisors UI
         const $selectedSupervisors = $form.find('.pandat69-supervisor-container .pandat69-selected-users-container');
         $selectedSupervisors.empty();
-    
+        
         if (task.supervisor_user_ids && task.supervisor_user_ids.length > 0) {
             const supervisorNames = task.supervisor_user_names.split(', ');
             for (let i = 0; i < task.supervisor_user_ids.length; i++) {
@@ -1205,18 +1380,47 @@ jQuery(document).ready(function($) {
                 }
             }
         }
-    
+        
         // Set notification fields
         $('#pandat69-notify-deadline').prop('checked', task.notify_deadline == 1);
         $('#pandat69-notify-days-before').val(task.notify_days_before || 3); // Default to 3 if null/undefined
-    
+        
         // Show/hide days field based on checkbox state from task data
         if(task.notify_deadline == 1) {
             $('.pandat69-deadline-notification-days').show();
         } else {
             $('.pandat69-deadline-notification-days').hide();
         }
-    
+        
+        // --- PARENT TASK ---
+        // Load potential parent tasks and set selected value
+        loadPotentialParentTasks(task.id);
+        
+        // Wait a moment for the parent task options to load, then set the selected value
+        setTimeout(function() {
+            $form.find('#pandat69-parent-task').val(task.parent_task_id || '');
+            
+            // Fix NiceSelect conflicts
+            fixSelects();
+            
+            // Additional protection for select values
+            setTimeout(function() {
+                // Ensure the value is still set (NiceSelect might have changed it)
+                $form.find('#pandat69-task-status').val(task.status);
+                $form.find('#pandat69-task-category').val(task.category_id || '');
+                $form.find('#pandat69-parent-task').val(task.parent_task_id || '');
+                
+                // Make sure original selects are visible
+                $('.pandat69-select').each(function() {
+                    const $niceSelect = $(this).next('.nice-select');
+                    if ($niceSelect.length) {
+                        $niceSelect.hide();
+                        $(this).show();
+                    }
+                });
+            }, 100);
+        }, 500); // Small delay to ensure the options are loaded
+        
         // Update form title
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Edit Task');
     }
@@ -1250,9 +1454,9 @@ jQuery(document).ready(function($) {
             deadline: $form.find('#pandat69-task-deadline').val(),
             assigned_persons: $form.find('#pandat69-task-assigned').val(),
             supervisor_persons: $form.find('#pandat69-task-supervisor').val(),
-            // Add notification fields to formData
             notify_deadline: $form.find('#pandat69-notify-deadline').is(':checked') ? 1 : 0,
-            notify_days_before: $form.find('#pandat69-notify-days-before').val()
+            notify_days_before: $form.find('#pandat69-notify-days-before').val(),
+            parent_task_id: $form.find('#pandat69-parent-task').val()
         };
 
         // Add task ID if editing
@@ -1427,35 +1631,63 @@ function setupSupervisorAutocomplete() {
         // Clear current options first, preserving the default "Select Category" option
         const $categorySelect = $('#pandat69-task-category');
         $categorySelect.find('option:not(:first)').remove();
-
+    
         // Add category options to select dropdown
         categories.forEach(function(category) {
             $categorySelect.append(`<option value="${category.id}">${category.name}</option>`);
         });
-
+    
         // Update category list for management
         const $categoryList = $('.pandat69-category-list');
         $categoryList.empty();
-
+    
         if (categories.length === 0) {
             $categoryList.html('<li class="pandat69-no-categories">No categories found.</li>');
-            return;
+        } else {
+            categories.forEach(function(category) {
+                $categoryList.append(`
+                    <li class="pandat69-category-item">
+                        <span class="pandat69-category-name">${category.name}</span>
+                        <button type="button" class="pandat69-icon-button pandat69-delete-category-btn" data-category-id="${category.id}" title="Delete Category">×</button>
+                    </li>
+                `);
+            });
+    
+            // Add event handler for delete buttons
+            $('.pandat69-delete-category-btn').on('click', function() {
+                const categoryId = $(this).data('category-id');
+                deleteCategory(categoryId);
+            });
         }
-
-        categories.forEach(function(category) {
-            $categoryList.append(`
-                <li class="pandat69-category-item">
-                    <span class="pandat69-category-name">${category.name}</span>
-                    <button type="button" class="pandat69-icon-button pandat69-delete-category-btn" data-category-id="${category.id}" title="Delete Category">×</button>
-                </li>
-            `);
-        });
-
-        // Add event handler for delete buttons
-        $('.pandat69-delete-category-btn').on('click', function() {
-            const categoryId = $(this).data('category-id');
-            deleteCategory(categoryId);
-        });
+    
+        // Fix NiceSelect conflicts
+        fixSelects();
+        
+        // Additional protection for the category select
+        setTimeout(function() {
+            // If there's a NiceSelect next to our category select, remove or hide it
+            const $niceSelect = $categorySelect.next('.nice-select');
+            if ($niceSelect.length) {
+                // Try to destroy NiceSelect if the function exists
+                if (typeof $.fn.niceSelect !== 'undefined') {
+                    try {
+                        $categorySelect.niceSelect('destroy');
+                    } catch(e) {
+                        console.log('Could not destroy NiceSelect on category select', e);
+                    }
+                }
+                
+                // Either way, remove the NiceSelect element
+                $niceSelect.remove();
+                
+                // Make sure our select is visible
+                $categorySelect.css({
+                    'display': 'block',
+                    'visibility': 'visible',
+                    'opacity': '1'
+                });
+            }
+        }, 100);
     }
 
     function addCategory() {
@@ -1747,94 +1979,6 @@ function setupSupervisorAutocomplete() {
             });
         }
     
-        function updateCategoryLists(categories) {
-            // Clear current options first, preserving the default "Select Category" option
-            const $categorySelect = $('#pandat69-task-category');
-            $categorySelect.find('option:not(:first)').remove();
-    
-            // Add category options to select dropdown
-            categories.forEach(function(category) {
-                $categorySelect.append(`<option value="${category.id}">${category.name}</option>`);
-            });
-    
-            // Update category list for management
-            const $categoryList = $('.pandat69-category-list');
-            $categoryList.empty();
-    
-            if (categories.length === 0) {
-                $categoryList.html('<li class="pandat69-no-categories">No categories found.</li>');
-                return;
-            }
-    
-            categories.forEach(function(category) {
-                $categoryList.append(`
-                    <li class="pandat69-category-item">
-                        <span class="pandat69-category-name">${category.name}</span>
-                        <button type="button" class="pandat69-icon-button pandat69-delete-category-btn" data-category-id="${category.id}" title="Delete Category">×</button>
-                    </li>
-                `);
-            });
-    
-            // Add event handler for delete buttons
-            $('.pandat69-delete-category-btn').on('click', function() {
-                const categoryId = $(this).data('category-id');
-                deleteCategory(categoryId);
-            });
-        }
-    
-        function addCategory() {
-            const $form = $('.pandat69-add-category-form');
-            const $nameInput = $form.find('#pandat69-new-category-name');
-            const categoryName = $nameInput.val().trim();
-            const $message = $form.find('.pandat69-category-form-message');
-    
-            if (!categoryName) {
-                $message.text('Category name is required.').addClass('pandat69-error').fadeIn();
-                return;
-            }
-    
-            // Disable form while submitting
-            $form.find('input, button').prop('disabled', true);
-    
-            const $container = $('.pandat69-container');
-            const boardName = $container.data('board-name');
-    
-            $.ajax({
-                url: pandat69_ajax_object.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'pandat69_add_category',
-                    nonce: pandat69_ajax_object.nonce,
-                    board_name: boardName,
-                    name: categoryName
-                },
-                success: function(response) {
-                    if (response.success && response.data.category) {
-                        $message.text('Category added successfully.').removeClass('pandat69-error').addClass('pandat69-success').fadeIn();
-                        $nameInput.val('');
-    
-                        // Reload categories
-                        loadCategories();
-    
-                        // Auto-hide message after delay
-                        setTimeout(function() {
-                            $message.fadeOut();
-                        }, 3000);
-                    } else {
-                        console.error('Error adding category:', response.data?.message || 'Unknown error');
-                        $message.text(response.data?.message || 'Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('AJAX error:', error);
-                    $message.text('Failed to add category. Please try again.').removeClass('pandat69-success').addClass('pandat69-error').fadeIn();
-                },
-                complete: function() {
-                    $form.find('input, button').prop('disabled', false);
-                }
-            });
-        }
-    
         function addCategoryInline() {
             const $container = $('.pandat69-inline-category-form');
             const $nameInput = $container.find('.pandat69-new-category-name-inline');
@@ -2059,7 +2203,42 @@ function setupSupervisorAutocomplete() {
             userIds = userIds.filter(id => parseInt(id) !== parseInt(userId));
             $hiddenInput.val(userIds.join(','));
         }
-    
+
+        function loadPotentialParentTasks(taskId = 0) {
+            const $container = $('.pandat69-container');
+            const boardName = $container.data('board-name');
+            const $parentTaskSelect = $('#pandat69-parent-task');
+            
+            $parentTaskSelect.html('<option value="">-- None (Main Task) --</option>');
+            $parentTaskSelect.prop('disabled', true);
+            
+            $.ajax({
+                url: pandat69_ajax_object.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pandat69_fetch_potential_parent_tasks',
+                    nonce: pandat69_ajax_object.nonce,
+                    board_name: boardName,
+                    current_task_id: taskId
+                },
+                success: function(response) {
+                    if (response.success && response.data.parent_tasks) {
+                        response.data.parent_tasks.forEach(function(task) {
+                            $parentTaskSelect.append(`<option value="${task.id}">${task.name}</option>`);
+                        });
+                    } else {
+                        console.error('Error loading potential parent tasks:', response.data?.message || 'Unknown error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', error);
+                },
+                complete: function() {
+                    $parentTaskSelect.prop('disabled', false);
+                }
+            });
+        }        
+
         function addSelectedUserUI($container, userId, userName) {
             // Create selected user element
             const $selectedUser = $('<div class="pandat69-selected-user" data-user-id="' + userId + '">' + userName + '<span class="pandat69-remove-user">×</span></div>');
