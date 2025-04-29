@@ -1441,3 +1441,21 @@ div.pandat69-container,
 .pandat69-container .pandat69-task-item-details {
     position: relative;
 }
+
+.pandat69-deadline-type-selector {
+    margin-bottom: 10px;
+}
+
+.pandat69-deadline-type-selector label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.pandat69-deadline-type-selector input[type="radio"] {
+    margin-right: 5px;
+}
+
+.pandat69-deadline-date-input,
+.pandat69-deadline-days-input {
+    margin-top: 10px;
+}

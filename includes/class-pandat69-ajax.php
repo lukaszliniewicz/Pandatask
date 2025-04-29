@@ -153,19 +153,24 @@ class Pandat69_Ajax {
         }
     
         $data = array(
-             'board_name' => sanitize_key($_POST['board_name']),
-             'name' => sanitize_text_field($_POST['name']),
-             'description' => isset($_POST['description']) ? wp_kses_post($_POST['description']) : '',
-             'status' => sanitize_text_field($_POST['status']),
-             'category_id' => isset($_POST['category_id']) ? absint($_POST['category_id']) : null,
-             'priority' => absint($_POST['priority']),
-             'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
-             'assigned_persons' => $assigned_persons,
-             'supervisor_persons' => $supervisor_persons,
-             'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
-             'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
-             'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
-
+            'board_name' => sanitize_key($_POST['board_name']),
+            'name' => sanitize_text_field($_POST['name']),
+            'description' => isset($_POST['description']) ? wp_kses_post($_POST['description']) : '',
+            'status' => sanitize_text_field($_POST['status']),
+            'category_id' => isset($_POST['category_id']) ? absint($_POST['category_id']) : null,
+            'priority' => absint($_POST['priority']),
+            'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
+            'deadline_days_after_start' => isset($_POST['deadline_days_after_start']) && !empty($_POST['deadline_days_after_start']) 
+                ? absint($_POST['deadline_days_after_start']) 
+                : null,
+            'start_date' => isset($_POST['start_date']) && !empty($_POST['start_date']) 
+                ? sanitize_text_field($_POST['start_date']) 
+                : null,
+            'assigned_persons' => $assigned_persons,
+            'supervisor_persons' => $supervisor_persons,
+            'notify_deadline' => (isset($_POST['notify_deadline']) && $_POST['notify_deadline'] == 1) ? 1 : 0,
+            'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
+            'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
         );
     
          // Validate deadline format if provided
@@ -225,18 +230,23 @@ class Pandat69_Ajax {
         }
     
         $data = array(
-             'name' => sanitize_text_field($_POST['name']),
-             'description' => isset($_POST['description']) ? wp_kses_post($_POST['description']) : '',
-             'status' => sanitize_text_field($_POST['status']),
-             'category_id' => isset($_POST['category_id']) ? absint($_POST['category_id']) : null,
-             'priority' => absint($_POST['priority']),
-             'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
-             'assigned_persons' => $assigned_persons,
-             'supervisor_persons' => $supervisor_persons, // Add supervisor persons
-             'notify_deadline' => isset($_POST['notify_deadline']) ? 1 : 0,
-             'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
-             'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
-
+            'name' => sanitize_text_field($_POST['name']),
+            'description' => isset($_POST['description']) ? wp_kses_post($_POST['description']) : '',
+            'status' => sanitize_text_field($_POST['status']),
+            'category_id' => isset($_POST['category_id']) ? absint($_POST['category_id']) : null,
+            'priority' => absint($_POST['priority']),
+            'deadline' => isset($_POST['deadline']) && !empty($_POST['deadline']) ? sanitize_text_field($_POST['deadline']) : null,
+            'deadline_days_after_start' => isset($_POST['deadline_days_after_start']) && !empty($_POST['deadline_days_after_start']) 
+                ? absint($_POST['deadline_days_after_start']) 
+                : null,
+            'start_date' => isset($_POST['start_date']) && !empty($_POST['start_date']) 
+                ? sanitize_text_field($_POST['start_date']) 
+                : null,
+            'assigned_persons' => $assigned_persons,
+            'supervisor_persons' => $supervisor_persons,
+            'notify_deadline' => (isset($_POST['notify_deadline']) && $_POST['notify_deadline'] == 1) ? 1 : 0,
+            'notify_days_before' => isset($_POST['notify_days_before']) ? max(1, min(30, absint($_POST['notify_days_before']))) : 3,
+            'parent_task_id' => isset($_POST['parent_task_id']) && !empty($_POST['parent_task_id']) ? absint($_POST['parent_task_id']) : null,
         );
     
          // Validate deadline format if provided
@@ -489,18 +499,54 @@ class Pandat69_Ajax {
             wp_send_json_error(array('message' => 'Task ID and status are required.'));
         }
     
-        // Only update the status field
-        $data = array(
-            'status' => $status
-        );
+        // Get the current task before updating
+        $current_task = Pandat69_DB::get_task($task_id);
+        if (!$current_task) {
+            wp_send_json_error(array('message' => 'Task not found.'));
+        }
+    
+        // Prepare the update data
+        $data = array('status' => $status);
+        
+        // If changing from pending to in-progress, automatically set start date
+        $start_date = null;
+        $deadline = null;
+        $deadline_days_after_start = null;
+        
+        if ($status === 'in-progress' && $current_task->status === 'pending' && empty($current_task->start_date)) {
+            $data['start_date'] = date('Y-m-d', current_time('timestamp'));
+            $start_date = $data['start_date'];
+            
+            // If using days after start for deadline, calculate the actual deadline
+            if (!empty($current_task->deadline_days_after_start)) {
+                $start_date_obj = new DateTime($data['start_date']);
+                $start_date_obj->add(new DateInterval('P' . $current_task->deadline_days_after_start . 'D'));
+                $data['deadline'] = $start_date_obj->format('Y-m-d');
+                $deadline = $data['deadline'];
+                $deadline_days_after_start = $current_task->deadline_days_after_start;
+            }
+        }
     
         $result = Pandat69_DB::update_task($task_id, $data);
     
         if ($result) {
-            wp_send_json_success(array(
+            $response = array(
                 'message' => 'Status updated successfully.',
                 'status_text' => ucfirst(str_replace('-', ' ', $status))
-            ));
+            );
+            
+            // Include start date in response if it was set
+            if ($start_date) {
+                $response['start_date'] = $start_date;
+            }
+            
+            // Include deadline in response if it was calculated
+            if ($deadline) {
+                $response['deadline'] = $deadline;
+                $response['deadline_days_after_start'] = $deadline_days_after_start;
+            }
+            
+            wp_send_json_success($response);
         } else {
             wp_send_json_error(array('message' => 'Failed to update status.'));
         }

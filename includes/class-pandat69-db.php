@@ -34,21 +34,24 @@ class Pandat69_DB {
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             category_id BIGINT(20) UNSIGNED NULL,
             priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
+            start_date DATE NULL, /* New column for task start date */
             deadline DATE NULL,
+            deadline_days_after_start INT UNSIGNED NULL, /* For dynamic deadline calculation */
             notify_deadline TINYINT(1) NOT NULL DEFAULT 0,
             notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
             archived TINYINT(1) NOT NULL DEFAULT 0, 
-            parent_task_id BIGINT(20) UNSIGNED NULL, /* New column for subtasks */
+            parent_task_id BIGINT(20) UNSIGNED NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
+            PRIMARY KEY (id),
             KEY board_name (board_name),
             KEY status (status),
             KEY priority (priority),
             KEY deadline (deadline),
+            KEY start_date (start_date), /* New index */
             KEY category_id (category_id),
             KEY archived (archived),
-            KEY parent_task_id (parent_task_id) /* New index */
+            KEY parent_task_id (parent_task_id)
         ) $charset_collate;";
         dbDelta( $sql_tasks );
 
@@ -312,7 +315,8 @@ class Pandat69_DB {
             'status'        => sanitize_text_field($data['status']),
             'category_id'   => !empty($data['category_id']) ? absint($data['category_id']) : null,
             'priority'      => max(1, min(10, absint($data['priority']))),
-            'deadline'      => !empty($data['deadline']) ? sanitize_text_field($data['deadline']) : null,
+            'deadline_days_after_start' => !empty($data['deadline_days_after_start']) ? 
+                                    absint($data['deadline_days_after_start']) : null,
             'notify_deadline' => isset($data['notify_deadline']) ? absint($data['notify_deadline']) : 0,
             'notify_days_before' => isset($data['notify_days_before']) ? max(1, min(30, absint($data['notify_days_before']))) : 3,
             'parent_task_id' => !empty($data['parent_task_id']) ? absint($data['parent_task_id']) : null,
@@ -320,12 +324,44 @@ class Pandat69_DB {
             'updated_at'    => current_time('mysql', 1),
         );
 
-        $format = array('%s', '%s', '%s', '%s', '%d', '%d', '%s', '%d', '%d', '%s', '%s');
+        // Handle start_date based on status and input
+        if (!empty($data['start_date'])) {
+            $task_data['start_date'] = sanitize_text_field($data['start_date']);
+        } else if ($data['status'] === 'in-progress') {
+            // Default to today for in-progress tasks
+            $task_data['start_date'] = date('Y-m-d', current_time('timestamp'));
+        } else {
+            $task_data['start_date'] = null; // Null for pending tasks
+        }
+
+        // Handle deadline based on type
+        if (!empty($data['deadline_days_after_start']) && !empty($task_data['start_date'])) {
+            // Calculate deadline based on days after start
+            $start_date = new DateTime($task_data['start_date']);
+            $start_date->add(new DateInterval('P' . absint($data['deadline_days_after_start']) . 'D'));
+            $task_data['deadline'] = $start_date->format('Y-m-d');
+        } else if (!empty($data['deadline'])) {
+            // Use specific date provided
+            $task_data['deadline'] = sanitize_text_field($data['deadline']);
+        } else {
+            $task_data['deadline'] = null;
+        }
+
+        $format = array('%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%d', '%d', '%s', '%s');
         if ($task_data['category_id'] === null) {
             $format[4] = '%s'; // Pass null correctly
         }
+        if ($task_data['start_date'] === null) {
+            $format[7] = '%s'; // Format for start_date null
+        }
         if ($task_data['deadline'] === null) {
-            $format[6] = '%s';
+            $format[8] = '%s'; // Format for deadline null
+        }
+        if ($task_data['deadline_days_after_start'] === null) {
+            $format[6] = '%s'; // Format for deadline_days_after_start null
+        }
+        if ($task_data['parent_task_id'] === null) {
+            $format[9] = '%s'; // Format for parent_task_id null
         }
 
         $result = $wpdb->insert($tasks_table, $task_data, $format);
@@ -360,10 +396,18 @@ class Pandat69_DB {
         $prefix = self::get_db_prefix();
         $tasks_table = $prefix . 'tasks';
 
+        // Get current task for comparison
+        $current_task = self::get_task($task_id);
+        if (!$current_task) {
+            error_log("PANDAT69 DB Error: Attempting to update non-existent task $task_id");
+            return false;
+        }
+
         // Whitelist of allowed fields in the 'tasks' table that can be updated this way
         $allowed_task_fields = [
             'name', 'description', 'status', 'category_id', 'priority', 'deadline', 
-            'archived', 'notify_deadline', 'notify_days_before', 'parent_task_id'
+            'deadline_days_after_start', 'start_date', 'archived', 'notify_deadline', 
+            'notify_days_before', 'parent_task_id'
         ];
 
         $update_data = []; // Array to hold columns to be updated in the DB
@@ -386,6 +430,58 @@ class Pandat69_DB {
             } elseif ($key === 'status') {
                 $update_data['status'] = sanitize_text_field($value);
                 $format[] = '%s';
+                
+                // If changing to in-progress and no start date yet, set one
+                if ($value === 'in-progress' && 
+                    $current_task->status === 'pending' && 
+                    empty($current_task->start_date)) {
+                    
+                    $update_data['start_date'] = date('Y-m-d', current_time('timestamp'));
+                    $format[] = '%s';
+                    
+                    // If using days-after-start for deadline, calculate actual deadline
+                    if (!empty($current_task->deadline_days_after_start)) {
+                        $start_date = new DateTime($update_data['start_date']);
+                        $start_date->add(new DateInterval('P' . $current_task->deadline_days_after_start . 'D'));
+                        $update_data['deadline'] = $start_date->format('Y-m-d');
+                        $format[] = '%s';
+                    }
+                }
+            } elseif ($key === 'start_date') {
+                if (empty($value)) {
+                    $update_data['start_date'] = null;
+                    $format[] = '%s';
+                } else {
+                    $update_data['start_date'] = sanitize_text_field($value);
+                    $format[] = '%s';
+                    
+                    // If start date changes and using days-after-start, recalculate deadline
+                    if (!empty($current_task->deadline_days_after_start) && 
+                        $value !== $current_task->start_date) {
+                        
+                        $start_date = new DateTime($value);
+                        $start_date->add(new DateInterval('P' . $current_task->deadline_days_after_start . 'D'));
+                        $update_data['deadline'] = $start_date->format('Y-m-d');
+                        $format[] = '%s';
+                    }
+                }
+            } elseif ($key === 'deadline_days_after_start') {
+                if (empty($value)) {
+                    $update_data['deadline_days_after_start'] = null;
+                    $format[] = '%s';
+                } else {
+                    $days = absint($value);
+                    $update_data['deadline_days_after_start'] = $days;
+                    $format[] = '%d';
+                    
+                    // If we have a start date, calculate the actual deadline
+                    if (!empty($current_task->start_date)) {
+                        $start_date = new DateTime($current_task->start_date);
+                        $start_date->add(new DateInterval('P' . $days . 'D'));
+                        $update_data['deadline'] = $start_date->format('Y-m-d');
+                        $format[] = '%s';
+                    }
+                }
             } elseif ($key === 'category_id') {
                 // Handle empty/null category selection
                 $update_data['category_id'] = !empty($value) ? absint($value) : null;
@@ -404,17 +500,14 @@ class Pandat69_DB {
                     $format[] = '%s';
                 } else {
                     // Invalid date format passed - skip updating this field to prevent errors
-                    // Optionally log this: error_log("PANDAT69 Invalid deadline format received for task $task_id: $value");
                     continue;
                 }
             } elseif ($key === 'archived') {
                 $update_data['archived'] = absint($value) ? 1 : 0;
                 $format[] = '%d';
-
             } elseif ($key === 'parent_task_id') {
                 $update_data['parent_task_id'] = !empty($value) ? absint($value) : null;
                 $format[] = ($update_data['parent_task_id'] === null) ? '%s' : '%d';
-
             } elseif ($key === 'notify_deadline') {
                 $update_data['notify_deadline'] = absint($value) ? 1 : 0;
                 $format[] = '%d';
@@ -465,7 +558,6 @@ class Pandat69_DB {
         }
 
         // Return true if the update query executed without error
-        // Note: $result might be 0 if the data didn't actually change, but that's not an error.
         return true;
     }
     public static function delete_task($task_id) {
@@ -638,6 +730,38 @@ class Pandat69_DB {
             return array();
         endif;
 
+    }
+
+    /**
+     * Checks for tasks that should start today and updates their status.
+     * Should be called by a daily cron job.
+     *
+     * @return int Number of tasks that were started
+     */
+    public static function check_tasks_to_start() {
+        global $wpdb;
+        $prefix = self::get_db_prefix();
+        $tasks_table = $prefix . 'tasks';
+        
+        $today = date('Y-m-d');
+        
+        // Find pending tasks with start_date = today
+        $tasks = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$tasks_table}
+            WHERE status = 'pending'
+            AND start_date = %s
+            AND archived = 0",
+            $today
+        ));
+        
+        foreach($tasks as $task) {
+            // Update status to in-progress
+            self::update_task($task->id, array(
+                'status' => 'in-progress'
+            ));
+        }
+        
+        return count($tasks);
     }
 
     /**

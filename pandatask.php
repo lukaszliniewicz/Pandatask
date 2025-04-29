@@ -150,6 +150,45 @@ function pandat69_enqueue_scripts() {
 add_action( 'wp_enqueue_scripts', 'pandat69_enqueue_scripts' );
 
 /**
+ * Register daily scheduler for checking tasks that should start today
+ */
+function pandat69_register_task_start_scheduler() {
+    if (!wp_next_scheduled('pandat69_daily_task_start_check')) {
+        wp_schedule_event(time(), 'daily', 'pandat69_daily_task_start_check');
+    }
+}
+add_action('wp', 'pandat69_register_task_start_scheduler');
+
+/**
+ * Callback for the daily task start check
+ */
+function pandat69_daily_task_start_check() {
+    if (class_exists('Pandat69_DB')) {
+        $started_tasks = Pandat69_DB::check_tasks_to_start();
+        if ($started_tasks > 0) {
+            error_log("Pandatask: $started_tasks tasks automatically started today");
+        }
+    }
+}
+add_action('pandat69_daily_task_start_check', 'pandat69_daily_task_start_check');
+
+/**
+ * Cleanup scheduler on plugin deactivation
+ */
+function pandat69_deactivate_task_start_scheduler() {
+    $timestamp = wp_next_scheduled('pandat69_daily_task_start_check');
+    if ($timestamp) {
+        wp_unschedule_event($timestamp, 'pandat69_daily_task_start_check');
+    }
+}
+register_deactivation_hook(__FILE__, 'pandat69_deactivate_task_start_scheduler');
+
+function pandat69_register_deadline_notification_scheduler() {
+    Pandat69_Deadline_Notifications::init();
+}
+add_action('wp', 'pandat69_register_deadline_notification_scheduler');
+
+/**
  * Check if BuddyPress is active.
  * Uses bp_is_active to check if the core component is running.
  *

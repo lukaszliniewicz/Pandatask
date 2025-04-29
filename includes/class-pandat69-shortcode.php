@@ -150,6 +150,11 @@ class Pandat69_Shortcode {
                                     <option value="done">Done</option>
                                 </select>
                             </div>
+                            <div class="pandat69-form-field pandat69-form-field-half">
+                                <label for="pandat69-task-start-date">Start Date:</label>
+                                <input type="text" id="pandat69-task-start-date" name="start_date" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
+                                <p class="pandat69-description">Leave empty for pending tasks. Will be set automatically when task becomes in-progress.</p>
+                            </div>
                              <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-priority">Priority (1-10):</label>
                                 <input type="number" id="pandat69-task-priority" name="priority" class="pandat69-input" min="1" max="10" value="5" required>
@@ -184,8 +189,27 @@ class Pandat69_Shortcode {
                                 </select>
                             </div>
                             <div class="pandat69-form-field pandat69-form-field-half">
-                                <label for="pandat69-task-deadline">Deadline:</label>
-                                <input type="text" id="pandat69-task-deadline" name="deadline" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
+                                <label>Deadline Setting:</label>
+                                <div class="pandat69-deadline-type-selector">
+                                    <label>
+                                        <input type="radio" name="deadline_type" value="date" checked> 
+                                        Specific date
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="deadline_type" value="days_after"> 
+                                        Days after start
+                                    </label>
+                                </div>
+                                
+                                <div class="pandat69-deadline-date-input">
+                                    <label for="pandat69-task-deadline">Deadline Date:</label>
+                                    <input type="text" id="pandat69-task-deadline" name="deadline" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
+                                </div>
+                                
+                                <div class="pandat69-deadline-days-input" style="display: none;">
+                                    <label for="pandat69-task-deadline-days">Days after start:</label>
+                                    <input type="number" id="pandat69-task-deadline-days" name="deadline_days_after_start" class="pandat69-input" min="1" value="7">
+                                </div>
                             </div>
                         </div>
                         <div class="pandat69-form-field">

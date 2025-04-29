@@ -228,6 +228,14 @@ jQuery(document).ready(function($) {
             loadTasks();
         });
 
+        $('#pandat69-task-status').on('change', function() {
+            updateStartDateBasedOnStatus();
+        });
+        
+        $('input[name="deadline_type"]').on('change', function() {
+            toggleDeadlineInputs();
+        });
+
         // User search input
         setupUserAutocomplete();
         setupSupervisorAutocomplete();
@@ -351,6 +359,29 @@ jQuery(document).ready(function($) {
             $dropdown.remove();
         });
     });
+
+    function updateStartDateBasedOnStatus() {
+        const status = $('#pandat69-task-status').val();
+        const $startDate = $('#pandat69-task-start-date');
+        
+        if (status === 'in-progress' && !$startDate.val()) {
+            // Set to current date if changing to in-progress
+            const today = new Date();
+            $startDate.datepicker('setDate', today);
+        }
+    }
+    
+    function toggleDeadlineInputs() {
+        const deadlineType = $('input[name="deadline_type"]:checked').val();
+        
+        if (deadlineType === 'date') {
+            $('.pandat69-deadline-date-input').show();
+            $('.pandat69-deadline-days-input').hide();
+        } else {
+            $('.pandat69-deadline-date-input').hide();
+            $('.pandat69-deadline-days-input').show();
+        }
+    }
 
     function setupTabs() {
         $('.pandat69-tab-item').on('click', function() {
@@ -553,7 +584,8 @@ jQuery(document).ready(function($) {
                 <div class="pandat69-task-item-meta">
                     <span><span class="pandat69-task-status pandat69-status-${task.status}" data-status="${task.status}">${task.status.replace('-', ' ')}</span></span>
                     <span><strong>Priority:</strong> ${task.priority}</span>
-                    ${task.deadline ? `<span><strong>Deadline:</strong> ${task.deadline}</span>` : ''}
+                    ${task.start_date ? `<span><strong>Started:</strong> ${task.start_date}</span>` : ''}
+                    ${task.deadline ? `<span><strong>Deadline:</strong> ${task.deadline}${task.deadline_days_after_start ? ` (${task.deadline_days_after_start} days after start)` : ''}</span>` : ''}
                     <span><strong>Category:</strong> ${task.category_name}</span>
                     <span><strong>Assigned to:</strong> ${task.assigned_user_names}</span>
                     <span><strong>Supervisors:</strong> ${task.supervisor_user_names}</span>
@@ -569,7 +601,7 @@ jQuery(document).ready(function($) {
                 }
             </div>
         </li>`;
-    }   
+    }
 
     function loadArchivedTasks() {
         const $container = $('.pandat69-container');
@@ -998,9 +1030,27 @@ jQuery(document).ready(function($) {
                     <span class="pandat69-detail-value">${task.category_name}</span>
                 </div>
                 <div class="pandat69-detail-item">
+                    <span class="pandat69-detail-label">Start Date:</span>
+                    <span class="pandat69-detail-value">${task.start_date || 'Not started'}</span>
+                </div>`;
+                
+        // Different display for deadlines based on how they were set
+        if (task.deadline) {
+            html += `
+                <div class="pandat69-detail-item">
                     <span class="pandat69-detail-label">Deadline:</span>
-                    <span class="pandat69-detail-value">${task.deadline || 'No deadline'}</span>
-                </div>
+                    <span class="pandat69-detail-value">${task.deadline}${task.deadline_days_after_start ? 
+                        ` (${task.deadline_days_after_start} days after start)` : ''}</span>
+                </div>`;
+        } else {
+            html += `
+                <div class="pandat69-detail-item">
+                    <span class="pandat69-detail-label">Deadline:</span>
+                    <span class="pandat69-detail-value">No deadline</span>
+                </div>`;
+        }
+        
+        html += `
                 <div class="pandat69-detail-item">
                     <span class="pandat69-detail-label">Assigned to:</span>
                     <span class="pandat69-detail-value">${task.assigned_user_names}</span>
@@ -1009,7 +1059,7 @@ jQuery(document).ready(function($) {
                     <span class="pandat69-detail-label">Supervisors:</span>
                     <span class="pandat69-detail-value">${task.supervisor_user_names}</span>
                 </div>`;
-                
+                    
         // Add parent task information if this is a subtask
         if (task.parent_task_id && task.parent_task_name) {
             html += `
@@ -1098,6 +1148,29 @@ jQuery(document).ready(function($) {
         container.find('.pandat69-unarchive-task-detail-btn').on('click', function() {
             unarchiveTask(task.id);
         });
+    }
+
+    // Helper function to update UI when start date changes
+    function updateTaskStartDateUI(taskId, startDate) {
+        const taskItem = $('.pandat69-task-item[data-task-id="' + taskId + '"]');
+        const metaContainer = taskItem.find('.pandat69-task-item-meta');
+        
+        // Add or update start date element in task list
+        const startDateElement = metaContainer.find('span:contains("Started:")');
+        if (startDateElement.length) {
+            startDateElement.html('<strong>Started:</strong> ' + startDate);
+        } else {
+            metaContainer.find('span:contains("Priority:")').after(
+                '<span><strong>Started:</strong> ' + startDate + '</span>'
+            );
+        }
+        
+        // Update in task details if open
+        const detailsContainer = $('.pandat69-task-details-expandable[data-task-id="' + taskId + '"]');
+        if (detailsContainer.length) {
+            detailsContainer.find('.pandat69-detail-value:contains("Not started")')
+                .text(startDate);
+        }
     }
 
     function deleteTask(taskId) {
@@ -1240,7 +1313,7 @@ jQuery(document).ready(function($) {
 
     function updateTaskStatus(taskId, newStatus, button) {
         button.prop('disabled', true);
-
+    
         $.ajax({
             url: pandat69_ajax_object.ajax_url,
             type: 'POST',
@@ -1258,17 +1331,69 @@ jQuery(document).ready(function($) {
                         .removeClass()
                         .addClass('pandat69-task-status pandat69-status-' + newStatus)
                         .text(newStatus.replace('-', ' '));
-
+    
                     // Update status in the details view
                     const detailsContainer = $('.pandat69-task-details-expandable[data-task-id="' + taskId + '"]');
                     detailsContainer.find('.pandat69-detail-value.pandat69-task-status')
                         .removeClass()
                         .addClass('pandat69-detail-value pandat69-task-status pandat69-status-' + newStatus)
                         .text(newStatus.replace('-', ' '));
-
+    
                     // Update button data attribute
                     button.data('current-status', newStatus);
-
+    
+                    // If a start date was automatically set (when moving to in-progress)
+                    if (response.data.start_date) {
+                        // Update start date in task list item
+                        const metaContainer = taskItem.find('.pandat69-task-item-meta');
+                        const startDateElement = metaContainer.find('span:contains("Started:")');
+                        
+                        if (startDateElement.length) {
+                            // Update existing start date element
+                            startDateElement.html(`<strong>Started:</strong> ${response.data.start_date}`);
+                        } else {
+                            // Add start date element after priority
+                            metaContainer.find('span:contains("Priority:")').after(
+                                `<span><strong>Started:</strong> ${response.data.start_date}</span>`
+                            );
+                        }
+                        
+                        // Update start date in details view if open
+                        if (detailsContainer.length) {
+                            const startDateDetailElement = detailsContainer.find('.pandat69-detail-label:contains("Start Date:")').next();
+                            if (startDateDetailElement.length) {
+                                startDateDetailElement.text(response.data.start_date);
+                            }
+                        }
+                        
+                        // If deadline was also calculated from days-after-start, update deadline display
+                        if (response.data.deadline) {
+                            // Update deadline in task list item
+                            const deadlineElement = metaContainer.find('span:contains("Deadline:")');
+                            const deadlineText = response.data.deadline_days_after_start ? 
+                                `${response.data.deadline} (${response.data.deadline_days_after_start} days after start)` : 
+                                response.data.deadline;
+                                
+                            if (deadlineElement.length) {
+                                // Update existing deadline element
+                                deadlineElement.html(`<strong>Deadline:</strong> ${deadlineText}`);
+                            } else {
+                                // Add deadline element
+                                metaContainer.find('span:contains("Started:")').after(
+                                    `<span><strong>Deadline:</strong> ${deadlineText}</span>`
+                                );
+                            }
+                            
+                            // Update deadline in details view if open
+                            if (detailsContainer.length) {
+                                const deadlineDetailElement = detailsContainer.find('.pandat69-detail-label:contains("Deadline:")').next();
+                                if (deadlineDetailElement.length) {
+                                    deadlineDetailElement.html(deadlineText);
+                                }
+                            }
+                        }
+                    }
+    
                     // Show a temporary status updated message
                     const statusMsg = $('<span class="pandat69-status-updated">✓ Updated</span>');
                     button.after(statusMsg);
@@ -1300,11 +1425,17 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-priority').val('5');
         $form.find('#pandat69-task-category').val('');
         $form.find('#pandat69-task-deadline').val('');
+        $form.find('#pandat69-task-start-date').val(''); // Reset start date
         $form.find('#pandat69-task-assigned').val('');
         $form.find('.pandat69-selected-users-container').empty();
         $form.find('#pandat69-task-supervisor').val('');
         $form.find('.pandat69-supervisor-container .pandat69-selected-users-container').empty();
     
+        // Reset deadline type and days input
+        $('input[name="deadline_type"][value="date"]').prop('checked', true);
+        $('#pandat69-task-deadline-days').val('7'); // Default to 7 days
+        toggleDeadlineInputs(); // Show/hide the appropriate inputs
+        
         // Reset TinyMCE if active
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
             tinymce.get('pandat69-task-description').setContent('');
@@ -1326,6 +1457,7 @@ jQuery(document).ready(function($) {
         // Update form title
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Add New Task');
     }
+    
 
     function fillTaskForm(task) {
         const $form = $('.pandat69-task-form');
@@ -1336,7 +1468,20 @@ jQuery(document).ready(function($) {
         $form.find('#pandat69-task-status').val(task.status);
         $form.find('#pandat69-task-priority').val(task.priority);
         $form.find('#pandat69-task-category').val(task.category_id || '');
-        $form.find('#pandat69-task-deadline').val(task.deadline || '');
+        $form.find('#pandat69-task-start-date').val(task.start_date || ''); // Fill start date
+        
+        // Set deadline fields based on whether we're using days after start
+        if (task.deadline_days_after_start) {
+            $('input[name="deadline_type"][value="days_after"]').prop('checked', true);
+            $('#pandat69-task-deadline-days').val(task.deadline_days_after_start);
+            $('#pandat69-task-deadline').val(task.deadline || ''); // Still show the calculated date
+        } else {
+            $('input[name="deadline_type"][value="date"]').prop('checked', true);
+            $('#pandat69-task-deadline').val(task.deadline || '');
+        }
+        
+        // Toggle deadline inputs based on selection
+        toggleDeadlineInputs();
         
         // Set description in TinyMCE or textarea
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
@@ -1424,24 +1569,37 @@ jQuery(document).ready(function($) {
         // Update form title
         $('.pandat69-add-task-section .pandat69-expandable-header h3').text('Edit Task');
     }
+    
 
 
     function submitTaskForm() {
         const $form = $('.pandat69-task-form');
         const taskId = $form.find('#pandat69-task-id').val();
         const isEdit = !!taskId;
-
+    
         // Get form data
         const name = $form.find('#pandat69-task-name').val().trim();
         let description = '';
-
+    
         // Get description from TinyMCE if active
         if (typeof tinymce !== 'undefined' && tinymce.get('pandat69-task-description')) {
             description = tinymce.get('pandat69-task-description').getContent();
         } else {
             description = $form.find('#pandat69-task-description').val();
         }
-
+    
+        // Handle deadline type options
+        const deadlineType = $('input[name="deadline_type"]:checked').val();
+        let deadline = '';
+        let deadline_days_after_start = '';
+        
+        if (deadlineType === 'days_after') {
+            deadline_days_after_start = $('#pandat69-task-deadline-days').val();
+            // Leave deadline empty - will be calculated server-side
+        } else {
+            deadline = $('#pandat69-task-deadline').val();
+        }
+    
         const formData = {
             action: isEdit ? 'pandat69_update_task' : 'pandat69_add_task',
             nonce: pandat69_ajax_object.nonce,
@@ -1451,29 +1609,31 @@ jQuery(document).ready(function($) {
             status: $form.find('#pandat69-task-status').val(),
             category_id: $form.find('#pandat69-task-category').val(),
             priority: $form.find('#pandat69-task-priority').val(),
-            deadline: $form.find('#pandat69-task-deadline').val(),
+            deadline: deadline,
+            deadline_days_after_start: deadline_days_after_start,
+            start_date: $form.find('#pandat69-task-start-date').val(),
             assigned_persons: $form.find('#pandat69-task-assigned').val(),
             supervisor_persons: $form.find('#pandat69-task-supervisor').val(),
             notify_deadline: $form.find('#pandat69-notify-deadline').is(':checked') ? 1 : 0,
             notify_days_before: $form.find('#pandat69-notify-days-before').val(),
             parent_task_id: $form.find('#pandat69-parent-task').val()
         };
-
+    
         // Add task ID if editing
         if (isEdit) {
             formData.task_id = taskId;
         }
-
+    
         // Basic validation
         if (!formData.name) {
             showFormMessage($form, 'error', 'Task name is required.');
             return;
         }
-
+    
         // Disable form while submitting
         $form.find('input, select, textarea, button').prop('disabled', true);
         $form.find('.pandat69-submit-task-btn').text(isEdit ? 'Updating...' : 'Adding...');
-
+    
         $.ajax({
             url: pandat69_ajax_object.ajax_url,
             type: 'POST',
@@ -1481,17 +1641,17 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     showFormMessage($form, 'success', isEdit ? 'Task updated successfully.' : 'Task added successfully.');
-
+    
                     // Reload tasks
                     loadTasks();
-
+    
                     // If we're in week or month view, refresh those too
                     if ($('.pandat69-tab-week').hasClass('active')) {
                         loadWeekTasks();
                     } else if ($('.pandat69-tab-month').hasClass('active')) {
                         loadMonthTasks();
                     }
-
+    
                     // Reset form
                     setTimeout(function() {
                         resetTaskForm();
