@@ -111,11 +111,6 @@ The plugin leverages BuddyPress's existing group privacy and membership system. 
 *   No granular roles *within the board itself* beyond Assignee/Supervisor for notifications/filtering. Overall access is via page/group permissions.
 *   Subtask hierarchy doesn't prevent deep circular references (e.g., making a grandchild task the parent of its grandparent) through the UI currently.
 
-## Screenshots
-
-![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
-*(Main task list view)*
-
 ## Changelog
 
 ### 1.0.9
