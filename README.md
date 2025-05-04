@@ -2,8 +2,6 @@
 
 A WordPress plugin that adds task management boards, including in BuddyPress groups (can be turned on for individual groups), via a shortcode.
 
-![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
-
 ## Overview
 
 This plugin provides a way to display and manage task lists directly within WordPress pages or posts. It uses a shortcode, `[task_board]`, to render the board interface. You can create multiple distinct boards by specifying a unique `board_name` in the shortcode.
