@@ -2,7 +2,7 @@
 
 A WordPress plugin that adds task management boards via a shortcode, including optional integration with BuddyPress groups. Features list view, week/month calendar overviews, subtasks, user assignments & supervisors, and notifications.
 
-![Task Board Screenshot](https://github.com/user-attachments/assets/08a516fc-2987-486f-8dab-8ff3f79c9190)
+![Task Board Screenshot (GIF)](https://github.com/user-attachments/assets/2c46f6bb-59c5-4c40-b45f-cfe2c5ce164b)
 
 ## Overview
 
