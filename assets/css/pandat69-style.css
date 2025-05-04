@@ -198,7 +198,7 @@ div.pandat69-container,
     padding: 15px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     cursor: pointer;
     transition: box-shadow 0.2s ease;
     flex-wrap: wrap;
@@ -224,8 +224,9 @@ div.pandat69-container,
     font-size: 0.9em;
     color: #5d6b7b;
     display: flex;
-    gap: 15px;
     flex-wrap: wrap;
+    flex-direction: row;
+    gap:10px;
 }
 
 .pandat69-container .pandat69-task-item-meta span {
@@ -549,6 +550,7 @@ div.pandat69-container,
     padding: 4px !important;
     color: #384D68 !important;
 }
+
 
 /* User Autocomplete */
 .pandat69-container .pandat69-user-autocomplete-container {
@@ -1301,7 +1303,6 @@ div.pandat69-container,
     font-size: 0.9em;
     color: #5d6b7b;
     display: flex;
-    gap: 15px;
     flex-wrap: wrap;
 }
 
@@ -1458,4 +1459,751 @@ div.pandat69-container,
 .pandat69-deadline-date-input,
 .pandat69-deadline-days-input {
     margin-top: 10px;
+}
+/* Task view mode styles */
+.pandat69-container .pandat69-task-item-details {
+    position: relative;
+    padding-left: 25px; /* Make room for indicators */
+}
+
+/* Task type indicators */
+.pandat69-container .pandat69-task-type-label {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    color: white !important;
+    text-transform: capitalize;
+    margin-left: 5px;
+    border-radius: 3px;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+
+.pandat69-container .pandat69-type-start {
+    background-color: #81c784; /* Light green */
+}
+
+.pandat69-container .pandat69-type-deadline {
+    background-color: #ef5350; /* Light red */
+}
+
+.pandat69-container .pandat69-type-spanning {
+    background-color: #64b5f6; /* Light blue */
+}
+
+.pandat69-container .pandat69-type-both {
+    background-color: #ce93d8; /* Light purple */
+}
+
+/* Task border colors - keeping these for visual cues */
+.pandat69-container .pandat69-starting-task {
+    border-left: 3px solid #81c784;
+}
+
+.pandat69-container .pandat69-deadline-task {
+    border-left: 3px solid #ef5350;
+}
+
+.pandat69-container .pandat69-spanning-task {
+    border-left: 3px solid #64b5f6;
+}
+
+/* Combined indicators (tasks that match multiple criteria) */
+.pandat69-container .pandat69-starting-task.pandat69-deadline-task {
+    border-left: 3px solid #ce93d8; /* Purple for tasks that both start and end in the period */
+}
+
+/* Highlight for parent task information in subtasks */
+.pandat69-container .pandat69-parent-task-highlight {
+    background-color: #f8f9fa;
+    border-left: 3px solid #9e9e9e;
+    padding: 3px 8px;
+    margin: 2px 0;
+    display: inline-block;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.pandat69-container .pandat69-parent-task-highlight strong {
+    color: #607d8b;
+}
+
+/* Regular task view - maintain indentation and arrow indicator */
+.pandat69-container .pandat69-tab-all .pandat69-subtask {
+    margin-left: 30px;
+    position: relative;
+    border-left: 3px dashed #9e9e9e;
+}
+
+.pandat69-container .pandat69-tab-all .pandat69-subtask::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 0;
+    height: 50%;
+    width: 10px;
+}
+
+.pandat69-container .pandat69-tab-all .pandat69-subtask-indicator {
+    position: absolute;
+    left: -33px;
+    color: #384D68;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+/* Week/Month overview - no indentation but highlighted parent info */
+.pandat69-container .pandat69-tab-week .pandat69-subtask,
+.pandat69-container .pandat69-tab-month .pandat69-subtask,
+.pandat69-container .pandat69-tab-archive .pandat69-subtask {
+    margin-left: 0;
+    border-left: 3px dashed #9e9e9e;
+}
+
+/* Show All view sections */
+.pandat69-container .pandat69-week-section {
+    margin-bottom: 30px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pandat69-container .pandat69-week-section h3 {
+    color: #384D68;
+    padding: 10px 15px !important;
+    margin: 0;
+    font-size: 1.1em;
+    border: solid #384D68 1px;
+}
+
+/* View mode controls */
+.pandat69-container .pandat69-view-options {
+    background-color: #f5f7fa;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.pandat69-container .pandat69-view-mode,
+.pandat69-container .pandat69-per-day-options {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.pandat69-container .pandat69-view-options label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    cursor: pointer;
+    font-weight: normal;
+    font-size: 16px;
+}
+
+.pandat69-container .pandat69-view-options input[type="radio"],
+.pandat69-container .pandat69-view-options input[type="checkbox"] {
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .pandat69-container .pandat69-view-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+
+/* Full-screen Modal Styles */
+#pandat69-fullscreen-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+#pandat69-fullscreen-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.pandat69-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 1000000;
+}
+
+.pandat69-modal-container {
+    position: relative;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background-color: #ffffff;
+    border-radius: 5px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1000001;
+}
+
+.pandat69-modal-content {
+    padding: 25px;
+    position: relative;
+}
+
+.pandat69-modal-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e5eb;
+}
+
+.pandat69-modal-header h3 {
+    margin: 0;
+    font-size: 1.5em;
+    color: #384D68;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.pandat69-modal-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #384D68;
+    cursor: pointer;
+    z-index: 1000002;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f5f7fa;
+}
+
+.pandat69-modal-close:hover {
+    background-color: #e0e5eb;
+}
+
+.pandat69-modal-body {
+    width: 100%;
+}
+
+/* When modal is open, prevent page scrolling */
+body.pandat69-modal-open {
+    overflow: hidden;
+}
+
+/* Safeguard for stacking - ensure all inner elements have proper z-index */
+#pandat69-fullscreen-modal .pandat69-form,
+#pandat69-fullscreen-modal .pandat69-form-field,
+#pandat69-fullscreen-modal .pandat69-expandable-section,
+#pandat69-fullscreen-modal .pandat69-expandable-content {
+    z-index: auto !important;
+}
+
+/* Form elements inside modal */
+#pandat69-fullscreen-modal .pandat69-form-field {
+    margin-bottom: 15px;
+}
+
+#pandat69-fullscreen-modal label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #384D68;
+}
+
+#pandat69-fullscreen-modal .pandat69-input,
+#pandat69-fullscreen-modal .pandat69-select,
+#pandat69-fullscreen-modal .pandat69-textarea,
+#pandat69-fullscreen-modal input[type="text"].pandat69-input,
+#pandat69-fullscreen-modal input[type="number"].pandat69-input,
+#pandat69-fullscreen-modal select.pandat69-select,
+#pandat69-fullscreen-modal textarea.pandat69-textarea {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
+    width: 100%;
+    color: #384D68;
+    line-height: 1.5;
+    height: auto;
+    min-height: 38px;
+    box-shadow: none;
+    font-family: inherit;
+    display: block;
+    opacity: 1 !important;
+    visibility: visible !important;
+    position: static !important;
+}
+
+#pandat69-fullscreen-modal .pandat69-select,
+#pandat69-fullscreen-modal select.pandat69-select {
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    appearance: menulist;
+    background-color: #fff;
+    height: 38px;
+    padding: 5px 10px;
+    background-image: none;
+    cursor: pointer;
+    max-width: 100%;
+}
+
+#pandat69-fullscreen-modal .pandat69-textarea,
+#pandat69-fullscreen-modal textarea.pandat69-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Button styles */
+#pandat69-fullscreen-modal .pandat69-button,
+#pandat69-fullscreen-modal button.pandat69-button {
+    background-color: #ffffff;
+    color: #384D68;
+    border: 1px solid #384D68;
+    padding: 8px 15px;
+    text-decoration: none;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.5;
+    box-shadow: none;
+    font-weight: normal;
+    height: auto;
+    text-shadow: none;
+    margin-bottom: 0;
+    border-radius: 3px;
+}
+
+#pandat69-fullscreen-modal .pandat69-button:hover,
+#pandat69-fullscreen-modal button.pandat69-button:hover {
+    background-color: #384D68;
+    color: #ffffff;
+    border-color: #384D68;
+}
+
+#pandat69-fullscreen-modal .pandat69-submit-task-btn,
+#pandat69-fullscreen-modal .pandat69-add-category-btn {
+    background-color: #384D68;
+    color: #ffffff;
+    font-weight: 600;
+    min-width: 120px;
+}
+
+#pandat69-fullscreen-modal .pandat69-submit-task-btn:hover,
+#pandat69-fullscreen-modal .pandat69-add-category-btn:hover {
+    background-color: #2a3b50;
+}
+
+/* Form actions */
+#pandat69-fullscreen-modal .pandat69-form-actions {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+/* Category section specific styles */
+#pandat69-fullscreen-modal .pandat69-category-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+#pandat69-fullscreen-modal .pandat69-category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px dashed #f0f0f0;
+    background-color: #fff;
+    margin-bottom: 5px;
+    border-radius: 3px;
+}
+
+#pandat69-fullscreen-modal .pandat69-category-item:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+#pandat69-fullscreen-modal .pandat69-category-name {
+    font-weight: 500;
+}
+
+#pandat69-fullscreen-modal .pandat69-add-category-form {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 3px;
+    border: 1px solid #eee;
+}
+
+#pandat69-fullscreen-modal .pandat69-add-category-form label {
+    margin-bottom: 8px;
+}
+
+/* Adjusted expandable section styles in modal */
+#pandat69-fullscreen-modal .pandat69-expandable-section {
+    display: block !important;
+    border: none;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background: transparent;
+}
+
+#pandat69-fullscreen-modal .pandat69-expandable-content {
+    padding: 0;
+    display: block !important;
+}
+
+/* Hide the original headers when in modal */
+#pandat69-fullscreen-modal .pandat69-expandable-header {
+    display: none !important;
+}
+
+/* Form rows layout */
+#pandat69-fullscreen-modal .pandat69-form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+#pandat69-fullscreen-modal .pandat69-form-field-half {
+    flex: 1;
+    min-width: 0;
+}
+
+/* TinyMCE specific handling */
+#pandat69-fullscreen-modal .mce-tinymce {
+    border: 1px solid #ccc !important;
+    visibility: visible !important;
+    display: block !important;
+    opacity: 1 !important;
+}
+
+#pandat69-fullscreen-modal .mce-panel,
+#pandat69-fullscreen-modal .mce-container {
+    z-index: auto !important;
+}
+
+/* Category input group */
+#pandat69-fullscreen-modal .pandat69-category-input-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+#pandat69-fullscreen-modal .pandat69-category-input-group .pandat69-select {
+    flex-grow: 1;
+}
+
+/* User autocomplete */
+#pandat69-fullscreen-modal .pandat69-user-autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+#pandat69-fullscreen-modal .pandat69-user-search-input {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+#pandat69-fullscreen-modal .pandat69-user-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ddd;
+    z-index: 1000003;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#pandat69-fullscreen-modal .pandat69-user-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    color: #384D68;
+}
+
+#pandat69-fullscreen-modal .pandat69-user-suggestion-item:hover {
+    background-color: #f5f5f5;
+}
+
+#pandat69-fullscreen-modal .pandat69-selected-users-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+#pandat69-fullscreen-modal .pandat69-selected-user {
+    display: inline-flex;
+    align-items: center;
+    background: #eef2f7;
+    border: 1px solid #c0cbd9;
+    padding: 4px 10px 4px 12px;
+    font-size: 13px;
+    cursor: default;
+    color: #384D68;
+}
+
+#pandat69-fullscreen-modal .pandat69-remove-user {
+    margin-left: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    color: #5d6b7b;
+    cursor: pointer;
+}
+
+/* Datepicker fixes */
+.ui-datepicker {
+    z-index: 1000010 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .pandat69-modal-container {
+        width: 95%;
+        max-height: 95vh;
+    }
+    
+    #pandat69-fullscreen-modal .pandat69-form-row {
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 0;
+    }
+    
+    #pandat69-fullscreen-modal .pandat69-form-field-half {
+        margin-bottom: 15px;
+    }
+    
+    #pandat69-fullscreen-modal .pandat69-form-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    #pandat69-fullscreen-modal .pandat69-form-actions .pandat69-button {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+/* Toggle Switch Styling */
+.pandat69-container .pandat69-toggle-container {
+    display: flex;
+    align-items: center;
+    margin-left: auto; /* Push to the right */
+}
+
+.pandat69-container .pandat69-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    margin-right: 10px;
+}
+
+.pandat69-container .pandat69-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.pandat69-container .pandat69-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.pandat69-container .pandat69-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+.pandat69-container .pandat69-switch input:checked + .pandat69-slider {
+    background-color: #384D68;
+}
+
+.pandat69-container .pandat69-switch input:focus + .pandat69-slider {
+    box-shadow: 0 0 1px #384D68;
+}
+
+.pandat69-container .pandat69-switch input:checked + .pandat69-slider:before {
+    transform: translateX(26px);
+}
+
+.pandat69-container .pandat69-slider.pandat69-round {
+    border-radius: 34px;
+}
+
+.pandat69-container .pandat69-slider.pandat69-round:before {
+    border-radius: 50%;
+}
+
+.pandat69-container .pandat69-toggle-label {
+    font-size: 14px;
+    color: #384D68;
+    font-weight: 500;
+    padding-left: 5px;
+}
+
+/* Responsive adjustments for toggle */
+@media (max-width: 768px) {
+    .pandat69-container .pandat69-toggle-container {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
+
+/* Task Description and Read More */
+.pandat69-task-description {
+    margin-top: 8px;
+    margin-bottom: 10px;
+    display: block;
+    width: 100%;
+    background-color: #f3f3f3;
+    padding: 5px 15px;
+}
+
+.pandat69-description-preview {
+    margin-top: 5px;
+    line-height: 1.5;
+}
+
+.pandat69-read-more {
+    color: #384D68;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.pandat69-read-more:hover {
+    text-decoration: underline;
+}
+
+.pandat69-full-description {
+    margin-top: 8px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+/* Task Item Footer */
+.pandat69-task-item-footer {
+    border-top: 1px solid #f0f0f0;
+    margin-top: 10px;
+    padding-top: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pandat69-footer-left {
+    display: flex;
+    gap: 5px;
+}
+
+.pandat69-footer-right {
+    margin-left: auto;
+}
+
+.pandat69-show-comments-btn {
+    font-size: 13px;
+    padding: 5px 10px;
+    background-color: #f5f7fa;
+    color: #384D68;
+    border: 1px solid #e0e5eb;
+}
+
+.pandat69-show-comments-btn:hover {
+    background-color: #e0e5eb;
+    color: #384D68;
+}
+
+/* Task Item Selection Highlighting */
+.pandat69-task-item.pandat69-task-selected {
+    border-color: #384D68;
+    box-shadow: 0 0 0 1px #384D68;
+}
+
+/* Comments Only Section */
+.pandat69-task-details-expandable {
+    padding: 15px;
+    margin-top: 0;
+    border-top: none;
+    background-color: #f9f9f9;
+}
+
+/* Remove old actions container styles since we've moved the buttons */
+.pandat69-task-item-actions {
+    display: none;
+}
+
+/* Mobile Improvements */
+@media (max-width: 768px) {
+    .pandat69-task-item-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .pandat69-footer-left {
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .pandat69-footer-right {
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    .pandat69-show-comments-btn {
+        width: 100%;
+    }
+}
+    .pandat69-select {
+        display:inherit!important;
 }

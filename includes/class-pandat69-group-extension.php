@@ -277,20 +277,10 @@ class Pandat69_Group_Extension extends BP_Group_Extension {
              bp_core_add_message(__('There was an error saving task settings. Please try again.', 'pandatask'), 'error');
         }
 
-        // Redirect back to the settings page
-        $redirect_url = bp_get_group_permalink( groups_get_current_group() ) . 'admin/' . $this->screens['admin']['slug'] . '/';
-        bp_core_redirect( $redirect_url );
+        $group = groups_get_current_group();
+        $redirect_url = trailingslashit(bp_get_group_permalink($group) . 'admin/' . $this->slug);
+        bp_core_redirect($redirect_url);
     }
-
-    /**
-     * The display method is not directly used by BuddyPress screen functions anymore.
-     * Kept for potential direct calls, but setup_nav_visibility and display_screen_content are primary now.
-     * Use display_screen_content for outputting the shortcode.
-     */
-    // public function display( $group_id = null ) {
-    //     // DEPRECATED in favor of display_screen_content
-    //     $this->display_screen_content(); 
-    // }
 }
 
 // Function to register the extension with BuddyPress

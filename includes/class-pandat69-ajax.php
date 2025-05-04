@@ -508,6 +508,15 @@ class Pandat69_Ajax {
         // Prepare the update data
         $data = array('status' => $status);
         
+        // Handle completion date for status changes to/from 'done'
+        $completed_at = null;
+        if ($status === 'done' && $current_task->status !== 'done') {
+            $completed_at = current_time('mysql', 1);
+            $data['completed_at'] = $completed_at;
+        } else if ($status !== 'done' && $current_task->status === 'done') {
+            $data['completed_at'] = null;
+        }
+        
         // If changing from pending to in-progress, automatically set start date
         $start_date = null;
         $deadline = null;
@@ -544,6 +553,15 @@ class Pandat69_Ajax {
             if ($deadline) {
                 $response['deadline'] = $deadline;
                 $response['deadline_days_after_start'] = $deadline_days_after_start;
+            }
+            
+            // Include completed_at in response if task was marked as done
+            if ($completed_at) {
+                $response['completed_at'] = $completed_at;
+            }
+            // Always include the current completed_at value if status is done
+            else if ($status === 'done' && $current_task->completed_at) {
+                $response['completed_at'] = $current_task->completed_at;
             }
             
             wp_send_json_success($response);

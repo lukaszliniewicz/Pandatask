@@ -41,6 +41,7 @@ class Pandat69_DB {
             notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
             archived TINYINT(1) NOT NULL DEFAULT 0, 
             parent_task_id BIGINT(20) UNSIGNED NULL,
+            completed_at DATETIME NULL, /* New column for completion date */
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -50,6 +51,7 @@ class Pandat69_DB {
             KEY deadline (deadline),
             KEY start_date (start_date), /* New index */
             KEY category_id (category_id),
+            KEY completed_at (completed_at), /* New index for completion date */
             KEY archived (archived),
             KEY parent_task_id (parent_task_id)
         ) $charset_collate;";
@@ -307,7 +309,7 @@ class Pandat69_DB {
         global $wpdb;
         $prefix = self::get_db_prefix();
         $tasks_table = $prefix . 'tasks';
-
+    
         $task_data = array(
             'board_name'    => sanitize_text_field($data['board_name']),
             'name'          => sanitize_text_field($data['name']),
@@ -323,7 +325,7 @@ class Pandat69_DB {
             'created_at'    => current_time('mysql', 1),
             'updated_at'    => current_time('mysql', 1),
         );
-
+    
         // Handle start_date based on status and input
         if (!empty($data['start_date'])) {
             $task_data['start_date'] = sanitize_text_field($data['start_date']);
@@ -333,7 +335,7 @@ class Pandat69_DB {
         } else {
             $task_data['start_date'] = null; // Null for pending tasks
         }
-
+    
         // Handle deadline based on type
         if (!empty($data['deadline_days_after_start']) && !empty($task_data['start_date'])) {
             // Calculate deadline based on days after start
@@ -346,8 +348,15 @@ class Pandat69_DB {
         } else {
             $task_data['deadline'] = null;
         }
-
-        $format = array('%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%d', '%d', '%s', '%s');
+        
+        // Set completed_at if status is 'done'
+        if ($data['status'] === 'done') {
+            $task_data['completed_at'] = current_time('mysql', 1);
+        } else {
+            $task_data['completed_at'] = null;
+        }
+    
+        $format = array('%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s');
         if ($task_data['category_id'] === null) {
             $format[4] = '%s'; // Pass null correctly
         }
@@ -363,22 +372,26 @@ class Pandat69_DB {
         if ($task_data['parent_task_id'] === null) {
             $format[9] = '%s'; // Format for parent_task_id null
         }
-
+        if ($task_data['completed_at'] === null) {
+            // Adjust format index for completed_at null
+            $format[14] = '%s';
+        }
+    
         $result = $wpdb->insert($tasks_table, $task_data, $format);
-
+    
         if ($result === false) {
             error_log("PANDAT69 DB Error adding task: " . $wpdb->last_error);
             return false;
         }
         $task_id = $wpdb->insert_id;
-
+    
         // Handle assignments for both assignees and supervisors
         self::update_task_assignments(
             $task_id, 
             $data['assigned_persons'] ?? [], 
             $data['supervisor_persons'] ?? []
         );
-
+    
         return $task_id;
     }
 
@@ -395,31 +408,31 @@ class Pandat69_DB {
         global $wpdb;
         $prefix = self::get_db_prefix();
         $tasks_table = $prefix . 'tasks';
-
+    
         // Get current task for comparison
         $current_task = self::get_task($task_id);
         if (!$current_task) {
             error_log("PANDAT69 DB Error: Attempting to update non-existent task $task_id");
             return false;
         }
-
+    
         // Whitelist of allowed fields in the 'tasks' table that can be updated this way
         $allowed_task_fields = [
             'name', 'description', 'status', 'category_id', 'priority', 'deadline', 
             'deadline_days_after_start', 'start_date', 'archived', 'notify_deadline', 
-            'notify_days_before', 'parent_task_id'
+            'notify_days_before', 'parent_task_id', 'completed_at'
         ];
-
+    
         $update_data = []; // Array to hold columns to be updated in the DB
         $format = [];      // Corresponding formats for $wpdb->update
-
+    
         // Build the update array and format array based ONLY on what's in $data
         foreach ($data as $key => $value) {
             // Only process fields that are allowed for the tasks table
             if (!in_array($key, $allowed_task_fields)) {
                 continue;
             }
-
+    
             // Sanitize and format based on the field key
             if ($key === 'name') {
                 $update_data['name'] = sanitize_text_field($value);
@@ -430,6 +443,15 @@ class Pandat69_DB {
             } elseif ($key === 'status') {
                 $update_data['status'] = sanitize_text_field($value);
                 $format[] = '%s';
+                
+                // Set or clear completed_at when status changes to or from 'done'
+                if ($value === 'done' && $current_task->status !== 'done') {
+                    $update_data['completed_at'] = current_time('mysql', 1);
+                    $format[] = '%s';
+                } elseif ($value !== 'done' && $current_task->status === 'done') {
+                    $update_data['completed_at'] = null;
+                    $format[] = '%s';
+                }
                 
                 // If changing to in-progress and no start date yet, set one
                 if ($value === 'in-progress' && 
@@ -502,6 +524,15 @@ class Pandat69_DB {
                     // Invalid date format passed - skip updating this field to prevent errors
                     continue;
                 }
+            } elseif ($key === 'completed_at') {
+                // Handle completed_at directly if passed
+                if (empty($value)) {
+                    $update_data['completed_at'] = null;
+                    $format[] = '%s';
+                } else {
+                    $update_data['completed_at'] = sanitize_text_field($value);
+                    $format[] = '%s';
+                }
             } elseif ($key === 'archived') {
                 $update_data['archived'] = absint($value) ? 1 : 0;
                 $format[] = '%d';
@@ -516,7 +547,7 @@ class Pandat69_DB {
                 $format[] = '%d';
             }
         }
-
+    
         // If no valid task fields were provided to update, only handle assignments if present
         if (empty($update_data)) {
             // Handle assignments (both assignees and supervisors)
@@ -530,24 +561,24 @@ class Pandat69_DB {
             // Decide if returning true/false makes sense. Let's return true as no DB error occurred.
             return true;
         }
-
+    
         // Always add/update the 'updated_at' timestamp
         $update_data['updated_at'] = current_time('mysql', 1);
         $format[] = '%s';
-
+    
         // Prepare the WHERE clause
         $where = array('id' => $task_id);
         $where_format = array('%d');
-
+    
         // Perform the database update
         $result = $wpdb->update($tasks_table, $update_data, $where, $format, $where_format);
-
+    
         // Check for DB errors
         if ($result === false) {
             error_log("PANDAT69 DB Error updating task $task_id: " . $wpdb->last_error);
             return false;
         }
-
+    
         // Handle assignments (both assignees and supervisors)
         if (isset($data['assigned_persons']) || isset($data['supervisor_persons'])) {
             self::update_task_assignments(
@@ -556,7 +587,7 @@ class Pandat69_DB {
                 $data['supervisor_persons'] ?? []
             );
         }
-
+    
         // Return true if the update query executed without error
         return true;
     }

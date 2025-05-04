@@ -52,10 +52,17 @@ class Pandat69_Shortcode {
                 
                 <!-- "All" tab - existing content -->
                 <div class="pandat69-tab-content pandat69-tab-all active">
-                    <div class="pandat69-controls">
-                        <button class="pandat69-button pandat69-add-task-btn">Add New Task</button>
-                        <button class="pandat69-button pandat69-manage-categories-btn">Manage Categories</button>
+                <div class="pandat69-controls">
+                    <button class="pandat69-button pandat69-add-task-btn">Add New Task</button>
+                    <button class="pandat69-button pandat69-manage-categories-btn">Manage Categories</button>
+                    <div class="pandat69-toggle-container">
+                        <label class="pandat69-switch">
+                            <input type="checkbox" id="pandat69-my-tasks-toggle">
+                            <span class="pandat69-slider pandat69-round"></span>
+                        </label>
+                        <span class="pandat69-toggle-label">Only My Tasks</span>
                     </div>
+                </div>
                     <div class="pandat69-filters">
                         <input type="text" class="pandat69-input pandat69-search-input" placeholder="Search tasks...">
                         <select class="pandat69-select pandat69-sort-select">
@@ -232,6 +239,7 @@ class Pandat69_Shortcode {
                                 <!-- Hidden field to store the actual user IDs -->
                                 <input type="hidden" id="pandat69-task-assigned" name="assigned_persons" value="">
                             </div>
+                        </div>
                         <div class="pandat69-form-field pandat69-supervisor-container">
                             <label for="pandat69-task-supervisor-search">Task Supervisors:</label>
                             <div class="pandat69-user-autocomplete-container">
@@ -241,7 +249,7 @@ class Pandat69_Shortcode {
                                 <!-- Hidden field to store the supervisor IDs -->
                                 <input type="hidden" id="pandat69-task-supervisor" name="supervisor_persons" value="">
                             </div>
-                        </div>`
+                        </div>
     
                         <div class="pandat69-form-actions">
                             <button type="submit" class="pandat69-button pandat69-submit-task-btn">Save Task</button>
@@ -274,6 +282,17 @@ class Pandat69_Shortcode {
                             <div class="pandat69-form-message pandat69-category-form-message" style="display: none;"></div>
                         </div>
                     </form>
+                </div>
+            </div>
+            
+            <!-- Full-Screen Modal -->
+            <div id="pandat69-fullscreen-modal" style="display: none;">
+                <div class="pandat69-modal-overlay"></div>
+                <div class="pandat69-modal-container">
+                    <div class="pandat69-modal-content">
+                        <div class="pandat69-modal-close">×</div>
+                        <div class="pandat69-modal-body"></div>
+                    </div>
                 </div>
             </div>
         </div>
