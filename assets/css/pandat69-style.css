@@ -2207,3 +2207,7 @@ body.pandat69-modal-open {
     .pandat69-select {
         display:inherit!important;
 }
+
+    .pandat69-description {
+        font-size: 14px;
+}

@@ -491,79 +491,95 @@ class Pandat69_Ajax {
     public function quick_update_status() {
         $this->verify_nonce();
         $this->check_permissions();
-    
+
         $task_id = isset($_POST['task_id']) ? absint($_POST['task_id']) : 0;
         $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
-    
+
         if (!$task_id || empty($status)) {
             wp_send_json_error(array('message' => 'Task ID and status are required.'));
         }
-    
+
         // Get the current task before updating
         $current_task = Pandat69_DB::get_task($task_id);
         if (!$current_task) {
             wp_send_json_error(array('message' => 'Task not found.'));
         }
-    
+
         // Prepare the update data
         $data = array('status' => $status);
-        
+
         // Handle completion date for status changes to/from 'done'
         $completed_at = null;
         if ($status === 'done' && $current_task->status !== 'done') {
-            $completed_at = current_time('mysql', 1);
+            $completed_at = current_time('mysql', 1); // Use GMT for database consistency
             $data['completed_at'] = $completed_at;
         } else if ($status !== 'done' && $current_task->status === 'done') {
             $data['completed_at'] = null;
         }
-        
+
         // If changing from pending to in-progress, automatically set start date
         $start_date = null;
         $deadline = null;
         $deadline_days_after_start = null;
-        
+
         if ($status === 'in-progress' && $current_task->status === 'pending' && empty($current_task->start_date)) {
-            $data['start_date'] = date('Y-m-d', current_time('timestamp'));
+            // --- CORRECTED LINE ---
+            $data['start_date'] = current_time('Y-m-d'); // Use WordPress function for correct timezone
+            // --- END CORRECTION ---
             $start_date = $data['start_date'];
-            
+
             // If using days after start for deadline, calculate the actual deadline
             if (!empty($current_task->deadline_days_after_start)) {
-                $start_date_obj = new DateTime($data['start_date']);
-                $start_date_obj->add(new DateInterval('P' . $current_task->deadline_days_after_start . 'D'));
-                $data['deadline'] = $start_date_obj->format('Y-m-d');
-                $deadline = $data['deadline'];
-                $deadline_days_after_start = $current_task->deadline_days_after_start;
+                try { // Add try-catch for DateTime robustness
+                    $start_date_obj = new DateTime($data['start_date']); // Uses site's timezone by default with Y-m-d format
+                    $start_date_obj->add(new DateInterval('P' . absint($current_task->deadline_days_after_start) . 'D'));
+                    $data['deadline'] = $start_date_obj->format('Y-m-d');
+                    $deadline = $data['deadline'];
+                    $deadline_days_after_start = $current_task->deadline_days_after_start;
+                } catch (Exception $e) {
+                    // Log error or handle potential DateTime exception
+                    error_log('Pandatask DateTime Error: ' . $e->getMessage());
+                    // Optionally clear deadline if calculation failed
+                    // $data['deadline'] = null;
+                    // $deadline = null;
+                }
             }
         }
-    
+
         $result = Pandat69_DB::update_task($task_id, $data);
-    
+
         if ($result) {
             $response = array(
                 'message' => 'Status updated successfully.',
                 'status_text' => ucfirst(str_replace('-', ' ', $status))
             );
-            
+
             // Include start date in response if it was set
             if ($start_date) {
                 $response['start_date'] = $start_date;
             }
-            
+
             // Include deadline in response if it was calculated
             if ($deadline) {
                 $response['deadline'] = $deadline;
                 $response['deadline_days_after_start'] = $deadline_days_after_start;
             }
-            
-            // Include completed_at in response if task was marked as done
+
+            // Include completed_at in response if task was marked as done this time
             if ($completed_at) {
                 $response['completed_at'] = $completed_at;
             }
             // Always include the current completed_at value if status is done
-            else if ($status === 'done' && $current_task->completed_at) {
-                $response['completed_at'] = $current_task->completed_at;
+            // Re-fetch task or use existing value if available (careful with potential race condition if not re-fetched)
+            else if ($status === 'done') {
+                 // Use the value we determined earlier if it exists, otherwise use existing task data
+                $response['completed_at'] = $data['completed_at'] ?? $current_task->completed_at;
+            } else {
+                 // If status is not done, completed_at should be null or not present
+                 $response['completed_at'] = null; // Explicitly set to null if not done
             }
-            
+
+
             wp_send_json_success($response);
         } else {
             wp_send_json_error(array('message' => 'Failed to update status.'));
