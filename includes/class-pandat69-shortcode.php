@@ -160,7 +160,7 @@ class Pandat69_Shortcode {
                             <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-start-date">Start Date:</label>
                                 <input type="text" id="pandat69-task-start-date" name="start_date" class="pandat69-input pandat69-datepicker" placeholder="YYYY-MM-DD">
-                                <p class="pandat69-description">Will be set automatically for a pending task when it is set to in-progress later, and if set will chage pending tasks to in-progress on that date.</p>
+                                <p class="pandat69-description">Will be set automatically for a pending task when it is set to in-progress later, and if set here will change pending tasks to in-progress on chosen date.</p>
                             </div>
                              <div class="pandat69-form-field pandat69-form-field-half">
                                 <label for="pandat69-task-priority">Priority (1-10):</label>

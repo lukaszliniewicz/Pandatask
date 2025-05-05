@@ -151,8 +151,4 @@ The plugin leverages BuddyPress's existing group privacy and membership system. 
 *   **Requires PHP:** 7.4
 *   **Stable tag:** 1.0.9
 *   **License:** GPLv2 or later
-<<<<<<< HEAD
 *   **License URI:** https://www.gnu.org/licenses/gpl-2.0.html
-=======
-*   **License URI:** https://www.gnu.org/licenses/gpl-2.0.html
->>>>>>> c630475a06eb3731330380288450b3d755955091

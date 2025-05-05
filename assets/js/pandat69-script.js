@@ -333,9 +333,9 @@ jQuery(document).ready(function($) {
     let currentWeekStart = new Date();
     let currentMonthDate = new Date();
     let weekViewMode = 'per_day';
-    let weekShowStartingTasks = false;
+    let weekShowStartingTasks = true;
     let monthViewMode = 'per_day';
-    let monthShowStartingTasks = false;
+    let monthShowStartingTasks = true;
     let showOnlyMyTasks = false;
 
     // Initialize the task board
