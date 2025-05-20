@@ -181,6 +181,95 @@ class Pandat69_Ajax {
         $task_id = Pandat69_DB::add_task($data);
     
         if ($task_id) {
+            // Process @mentions in task description
+            if (!empty($data['description'])) {
+                $mentioned_users = array();
+                preg_replace_callback('/@\[(.*?)\]\((\d+)\)/', function($matches) use (&$mentioned_users) {
+                    $mentioned_user_id = intval($matches[2]);
+                    if (!in_array($mentioned_user_id, $mentioned_users)) {
+                        $mentioned_users[] = $mentioned_user_id;
+                    }
+                    return $matches[0];
+                }, $data['description']);
+                
+                // Send notifications for mentions in task description
+                if (!empty($mentioned_users)) {
+                    $current_user_id = get_current_user_id();
+                    foreach ($mentioned_users as $mentioned_id) {
+                        // Skip if mentioning yourself
+                        if ($mentioned_id != $current_user_id) {
+                            // Send email notification
+                            if (class_exists('Pandat69_Email')) {
+                                // Create a customized mention notification for task descriptions
+                                $task = Pandat69_DB::get_task($task_id);
+                                if ($task) {
+                                    $user = get_userdata($mentioned_id);
+                                    if ($user && $user->user_email) {
+                                        $site_name = get_bloginfo('name');
+                                        $mentioner = get_userdata($current_user_id);
+                                        $mentioner_name = $mentioner ? $mentioner->display_name : __('Someone', 'pandatask');
+                                        
+                                        // translators: %s: Task name
+                                        $subject = sprintf(__('You were mentioned in task: %s', 'pandatask'), $task->name);
+                                        
+                                        // Clean up description text for plain text email
+                                        $plain_text_description = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="pandat69-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $data['description']));
+                                        
+                                        // translators: %s: User display name
+                                        $greeting = sprintf(__('Hello %s,', 'pandatask'), $user->display_name);
+                                        // translators: %s: Name of the user who mentioned them
+                                        $mention_intro = sprintf(__('%s mentioned you in a task description:', 'pandatask'), $mentioner_name);
+                                        // translators: %s: Task name
+                                        $task_line = sprintf(__('Task: %s', 'pandatask'), $task->name);
+                                        // translators: %s: The plain text content of the description
+                                        $description_line = sprintf(__('Description: %s', 'pandatask'), $plain_text_description);
+                                        $instructions = __('Please login to view the task details.', 'pandatask');
+                                        
+                                        $task_url = Pandat69_Email::get_task_board_url($task->board_name);
+                                        $task_link_line = '';
+                                        if ($task_url) {
+                                            // translators: %s: URL to the task board
+                                            $task_link_line = sprintf(__('View Task Board: %s', 'pandatask'), $task_url) . "\n\n";
+                                        }
+                                        $regards = __('Regards,', 'pandatask');
+                                        
+                                        $text_message = $greeting . "\n\n" .
+                                                        $mention_intro . "\n\n" .
+                                                        $task_line . "\n" .
+                                                        $description_line . "\n\n" .
+                                                        $instructions . "\n\n" .
+                                                        $task_link_line .
+                                                        $regards . "\n" .
+                                                        $site_name;
+                                        
+                                        $html_message = '<p>' . esc_html($greeting) . '</p>' .
+                                                        '<p>' . esc_html($mention_intro) . '</p>' .
+                                                        '<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1px solid #ddd;">' .
+                                                            '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                                            '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Description', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . wp_kses_post($data['description']) . '</td></tr>' .
+                                                        '</table>' .
+                                                        '<p>' . esc_html($instructions) . '</p>' .
+                                                        ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'pandatask')) . '</a></p>' : '') .
+                                                        '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
+                                        
+                                        // Use the private send_email method via reflection or create a public wrapper
+                                        $reflection = new ReflectionClass('Pandat69_Email');
+                                        $send_email_method = $reflection->getMethod('send_email');
+                                        $send_email_method->setAccessible(true);
+                                        $send_email_method->invoke(null, $user->user_email, $subject, $text_message, $html_message);
+                                    }
+                                }
+                            }
+                            
+                            // Send BuddyPress notification
+                            if (class_exists('Pandat69_Notifications')) {
+                                Pandat69_Notifications::add_mention_notification($task_id, $mentioned_id, $current_user_id);
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Optionally fetch the newly added task to return full data
             $new_task = Pandat69_DB::get_task($task_id);
             wp_send_json_success(array('message' => 'Task added successfully.', 'task' => $new_task));
@@ -393,6 +482,11 @@ class Pandat69_Ajax {
             // Send email notifications to assigned users
             if (class_exists('Pandat69_Email')) {
                 Pandat69_Email::send_comment_notification($task_id, $user_id, $comment_text);
+                
+                // NEW: Send email notifications for mentions
+                if (!empty($mentioned_users)) {
+                    Pandat69_Email::send_mention_notification($task_id, $mentioned_users, $user_id, $comment_text);
+                }
             }
             
             // Add BuddyPress notifications
@@ -491,95 +585,79 @@ class Pandat69_Ajax {
     public function quick_update_status() {
         $this->verify_nonce();
         $this->check_permissions();
-
+    
         $task_id = isset($_POST['task_id']) ? absint($_POST['task_id']) : 0;
         $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
-
+    
         if (!$task_id || empty($status)) {
             wp_send_json_error(array('message' => 'Task ID and status are required.'));
         }
-
+    
         // Get the current task before updating
         $current_task = Pandat69_DB::get_task($task_id);
         if (!$current_task) {
             wp_send_json_error(array('message' => 'Task not found.'));
         }
-
+    
         // Prepare the update data
         $data = array('status' => $status);
-
+        
         // Handle completion date for status changes to/from 'done'
         $completed_at = null;
         if ($status === 'done' && $current_task->status !== 'done') {
-            $completed_at = current_time('mysql', 1); // Use GMT for database consistency
+            $completed_at = current_time('mysql', 1);
             $data['completed_at'] = $completed_at;
         } else if ($status !== 'done' && $current_task->status === 'done') {
             $data['completed_at'] = null;
         }
-
+        
         // If changing from pending to in-progress, automatically set start date
         $start_date = null;
         $deadline = null;
         $deadline_days_after_start = null;
-
+        
         if ($status === 'in-progress' && $current_task->status === 'pending' && empty($current_task->start_date)) {
-            // --- CORRECTED LINE ---
-            $data['start_date'] = current_time('Y-m-d'); // Use WordPress function for correct timezone
-            // --- END CORRECTION ---
+            $data['start_date'] = date('Y-m-d', current_time('timestamp'));
             $start_date = $data['start_date'];
-
+            
             // If using days after start for deadline, calculate the actual deadline
             if (!empty($current_task->deadline_days_after_start)) {
-                try { // Add try-catch for DateTime robustness
-                    $start_date_obj = new DateTime($data['start_date']); // Uses site's timezone by default with Y-m-d format
-                    $start_date_obj->add(new DateInterval('P' . absint($current_task->deadline_days_after_start) . 'D'));
-                    $data['deadline'] = $start_date_obj->format('Y-m-d');
-                    $deadline = $data['deadline'];
-                    $deadline_days_after_start = $current_task->deadline_days_after_start;
-                } catch (Exception $e) {
-                    // Log error or handle potential DateTime exception
-                    error_log('Pandatask DateTime Error: ' . $e->getMessage());
-                    // Optionally clear deadline if calculation failed
-                    // $data['deadline'] = null;
-                    // $deadline = null;
-                }
+                $start_date_obj = new DateTime($data['start_date']);
+                $start_date_obj->add(new DateInterval('P' . $current_task->deadline_days_after_start . 'D'));
+                $data['deadline'] = $start_date_obj->format('Y-m-d');
+                $deadline = $data['deadline'];
+                $deadline_days_after_start = $current_task->deadline_days_after_start;
             }
         }
-
+    
         $result = Pandat69_DB::update_task($task_id, $data);
-
+    
         if ($result) {
             $response = array(
                 'message' => 'Status updated successfully.',
                 'status_text' => ucfirst(str_replace('-', ' ', $status))
             );
-
+            
             // Include start date in response if it was set
             if ($start_date) {
                 $response['start_date'] = $start_date;
             }
-
+            
             // Include deadline in response if it was calculated
             if ($deadline) {
                 $response['deadline'] = $deadline;
                 $response['deadline_days_after_start'] = $deadline_days_after_start;
             }
-
-            // Include completed_at in response if task was marked as done this time
+            
+            // Include completed_at in response if task was marked as done
             if ($completed_at) {
                 $response['completed_at'] = $completed_at;
             }
             // Always include the current completed_at value if status is done
-            // Re-fetch task or use existing value if available (careful with potential race condition if not re-fetched)
-            else if ($status === 'done') {
-                 // Use the value we determined earlier if it exists, otherwise use existing task data
-                $response['completed_at'] = $data['completed_at'] ?? $current_task->completed_at;
-            } else {
-                 // If status is not done, completed_at should be null or not present
-                 $response['completed_at'] = null; // Explicitly set to null if not done
+            else if ($status === 'done' && $current_task->completed_at) {
+                $response['completed_at'] = $current_task->completed_at;
             }
-
-
+            
             wp_send_json_success($response);
         } else {
             wp_send_json_error(array('message' => 'Failed to update status.'));

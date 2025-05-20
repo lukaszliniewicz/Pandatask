@@ -92,6 +92,94 @@ class Pandat69_Email {
     }
     
     /**
+     * Send notification to mentioned users
+     * 
+     * @param int $task_id The task ID
+     * @param array $mentioned_user_ids Array of mentioned user IDs
+     * @param int $mentioner_id The user ID who mentioned them
+     * @param string $comment_text The comment text containing the mention
+     * @return void
+     */
+    public static function send_mention_notification($task_id, $mentioned_user_ids, $mentioner_id, $comment_text) {
+        if (empty($mentioned_user_ids)) {
+            return;
+        }
+        
+        // Get task details
+        $task = Pandat69_DB::get_task($task_id);
+        if (!$task) {
+            return;
+        }
+        
+        $admin_email = get_option('admin_email');
+        $site_name = get_bloginfo('name');
+        $mentioner = get_userdata($mentioner_id);
+        
+        if (!$mentioner || !is_a($mentioner, 'WP_User')) {
+            $mentioner_name = __('A user', 'pandatask');
+        } else {
+            $mentioner_name = $mentioner->display_name;
+        }
+        
+        // Clean up comment text for plain text email (strip HTML)
+        $plain_text_comment = wp_strip_all_tags(preg_replace('/<a\s+[^>]*class="pandat69-mention"[^>]*>@([^<]+)<\/a>/i', '@$1', $comment_text));
+        
+        // Try to determine task URL
+        $task_url = self::get_task_board_url($task->board_name);
+        
+        foreach ($mentioned_user_ids as $user_id) {
+            $user = get_userdata($user_id);
+            if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+                continue;
+            }
+            
+            // translators: %s: Task name
+            $subject = sprintf(__('You were mentioned in task: %s', 'pandatask'), $task->name);
+            
+            // --- Plain text email ---
+            // translators: %s: User display name
+            $greeting = sprintf(__('Hello %s,', 'pandatask'), $user->display_name);
+            // translators: %s: Name of the user who mentioned them
+            $mention_intro = sprintf(__('%s mentioned you in a comment on a task:', 'pandatask'), $mentioner_name);
+            // translators: %s: Task name
+            $task_line = sprintf(__('Task: %s', 'pandatask'), $task->name);
+            // translators: %s: The plain text content of the comment
+            $comment_line = sprintf(__('Comment: %s', 'pandatask'), $plain_text_comment);
+            $instructions = __('Please login to view the task and respond if needed.', 'pandatask');
+            $task_link_line = '';
+            if ($task_url) {
+                // translators: %s: URL to the task board
+                $task_link_line = sprintf(__('View Task Board: %s', 'pandatask'), $task_url) . "\n\n";
+            }
+            $regards = __('Regards,', 'pandatask');
+            $signature = $site_name;
+    
+            $text_message = $greeting . "\n\n" .
+                            $mention_intro . "\n\n" .
+                            $task_line . "\n" .
+                            $comment_line . "\n\n" .
+                            $instructions . "\n\n" .
+                            $task_link_line .
+                            $regards . "\n" .
+                            $signature;
+            
+            // --- HTML email ---
+            $html_message = '<p>' . esc_html($greeting) . '</p>' .
+                            '<p>' . esc_html($mention_intro) . '</p>' .
+                            '<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1px solid #ddd;">' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Comment', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . wp_kses_post($comment_text) . '</td></tr>' .
+                            '</table>' .
+                            '<p>' . esc_html($instructions) . '</p>' .
+                            ($task_url ? '<p><a href="' . esc_url($task_url) . '" style="background-color: #384D68; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html(__('View Task Board', 'pandatask')) . '</a></p>' : '') .
+                            '<p>' . esc_html($regards) . '<br>' . esc_html($site_name) . '</p>';
+            
+            self::send_email($user->user_email, $subject, $text_message, $html_message);
+        }
+    }    
+    
+    
+    /**
      * Send notification to assigned users when a comment is added
      * 
      * @param int $task_id The task ID

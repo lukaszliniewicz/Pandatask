@@ -6,6 +6,23 @@ jQuery(document).ready(function($) {
         isOpen: false
     };
 
+    let taskColorMap = new Map(); // To store consistent colors for tasks
+    let availableTaskColors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
+        '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43',
+        '#C44569', '#40407A', '#706FD3', '#F8B500', '#EE5A6F'
+    ];
+    let colorIndex = 0;
+    
+    // Function to get a consistent color for a task
+    function getTaskColor(taskId) {
+        if (!taskColorMap.has(taskId)) {
+            taskColorMap.set(taskId, availableTaskColors[colorIndex % availableTaskColors.length]);
+            colorIndex++;
+        }
+        return taskColorMap.get(taskId);
+    }
+
     function openModal(title, content) {
         // Get the modal elements
         const $modal = $('#pandat69-fullscreen-modal');
@@ -184,11 +201,31 @@ jQuery(document).ready(function($) {
     /**
      * Fix for iOS keyboard pushing content up
      */
+
+    function isIOSDevice() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
     function setupiOSKeyboardFix() {
+        // Only apply iOS fixes on actual iOS devices
+        if (!isIOSDevice()) {
+            return;
+        }
+        
         $('#pandat69-fullscreen-modal').on('focus', 'input, textarea, select', function() {
-            $('.pandat69-modal-container').css('transform', 'translateY(-10%)');
+            // Add a small delay to prevent interference with autocomplete clicks
+            setTimeout(() => {
+                $('.pandat69-modal-container').css('transform', 'translateY(-10%)');
+            }, 100);
         }).on('blur', 'input, textarea, select', function() {
-            $('.pandat69-modal-container').css('transform', 'translateY(0)');
+            // Check if the blur is happening because of an autocomplete interaction
+            setTimeout(() => {
+                // Only apply the transform if no autocomplete suggestion is being clicked
+                if (!$('.pandat69-user-suggestions:visible').length || 
+                    !$('.pandat69-user-suggestions:hover').length) {
+                    $('.pandat69-modal-container').css('transform', 'translateY(0)');
+                }
+            }, 150);
         });
     }
 
@@ -378,6 +415,7 @@ jQuery(document).ready(function($) {
     
         // Initialize current week and month for calendar views
         setupCalendarDates();
+        setupMentionAutocomplete();
     }
 
     function fixSelects() {
@@ -731,6 +769,7 @@ jQuery(document).ready(function($) {
             <div class="pandat69-view-mode">
                 <label><input type="radio" name="view_mode_week" value="per_day" checked> Per Day</label>
                 <label><input type="radio" name="view_mode_week" value="show_all"> Show All</label>
+                <label><input type="radio" name="view_mode_week" value="calendar"> Calendar View</label>
             </div>
             <div class="pandat69-per-day-options">
                 <label><input type="checkbox" id="show_starting_tasks_week"> Show Starting Tasks</label>
@@ -750,6 +789,7 @@ jQuery(document).ready(function($) {
             <div class="pandat69-view-mode">
                 <label><input type="radio" name="view_mode_month" value="per_day" checked> Per Day</label>
                 <label><input type="radio" name="view_mode_month" value="show_all"> Show All</label>
+                <label><input type="radio" name="view_mode_month" value="calendar"> Calendar View</label>
             </div>
             <div class="pandat69-per-day-options">
                 <label><input type="checkbox" id="show_starting_tasks_month"> Show Starting Tasks</label>
@@ -775,23 +815,43 @@ jQuery(document).ready(function($) {
         // Week view controls
         $(document).on('change', 'input[name="view_mode_week"]', function() {
             weekViewMode = $(this).val();
+            
+            // Show/hide per-day options based on view mode
+            if (weekViewMode === 'calendar') {
+                $('.pandat69-tab-week .pandat69-per-day-options').hide();
+            } else {
+                $('.pandat69-tab-week .pandat69-per-day-options').show();
+            }
+            
             loadWeekTasks();
         });
         
         $(document).on('change', '#show_starting_tasks_week', function() {
             weekShowStartingTasks = $(this).prop('checked');
-            loadWeekTasks();
+            if (weekViewMode !== 'calendar') {
+                loadWeekTasks();
+            }
         });
         
         // Month view controls
         $(document).on('change', 'input[name="view_mode_month"]', function() {
             monthViewMode = $(this).val();
+            
+            // Show/hide per-day options based on view mode
+            if (monthViewMode === 'calendar') {
+                $('.pandat69-tab-month .pandat69-per-day-options').hide();
+            } else {
+                $('.pandat69-tab-month .pandat69-per-day-options').show();
+            }
+            
             loadMonthTasks();
         });
         
         $(document).on('change', '#show_starting_tasks_month', function() {
             monthShowStartingTasks = $(this).prop('checked');
-            loadMonthTasks();
+            if (monthViewMode !== 'calendar') {
+                loadMonthTasks();
+            }
         });
         
         // Handle "Only My Tasks" toggles - keep them all in sync
@@ -928,6 +988,8 @@ jQuery(document).ready(function($) {
                     // Filter tasks based on view mode
                     if (weekViewMode === 'per_day') {
                         renderWeekViewPerDay(response.data.tasks, weekStart, weekEnd);
+                    } else if (weekViewMode === 'calendar') {
+                        renderWeekCalendarView(response.data.tasks, weekStart, weekEnd);
                     } else { // show_all mode
                         renderWeekViewAll(response.data.tasks, weekStart, weekEnd);
                     }
@@ -938,7 +1000,7 @@ jQuery(document).ready(function($) {
             },
             error: function(xhr, status, error) {
                 console.error('AJAX error:', error);
-                $('.pandat69-week-task-container').html('<p>Error loading tasks.</p>');
+                $('.pandat69-week-task-container').html('<p>Error loading tasks. Please try again.</p>');
             }
         });
     }
@@ -973,6 +1035,8 @@ jQuery(document).ready(function($) {
                     // Filter tasks based on view mode
                     if (monthViewMode === 'per_day') {
                         renderMonthViewPerDay(response.data.tasks, monthStart, monthEnd, year, month);
+                    } else if (monthViewMode === 'calendar') {
+                        renderMonthCalendarView(response.data.tasks, monthStart, monthEnd, year, month);
                     } else { // show_all mode
                         renderMonthViewAll(response.data.tasks, monthStart, monthEnd);
                     }
@@ -987,6 +1051,1113 @@ jQuery(document).ready(function($) {
             }
         });
     }
+
+    function renderWeekCalendarView(tasks, startDate, endDate) {
+        const container = $('.pandat69-week-task-container');
+        container.empty();
+    
+        // Filter tasks to only include those with both start_date and deadline
+        let calendarTasks = tasks.filter(task => {
+            if (!task.start_date || !task.deadline) {
+                return false;
+            }
+            
+            const taskStart = new Date(task.start_date);
+            const taskEnd = new Date(task.deadline);
+            const periodStart = new Date(startDate);
+            const periodEnd = new Date(endDate);
+            
+            return taskStart <= periodEnd && taskEnd >= periodStart;
+        });
+    
+        // Apply "Only My Tasks" filter if active
+        if (showOnlyMyTasks) {
+            const currentUserId = pandat69_ajax_object.current_user_id;
+            calendarTasks = calendarTasks.filter(function(task) {
+                return task.assigned_user_ids && 
+                       task.assigned_user_ids.includes(currentUserId.toString());
+            });
+        }
+    
+        if (calendarTasks.length === 0) {
+            container.html('<div class="pandat69-calendar-no-tasks">No tasks with both start date and deadline found for this week.</div>');
+            return;
+        }
+    
+        // Generate the calendar structure with improved task bars
+        const calendarHtml = renderImprovedCalendarGrid(calendarTasks, startDate, endDate, 'week');
+        container.html(calendarHtml);
+        
+        // Attach event handlers
+        attachCalendarTaskHandlers();
+    }
+    
+    function renderMonthCalendarView(tasks, startDate, endDate, year, month) {
+        const container = $('.pandat69-month-task-container');
+        container.empty();
+    
+        // Filter tasks to only include those with both start_date and deadline
+        let calendarTasks = tasks.filter(task => {
+            if (!task.start_date || !task.deadline) {
+                return false;
+            }
+            
+            // Task should intersect with the month period (be more lenient for month view)
+            const taskStart = new Date(task.start_date);
+            const taskEnd = new Date(task.deadline);
+            const monthStart = new Date(year, month, 1);
+            const monthEnd = new Date(year, month + 1, 0);
+            
+            return taskStart <= monthEnd && taskEnd >= monthStart;
+        });
+    
+        // Apply "Only My Tasks" filter if active
+        if (showOnlyMyTasks) {
+            const currentUserId = pandat69_ajax_object.current_user_id;
+            calendarTasks = calendarTasks.filter(function(task) {
+                return task.assigned_user_ids && 
+                       task.assigned_user_ids.includes(currentUserId.toString());
+            });
+        }
+    
+        if (calendarTasks.length === 0) {
+            container.html('<div class="pandat69-calendar-no-tasks">No tasks with both start date and deadline found for this month.</div>');
+            return;
+        }
+    
+        // Generate the month calendar structure
+        const calendarHtml = renderMonthCalendarGrid(calendarTasks, year, month);
+        container.html(calendarHtml);
+        
+        // Reattach event handlers
+        attachTaskEventHandlers();
+    }
+    
+    function attachCalendarTaskHandlers() {
+        // Handle month task bar clicks
+        $(document).off('click', '.pandat69-month-task-bar').on('click', '.pandat69-month-task-bar', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).data('task-id');
+            if (taskId) {
+                openCalendarTaskModal(taskId);
+            }
+        });
+        
+        // Handle week task bar clicks
+        $(document).off('click', '.pandat69-improved-task-bar').on('click', '.pandat69-improved-task-bar', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).data('task-id');
+            if (taskId) {
+                openCalendarTaskModal(taskId);
+            }
+        });
+    }    
+
+    function displayCalendarTaskModal(task) {
+        // Create or get modal
+        let modal = document.getElementById('pandat69-calendar-task-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'pandat69-calendar-task-modal';
+            modal.className = 'pandat69-calendar-task-modal';
+            document.body.appendChild(modal);
+        }
+        
+        const completedText = task.status === 'done' && task.completed_at ? 
+            `<span><strong>Completed:</strong> ${task.completed_at}</span>` : '';
+        
+        // Process description
+        let descriptionHtml = '';
+        if (task.description) {
+            const descriptionText = $('<div>').html(task.description).text();
+            const truncatedText = descriptionText.length > 200 ? 
+                descriptionText.substring(0, 200) + '...' : 
+                descriptionText;
+            descriptionHtml = `
+                <div class="pandat69-modal-detail">
+                    <strong>Description:</strong>
+                    <div class="pandat69-description-text">${truncatedText}</div>
+                    ${descriptionText.length > 200 ? 
+                        `<button class="pandat69-read-more-modal" data-full-desc="${escapeHtml(task.description)}">Read more</button>` : 
+                        ''}
+                </div>`;
+        }
+        
+        modal.innerHTML = `
+            <div class="pandat69-calendar-modal-content">
+                <div class="pandat69-calendar-modal-header">
+                    <h3>${escapeHtml(task.name)}</h3>
+                    <button class="pandat69-calendar-modal-close">×</button>
+                </div>
+                <div class="pandat69-calendar-modal-body">
+                    <div class="pandat69-modal-detail">
+                        <strong>Status:</strong> 
+                        <span class="pandat69-task-status pandat69-status-${task.status}">${task.status.replace('-', ' ')}</span>
+                    </div>
+                    <div class="pandat69-modal-detail">
+                        <strong>Priority:</strong> ${task.priority}
+                    </div>
+                    <div class="pandat69-modal-detail">
+                        <strong>Category:</strong> ${task.category_name}
+                    </div>
+                    <div class="pandat69-modal-detail">
+                        <strong>Start Date:</strong> ${task.start_date || 'Not set'}
+                    </div>
+                    ${completedText ? `<div class="pandat69-modal-detail">${completedText}</div>` : ''}
+                    <div class="pandat69-modal-detail">
+                        <strong>Deadline:</strong> ${task.deadline || 'No deadline'}${task.deadline_days_after_start ? 
+                            ` (${task.deadline_days_after_start} days after start)` : ''}
+                    </div>
+                    <div class="pandat69-modal-detail">
+                        <strong>Assigned to:</strong> ${task.assigned_user_names}
+                    </div>
+                    <div class="pandat69-modal-detail">
+                        <strong>Supervisors:</strong> ${task.supervisor_user_names}
+                    </div>
+                    ${task.parent_task_name ? 
+                        `<div class="pandat69-modal-detail"><strong>Parent Task:</strong> ${task.parent_task_name}</div>` : 
+                        ''}
+                    ${descriptionHtml}
+                    
+                    <div class="pandat69-calendar-modal-actions">
+                        <button type="button" class="pandat69-button pandat69-edit-task-btn" data-task-id="${task.id}">
+                            Edit
+                        </button>
+                        <button type="button" class="pandat69-button pandat69-delete-task-btn" data-task-id="${task.id}">
+                            Delete
+                        </button>
+                        ${!task.parent_task_id ? 
+                            `<button type="button" class="pandat69-button pandat69-add-subtask-btn" data-task-id="${task.id}">
+                                Add Subtask
+                            </button>` : ''
+                        }
+                        <button type="button" class="pandat69-button pandat69-archive-task-btn" data-task-id="${task.id}">
+                            Archive
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Show modal
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        // Add event listeners
+        modal.querySelector('.pandat69-calendar-modal-close').addEventListener('click', closeCalendarTaskModal);
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeCalendarTaskModal();
+            }
+        });
+        
+        // Handle description expansion
+        const readMoreBtn = modal.querySelector('.pandat69-read-more-modal');
+        if (readMoreBtn) {
+            readMoreBtn.addEventListener('click', function() {
+                const fullDesc = this.getAttribute('data-full-desc');
+                const descDiv = modal.querySelector('.pandat69-description-text');
+                descDiv.innerHTML = fullDesc;
+                this.remove();
+            });
+        }
+        
+        // Add handlers for action buttons
+        $(modal).find('.pandat69-edit-task-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeCalendarTaskModal();
+            editTask(taskId);
+        });
+        
+        $(modal).find('.pandat69-delete-task-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeCalendarTaskModal();
+            deleteTask(taskId);
+        });
+        
+        $(modal).find('.pandat69-add-subtask-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeCalendarTaskModal();
+            addSubtask(taskId);
+        });
+        
+        $(modal).find('.pandat69-archive-task-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeCalendarTaskModal();
+            archiveTask(taskId);
+        });
+    }
+    
+    function closeCalendarTaskModal() {
+        const modal = document.getElementById('pandat69-calendar-task-modal');
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // Handle escape key for calendar modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeCalendarTaskModal();
+        }
+    });
+
+        
+    function openCalendarTaskModal(taskId) {
+        // Fetch task details
+        $.ajax({
+            url: pandat69_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'pandat69_get_task_details',
+                nonce: pandat69_ajax_object.nonce,
+                task_id: taskId
+            },
+            success: function(response) {
+                if (response.success && response.data.task) {
+                    displayCalendarTaskModal(response.data.task);
+                } else {
+                    console.error('Error fetching task details:', response.data?.message || 'Unknown error');
+                    alert('Failed to load task details. Please try again.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', error);
+                alert('Failed to load task details. Please try again.');
+            }
+        });
+    }
+
+    
+    function renderImprovedCalendarGrid(tasks, startDate, endDate, viewType) {
+        const periodStart = new Date(startDate);
+        const periodEnd = new Date(endDate);
+        
+        // Generate day columns
+        const days = [];
+        for (let d = new Date(periodStart); d <= periodEnd; d.setDate(d.getDate() + 1)) {
+            days.push(new Date(d));
+        }
+        
+        // Build header
+        let headerHtml = '<div class="pandat69-calendar-view"><div class="pandat69-calendar-header">';
+        
+        days.forEach(day => {
+            const options = { month: 'short', day: 'numeric' };
+            if (viewType === 'month') {
+                options.weekday = 'short';
+            }
+            const dayLabel = day.toLocaleDateString(undefined, options);
+            headerHtml += `<div class="pandat69-calendar-day-column">${dayLabel}</div>`;
+        });
+        headerHtml += '</div>';
+        
+        // Build calendar body with improved task bars
+        let bodyHtml = '<div class="pandat69-calendar-body">';
+        
+        // Calculate task positions and avoid overlaps
+        const taskRows = distributeTasksInRows(tasks, periodStart, periodEnd);
+        
+        // Calculate grid height based on number of task rows
+        const gridHeight = Math.max(400, 50 + (taskRows.length * 40));
+        bodyHtml += `<div class="pandat69-calendar-grid" style="height: ${gridHeight}px; position: relative;">`;
+        
+        // Add day cells first
+        days.forEach((day, dayIndex) => {
+            const cellWidth = 100 / days.length;
+            bodyHtml += `<div class="pandat69-calendar-day-cell" 
+                              style="left: ${dayIndex * cellWidth}%; width: ${cellWidth}%; height: 100%;">
+                         </div>`;
+        });
+        
+        // Add task bars for each row
+        taskRows.forEach((rowTasks, rowIndex) => {
+            rowTasks.forEach(taskInfo => {
+                const { task, startIndex, duration, leftOffset, width } = taskInfo;
+                const taskColor = getTaskColor(task.id);
+                
+                bodyHtml += `<div class="pandat69-improved-task-bar pandat69-status-${task.status}" 
+                                 style="left: ${leftOffset}%; 
+                                        width: ${width}%; 
+                                        top: ${40 + (rowIndex * 40)}px;
+                                        background-color: ${taskColor};"
+                                 data-task-id="${task.id}"
+                                 title="${escapeHtml(task.name)} (${task.start_date} to ${task.deadline})">
+                                 <div class="pandat69-status-indicator"></div>
+                                 <span class="pandat69-task-bar-text">${escapeHtml(truncateTextForBar(task.name, width))}</span>
+                             </div>`;
+            });
+        });
+        
+        bodyHtml += '</div></div></div>';
+        
+        return headerHtml + bodyHtml;
+    }    
+    
+    
+    function calculateTaskSpans(tasks, dateToPosition, firstDayOfGrid, lastDayOfGrid, currentMonth) {
+        const taskSpans = [];
+        
+        // Apply "Only My Tasks" filter if active
+        let filteredTasks = tasks;
+        if (showOnlyMyTasks) {
+            const currentUserId = pandat69_ajax_object.current_user_id;
+            filteredTasks = tasks.filter(function(task) {
+                return task.assigned_user_ids && 
+                       task.assigned_user_ids.includes(currentUserId.toString());
+            });
+        }
+        
+        // Sort tasks by start date and duration for better layering
+        const sortedTasks = filteredTasks.slice().sort((a, b) => {
+            const startA = new Date(a.start_date);
+            const startB = new Date(b.start_date);
+            if (startA.getTime() === startB.getTime()) {
+                // If same start date, longer tasks first
+                const endA = new Date(a.deadline);
+                const endB = new Date(b.deadline);
+                return (endB - startB) - (endA - startA);
+            }
+            return startA - startB;
+        });
+        
+        // Track which rows are occupied for each day to avoid overlaps
+        const rowOccupancy = new Map();
+        
+        sortedTasks.forEach(task => {
+            if (!task.start_date || !task.deadline) return;
+            
+            const taskStart = new Date(task.start_date);
+            const taskEnd = new Date(task.deadline);
+            
+            // Clamp task to visible grid
+            const visibleStart = taskStart < firstDayOfGrid ? firstDayOfGrid : taskStart;
+            const visibleEnd = taskEnd > lastDayOfGrid ? lastDayOfGrid : taskEnd;
+            
+            const startDateStr = formatDate(visibleStart);
+            const endDateStr = formatDate(visibleEnd);
+            
+            const startPosition = dateToPosition.get(startDateStr);
+            const endPosition = dateToPosition.get(endDateStr);
+            
+            if (startPosition === undefined || endPosition === undefined) return;
+            
+            // Find the first available row for this task
+            let row = 0;
+            let rowFound = false;
+            
+            while (!rowFound) {
+                rowFound = true;
+                // Check if this row is occupied for any day this task spans
+                for (let pos = startPosition; pos <= endPosition; pos++) {
+                    const rowKey = `${row}-${pos}`;
+                    if (rowOccupancy.has(rowKey)) {
+                        rowFound = false;
+                        break;
+                    }
+                }
+                if (!rowFound) row++;
+            }
+            
+            // Mark this row as occupied for all days this task spans
+            for (let pos = startPosition; pos <= endPosition; pos++) {
+                const rowKey = `${row}-${pos}`;
+                rowOccupancy.set(rowKey, task.id);
+            }
+            
+            taskSpans.push({
+                task,
+                startPosition,
+                endPosition,
+                row
+            });
+        });
+        
+        return taskSpans;
+    }    
+    
+    function renderMonthCalendarGrid(tasks, year, month) {
+        const container = $('.pandat69-month-task-container');
+        container.empty();
+    
+        // Filter tasks to only include those with both start_date and deadline
+        let calendarTasks = tasks.filter(task => {
+            if (!task.start_date || !task.deadline) {
+                return false;
+            }
+            
+            const taskStart = new Date(task.start_date);
+            const taskEnd = new Date(task.deadline);
+            const monthStart = new Date(year, month, 1);
+            const monthEnd = new Date(year, month + 1, 0);
+            
+            return taskStart <= monthEnd && taskEnd >= monthStart;
+        });
+    
+        // Apply "Only My Tasks" filter if active
+        if (showOnlyMyTasks) {
+            const currentUserId = pandat69_ajax_object.current_user_id;
+            calendarTasks = calendarTasks.filter(function(task) {
+                return task.assigned_user_ids && 
+                       task.assigned_user_ids.includes(currentUserId.toString());
+            });
+        }
+    
+        if (calendarTasks.length === 0) {
+            container.html('<div class="pandat69-calendar-no-tasks">No tasks with both start date and deadline found for this month.</div>');
+            return;
+        }
+    
+        // Get the first and last day of the month
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month + 1, 0);
+        
+        // Get the first day of the calendar grid (might be from previous month)
+        const firstDayOfGrid = new Date(firstDayOfMonth);
+        firstDayOfGrid.setDate(firstDayOfGrid.getDate() - firstDayOfGrid.getDay());
+        
+        // Get the last day of the calendar grid (might be from next month)
+        const lastDayOfGrid = new Date(firstDayOfGrid);
+        lastDayOfGrid.setDate(lastDayOfGrid.getDate() + 41);
+        
+        // Adjust to end on Saturday
+        while (lastDayOfGrid.getDay() !== 6) {
+            lastDayOfGrid.setDate(lastDayOfGrid.getDate() - 1);
+        }
+        
+        // Create a map of dates to grid positions
+        const dateToPosition = new Map();
+        const currentDate = new Date(firstDayOfGrid);
+        let position = 0;
+        
+        while (currentDate <= lastDayOfGrid) {
+            const dateStr = formatDate(currentDate);
+            dateToPosition.set(dateStr, position);
+            currentDate.setDate(currentDate.getDate() + 1);
+            position++;
+        }
+        
+        // Calculate task spans and distribute them in rows
+        const taskSpans = calculateTaskSpans(calendarTasks, dateToPosition, firstDayOfGrid, lastDayOfGrid, month);
+        
+        // Calculate the maximum number of tasks in any single day
+        const tasksPerDay = new Map();
+        taskSpans.forEach(taskSpan => {
+            for (let pos = taskSpan.startPosition; pos <= taskSpan.endPosition; pos++) {
+                const currentCount = tasksPerDay.get(pos) || 0;
+                tasksPerDay.set(pos, Math.max(currentCount, taskSpan.row + 1));
+            }
+        });
+        
+        const maxTasksPerDay = Math.max(...Array.from(tasksPerDay.values()), 0);
+        const cellHeight = Math.max(120, 80 + (maxTasksPerDay * 25)); // Base height + task rows
+        
+        // Generate calendar structure
+        let calendarHtml = '<div class="pandat69-month-calendar-view">';
+        
+        // Add header with day names
+        calendarHtml += '<div class="pandat69-month-calendar-header">';
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        dayNames.forEach(dayName => {
+            calendarHtml += `<div class="pandat69-month-day-header">${dayName}</div>`;
+        });
+        calendarHtml += '</div>';
+        
+        // Add calendar body
+        calendarHtml += '<div class="pandat69-month-calendar-body">';
+        calendarHtml += '<div class="pandat69-month-grid-container">';
+        
+        // Generate day cells
+        const resetDate = new Date(firstDayOfGrid);
+        position = 0;
+        while (resetDate <= lastDayOfGrid) {
+            const weekIndex = Math.floor(position / 7);
+            const dayIndex = position % 7;
+            const isCurrentMonth = resetDate.getMonth() === month;
+            const dateStr = formatDate(resetDate);
+            const dayNumber = resetDate.getDate();
+            
+            const today = new Date();
+            const isToday = resetDate.toDateString() === today.toDateString();
+            
+            const dayClass = `pandat69-month-day-cell ${!isCurrentMonth ? 'pandat69-other-month' : ''} ${isToday ? 'pandat69-today' : ''}`.trim();
+            
+            calendarHtml += `<div class="${dayClass}" 
+                                  data-date="${dateStr}" 
+                                  data-position="${position}"
+                                  style="grid-row: ${weekIndex + 1}; grid-column: ${dayIndex + 1}; min-height: ${cellHeight}px;">`;
+            calendarHtml += `<div class="pandat69-month-day-number">${dayNumber}</div>`;
+            
+            // Add task bars directly in the cell
+            const cellTasks = taskSpans.filter(span => 
+                span.startPosition <= position && span.endPosition >= position
+            );
+            
+            cellTasks.forEach(taskSpan => {
+                const task = taskSpan.task;
+                const taskColor = getTaskColor(task.id);
+                const isTaskStart = taskSpan.startPosition === position;
+                const isTaskEnd = taskSpan.endPosition === position;
+                
+                const taskBarClass = `pandat69-month-task-bar pandat69-status-${task.status}`;
+                const taskStyle = `
+                    background-color: ${taskColor};
+                    margin-top: ${35 + (taskSpan.row * 25)}px;
+                    ${isTaskStart ? '' : 'margin-left: -10px; border-radius: 0 4px 4px 0;'}
+                    ${isTaskEnd ? '' : 'margin-right: -10px; border-radius: 4px 0 0 4px;'}
+                    ${!isTaskStart && !isTaskEnd ? 'margin-left: -10px; margin-right: -10px; border-radius: 0;' : ''}
+                `;
+                
+                calendarHtml += `
+                    <div class="${taskBarClass}" 
+                         data-task-id="${task.id}"
+                         style="${taskStyle}"
+                         title="${escapeHtml(task.name)} (${task.start_date} to ${task.deadline})">
+                        ${isTaskStart ? '<div class="pandat69-status-indicator"></div>' : ''}
+                        ${isTaskStart ? `<span class="pandat69-task-name">${escapeHtml(task.name)}</span>` : ''}
+                    </div>
+                `;
+            });
+            
+            calendarHtml += '</div>';
+            
+            resetDate.setDate(resetDate.getDate() + 1);
+            position++;
+        }
+        
+        calendarHtml += '</div>'; // Close grid container
+        calendarHtml += '</div>'; // Close calendar body
+        calendarHtml += '</div>'; // Close calendar view
+        
+        container.html(calendarHtml);
+        
+        // Attach event handlers for task bars
+        attachCalendarTaskHandlers();
+    }
+
+    // @Mention functionality
+    function setupMentionAutocomplete() {
+        $(document).on('input', '.pandat69-comment-textarea, #pandat69-task-description', function(e) {
+            const $textarea = $(this);
+            const text = $textarea.val();
+            const caretPos = this.selectionStart;
+            
+            // Find the last '@' before the caret position
+            const textBeforeCaret = text.substring(0, caretPos);
+            const lastAtIndex = textBeforeCaret.lastIndexOf('@');
+            
+            if (lastAtIndex === -1) {
+                hideMentionDropdown();
+                return;
+            }
+            
+            // Get the text after '@' up to the caret
+            const mentionText = textBeforeCaret.substring(lastAtIndex + 1);
+            
+            // Check if there's a space (which would break the mention)
+            if (mentionText.includes(' ') || mentionText.includes('\n')) {
+                hideMentionDropdown();
+                return;
+            }
+            
+            // If we have at least 1 character after '@', search for users
+            if (mentionText.length >= 1) {
+                searchUsersForMention(mentionText, $textarea, lastAtIndex);
+            } else if (mentionText.length === 0) {
+                // Just typed '@', show recent users or all users
+                searchUsersForMention('', $textarea, lastAtIndex);
+            } else {
+                hideMentionDropdown();
+            }
+        });
+        
+        // Hide dropdown when clicking outside
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.pandat69-mention-dropdown, .pandat69-comment-textarea, #pandat69-task-description').length) {
+                hideMentionDropdown();
+            }
+        });
+        
+        // Handle keyboard navigation in mention dropdown
+        $(document).on('keydown', '.pandat69-comment-textarea, #pandat69-task-description', function(e) {
+            const $dropdown = $('.pandat69-mention-dropdown');
+            if (!$dropdown.is(':visible')) return;
+            
+            const $items = $dropdown.find('.pandat69-mention-item');
+            const $active = $items.filter('.active');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if ($active.length === 0) {
+                    $items.first().addClass('active');
+                } else {
+                    $active.removeClass('active');
+                    const next = $active.next('.pandat69-mention-item');
+                    if (next.length) {
+                        next.addClass('active');
+                    } else {
+                        $items.first().addClass('active');
+                    }
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if ($active.length === 0) {
+                    $items.last().addClass('active');
+                } else {
+                    $active.removeClass('active');
+                    const prev = $active.prev('.pandat69-mention-item');
+                    if (prev.length) {
+                        prev.addClass('active');
+                    } else {
+                        $items.last().addClass('active');
+                    }
+                }
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if ($active.length) {
+                    $active.click();
+                }
+            } else if (e.key === 'Escape') {
+                hideMentionDropdown();
+            }
+        });
+    }
+    
+    function searchUsersForMention(searchTerm, $textarea, mentionStartPos) {
+        $.ajax({
+            url: pandat69_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'pandat69_fetch_users',
+                nonce: pandat69_ajax_object.nonce,
+                search: searchTerm
+            },
+            success: function(response) {
+                if (response.success && response.data.users) {
+                    showMentionDropdown(response.data.users, $textarea, mentionStartPos, searchTerm);
+                } else {
+                    hideMentionDropdown();
+                }
+            },
+            error: function() {
+                hideMentionDropdown();
+            }
+        });
+    }
+    
+    function showMentionDropdown(users, $textarea, mentionStartPos, searchTerm) {
+        hideMentionDropdown(); // Hide any existing dropdown
+        
+        if (users.length === 0) return;
+        
+        const $dropdown = $('<div class="pandat69-mention-dropdown"></div>');
+        
+        users.forEach(function(user, index) {
+            const userName = user.name;
+            const highlightedName = searchTerm ? 
+                userName.replace(new RegExp('(' + escapeRegExp(searchTerm) + ')', 'gi'), '<span class="pandat69-mention-highlight">$1</span>') :
+                userName;
+                
+            const $item = $('<div class="pandat69-mention-item" data-user-id="' + user.id + '" data-user-name="' + escapeHtml(userName) + '">' + highlightedName + '</div>');
+            
+            $item.on('click', function() {
+                insertMention($textarea, mentionStartPos, searchTerm, user.id, userName);
+                hideMentionDropdown();
+            });
+            
+            // Add hover effect
+            $item.on('mouseenter', function() {
+                $('.pandat69-mention-item').removeClass('active');
+                $(this).addClass('active');
+            });
+            
+            $dropdown.append($item);
+        });
+        
+        // Position the dropdown
+        const textareaOffset = $textarea.offset();
+        const textareaHeight = $textarea.outerHeight();
+        
+        $dropdown.css({
+            position: 'absolute',
+            top: textareaOffset.top + textareaHeight,
+            left: textareaOffset.left,
+            zIndex: 1000
+        });
+        
+        $('body').append($dropdown);
+        
+        // Highlight first item by default
+        $dropdown.find('.pandat69-mention-item').first().addClass('active');
+    }
+    
+    function insertMention($textarea, mentionStartPos, searchTerm, userId, userName) {
+        const textarea = $textarea[0];
+        const text = $textarea.val();
+        
+        // Calculate where to insert the mention
+        const beforeMention = text.substring(0, mentionStartPos);
+        const afterMention = text.substring(mentionStartPos + 1 + searchTerm.length);
+        
+        // Create the mention in the format expected by PHP: @[Username](123)
+        const mention = '@[' + userName + '](' + userId + ')';
+        
+        // Insert the mention
+        const newText = beforeMention + mention + afterMention;
+        $textarea.val(newText);
+        
+        // Position cursor after the mention
+        const newCaretPos = mentionStartPos + mention.length;
+        textarea.setSelectionRange(newCaretPos, newCaretPos);
+        
+        // Focus back on textarea
+        $textarea.focus();
+    }
+    
+    function hideMentionDropdown() {
+        $('.pandat69-mention-dropdown').remove();
+    }
+    
+    // Helper functions
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function renderCalendarGrid(tasks, startDate, endDate, viewType) {
+        const periodStart = new Date(startDate);
+        const periodEnd = new Date(endDate);
+        
+        // Generate day columns
+        const days = [];
+        for (let d = new Date(periodStart); d <= periodEnd; d.setDate(d.getDate() + 1)) {
+            days.push(new Date(d));
+        }
+        
+        // Build header
+        let headerHtml = '<div class="pandat69-calendar-view"><div class="pandat69-calendar-header">';
+        
+        days.forEach(day => {
+            const options = { month: 'short', day: 'numeric' };
+            if (viewType === 'month') {
+                options.weekday = 'short';
+            }
+            const dayLabel = day.toLocaleDateString(undefined, options);
+            headerHtml += `<div class="pandat69-calendar-day-column">${dayLabel}</div>`;
+        });
+        headerHtml += '</div>';
+        
+        // Build calendar body with task bars
+        let bodyHtml = '<div class="pandat69-calendar-body">';
+        
+        // Calculate task positions and avoid overlaps
+        const taskRows = distributeTasksInRows(tasks, periodStart, periodEnd);
+        
+        // Add task bars for each row
+        taskRows.forEach((rowTasks, rowIndex) => {
+            bodyHtml += '<div class="pandat69-calendar-timeline-row">';
+            
+            // Add day cells first
+            days.forEach((day, dayIndex) => {
+                bodyHtml += '<div class="pandat69-calendar-day-cell"></div>';
+            });
+            
+            // Add task bars for this row
+            rowTasks.forEach(taskInfo => {
+                const { task, startIndex, duration, leftOffset, width } = taskInfo;
+                
+                // Create truncated task name that fits in the bar
+                const truncatedName = truncateTextForBar(task.name, width);
+                
+                bodyHtml += `<div class="pandat69-task-bar pandat69-status-${task.status}" 
+                                 style="left: ${leftOffset}%; width: ${width}%;"
+                                 data-task-id="${task.id}"
+                                 title="${escapeHtml(task.name)} (${task.start_date} to ${task.deadline})">
+                                 <span class="pandat69-task-bar-text">${escapeHtml(truncatedName)}</span>
+                             </div>`;
+            });
+            
+            bodyHtml += '</div>';
+        });
+        
+        bodyHtml += '</div></div>';
+        
+        return headerHtml + bodyHtml;
+    }
+
+    function distributeTasksInRows(tasks, periodStart, periodEnd) {
+        const totalDays = Math.ceil((periodEnd - periodStart) / (24 * 60 * 60 * 1000)) + 1;
+        const dayWidth = 100 / totalDays;
+        const rows = [];
+        
+        // Sort tasks by start date, then by duration
+        const sortedTasks = tasks.slice().sort((a, b) => {
+            const dateA = new Date(a.start_date);
+            const dateB = new Date(b.start_date);
+            if (dateA.getTime() === dateB.getTime()) {
+                // If same start date, longer tasks first
+                const durationA = Math.ceil((new Date(a.deadline) - dateA) / (24 * 60 * 60 * 1000));
+                const durationB = Math.ceil((new Date(b.deadline) - dateB) / (24 * 60 * 60 * 1000));
+                return durationB - durationA;
+            }
+            return dateA - dateB;
+        });
+        
+        sortedTasks.forEach(task => {
+            const taskStart = new Date(task.start_date);
+            const taskEnd = new Date(task.deadline);
+            
+            // Clamp task dates to the visible period
+            const visibleStart = taskStart < periodStart ? periodStart : taskStart;
+            const visibleEnd = taskEnd > periodEnd ? periodEnd : taskEnd;
+            
+            // Calculate position and width with more precision
+            const startIndex = Math.floor((visibleStart - periodStart) / (24 * 60 * 60 * 1000));
+            const duration = Math.floor((visibleEnd - visibleStart) / (24 * 60 * 60 * 1000)) + 1;
+            
+            // Ensure minimum width and proper positioning
+            const leftOffset = startIndex * dayWidth;
+            const width = Math.max(duration * dayWidth, dayWidth * 0.1); // Minimum 10% of a day width
+            
+            const taskInfo = {
+                task,
+                startIndex,
+                duration,
+                leftOffset,
+                width
+            };
+            
+            // Find a row where this task doesn't overlap
+            let placed = false;
+            for (let i = 0; i < rows.length; i++) {
+                let hasOverlap = false;
+                for (const existingTask of rows[i]) {
+                    const existingEnd = existingTask.startIndex + existingTask.duration;
+                    const taskEnd = startIndex + duration;
+                    
+                    // Add a small buffer to prevent touching tasks
+                    if (!(startIndex >= existingEnd || taskEnd <= existingTask.startIndex)) {
+                        hasOverlap = true;
+                        break;
+                    }
+                }
+                
+                if (!hasOverlap) {
+                    rows[i].push(taskInfo);
+                    placed = true;
+                    break;
+                }
+            }
+            
+            // If no existing row worked, create a new one
+            if (!placed) {
+                rows.push([taskInfo]);
+            }
+        });
+        
+        return rows;
+    }
+    function truncateTextForBar(text, widthPercentage) {
+        // Estimate characters that can fit based on width percentage
+        // This is a rough calculation - adjust the multiplier as needed
+        const maxChars = Math.floor(widthPercentage * 0.8); // Rough estimate
+        
+        if (text.length <= maxChars) {
+            return text;
+        }
+        
+        // Truncate and add ellipsis
+        return text.substring(0, Math.max(1, maxChars - 3)) + '...';
+    }    
+    
+    // Task bar modal functions
+    function openTaskBarModal(taskId) {
+        // Fetch task details
+        $.ajax({
+            url: pandat69_ajax_object.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'pandat69_get_task_details',
+                nonce: pandat69_ajax_object.nonce,
+                task_id: taskId
+            },
+            success: function(response) {
+                if (response.success && response.data.task) {
+                    displayTaskBarModal(response.data.task);
+                } else {
+                    console.error('Error fetching task details:', response.data?.message || 'Unknown error');
+                    alert('Failed to load task details. Please try again.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', error);
+                alert('Failed to load task details. Please try again.');
+            }
+        });
+    }
+    
+    function displayTaskBarModal(task) {
+        let modal = document.getElementById('pandat69-task-bar-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'pandat69-task-bar-modal';
+            modal.className = 'pandat69-task-bar-modal';
+            document.body.appendChild(modal);
+        }
+        
+        const isSubtask = task.parent_task_id ? true : false;
+        const isArchived = task.archived == 1; // Ensure correct comparison
+    
+        const completedText = task.status === 'done' && task.completed_at ? 
+            `<div class="pandat69-detail-item"><strong>Completed:</strong> ${escapeHtml(task.completed_at)}</div>` : '';
+        
+        let descriptionHtml = '';
+        if (task.description) {
+            descriptionHtml = `
+                <div class="pandat69-detail-item">
+                    <strong>Description:</strong>
+                    <div style="margin-top: 5px; padding: 10px; background: #f9f9f9; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                        ${task.description} {/* Assuming description is already safe HTML from wp_kses_post */}
+                    </div>
+                </div>`;
+        }
+    
+        // --- NEW: Buttons for Archive/Unarchive and Add Subtask ---
+        let archiveButtonHtml = '';
+        if (isArchived) {
+            archiveButtonHtml = `<button type="button" class="pandat69-button pandat69-unarchive-task-modal-btn" data-task-id="${task.id}">Restore from Archive</button>`;
+        } else {
+            archiveButtonHtml = `<button type="button" class="pandat69-button pandat69-archive-task-modal-btn" data-task-id="${task.id}">Archive Task</button>`;
+        }
+    
+        let addSubtaskButtonHtml = '';
+        if (!isSubtask) {
+            addSubtaskButtonHtml = `<button type="button" class="pandat69-button pandat69-add-subtask-modal-btn" data-task-id="${task.id}">Add Subtask</button>`;
+        }
+        // --- END NEW Buttons ---
+        
+        modal.innerHTML = `
+            <div class="pandat69-task-bar-modal-content">
+                <div class="pandat69-task-bar-modal-header">
+                    <h3 class="pandat69-task-bar-modal-title">${escapeHtml(task.name)}</h3>
+                    <button class="pandat69-task-bar-modal-close">×</button>
+                </div>
+                <div class="pandat69-task-bar-modal-body">
+                    <div class="pandat69-detail-item">
+                        <strong>Status:</strong> 
+                        <span class="pandat69-task-status pandat69-status-${task.status}">${escapeHtml(task.status.replace('-', ' '))}</span>
+                    </div>
+                    <div class="pandat69-detail-item">
+                        <strong>Priority:</strong> ${escapeHtml(String(task.priority))}
+                    </div>
+                    <div class="pandat69-detail-item">
+                        <strong>Category:</strong> ${escapeHtml(task.category_name)}
+                    </div>
+                    <div class="pandat69-detail-item">
+                        <strong>Start Date:</strong> ${escapeHtml(task.start_date || 'Not set')}
+                    </div>
+                    ${completedText}
+                    <div class="pandat69-detail-item">
+                        <strong>Deadline:</strong> ${escapeHtml(task.deadline || 'No deadline')}${task.deadline_days_after_start ? 
+                            ` (${escapeHtml(String(task.deadline_days_after_start))} days after start)` : ''}
+                    </div>
+                    <div class="pandat69-detail-item">
+                        <strong>Assigned to:</strong> ${escapeHtml(task.assigned_user_names)}
+                    </div>
+                    <div class="pandat69-detail-item">
+                        <strong>Supervisors:</strong> ${escapeHtml(task.supervisor_user_names)}
+                    </div>
+                    ${task.parent_task_name ? 
+                        `<div class="pandat69-detail-item"><strong>Parent Task:</strong> ${escapeHtml(task.parent_task_name)}</div>` : 
+                        ''}
+                    ${descriptionHtml}
+                    
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e5eb; display: flex; flex-wrap: wrap; gap: 10px;">
+                        <button type="button" class="pandat69-button pandat69-edit-task-modal-btn" data-task-id="${task.id}">
+                            Edit Task
+                        </button>
+                        <button type="button" class="pandat69-button pandat69-button-danger pandat69-delete-task-modal-btn" data-task-id="${task.id}">
+                            Delete Task
+                        </button>
+                        ${archiveButtonHtml}
+                        ${addSubtaskButtonHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        modal.querySelector('.pandat69-task-bar-modal-close').addEventListener('click', closeTaskBarModal);
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeTaskBarModal();
+            }
+        });
+        
+        // --- UPDATED: Event Handlers for Modal Buttons ---
+        $(modal).find('.pandat69-edit-task-modal-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeTaskBarModal(); 
+            editTask(taskId); // editTask already opens the main form modal
+        });
+        
+        $(modal).find('.pandat69-delete-task-modal-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            deleteTask(taskId); // deleteTask will ask for confirmation
+            closeTaskBarModal(); // Close modal after initiating delete
+        });
+    
+        $(modal).find('.pandat69-archive-task-modal-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            archiveTask(taskId); // archiveTask will ask for confirmation
+            closeTaskBarModal();
+        });
+    
+        $(modal).find('.pandat69-unarchive-task-modal-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            unarchiveTask(taskId);
+            closeTaskBarModal();
+        });
+    
+        $(modal).find('.pandat69-add-subtask-modal-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            closeTaskBarModal();
+            addSubtask(taskId); // addSubtask opens the main form modal
+        });
+        // --- END UPDATED Event Handlers ---
+    }
+    
+    function closeTaskBarModal() {
+        const modal = document.getElementById('pandat69-task-bar-modal');
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // Handle escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeTaskBarModal();
+        }
+    });    
+    
+    
+    // Add this helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
 
     function renderWeekViewPerDay(tasks, startDate, endDate) {
         const container = $('.pandat69-week-task-container');
@@ -1872,46 +3043,58 @@ jQuery(document).ready(function($) {
     }
 
     function attachTaskEventHandlers() {
-        // Edit task button
-        $('.pandat69-edit-task-btn').off('click').on('click', function(e) {
+        // Edit task button (for list items and detail views)
+        $('.pandat69-edit-task-btn, .pandat69-edit-task-detail-btn').off('click').on('click', function(e) {
             e.stopPropagation();
-            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
-            editTask(taskId);
+            const taskId = $(this).data('task-id') || $(this).closest('.pandat69-task-item').data('task-id');
+            if (taskId) {
+                editTask(taskId);
+            }
         });
     
-        // Delete task button
-        $('.pandat69-delete-task-btn').off('click').on('click', function(e) {
+        // Delete task button (for list items and detail views)
+        $('.pandat69-delete-task-btn, .pandat69-delete-task-detail-btn').off('click').on('click', function(e) {
             e.stopPropagation();
-            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
-            deleteTask(taskId);
+            const taskId = $(this).data('task-id') || $(this).closest('.pandat69-task-item').data('task-id');
+            if (taskId) {
+                deleteTask(taskId);
+            }
         });
     
-        // Archive task button
-        $('.pandat69-archive-task-btn').off('click').on('click', function(e) {
+        // Archive task button (for list items and detail views)
+        $('.pandat69-archive-task-btn, .pandat69-archive-task-detail-btn').off('click').on('click', function(e) {
             e.stopPropagation();
-            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
-            archiveTask(taskId);
+            const taskId = $(this).data('task-id') || $(this).closest('.pandat69-task-item').data('task-id');
+            if (taskId) {
+                archiveTask(taskId);
+            }
         });
         
-        // Unarchive task button
-        $('.pandat69-unarchive-task-btn').off('click').on('click', function(e) {
+        // Unarchive task button (for list items and detail views)
+        $('.pandat69-unarchive-task-btn, .pandat69-unarchive-task-detail-btn').off('click').on('click', function(e) {
             e.stopPropagation();
-            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
-            unarchiveTask(taskId);
+            const taskId = $(this).data('task-id') || $(this).closest('.pandat69-task-item').data('task-id');
+            if (taskId) {
+                unarchiveTask(taskId);
+            }
         });
         
-        // Add subtask button
-        $('.pandat69-add-subtask-btn').off('click').on('click', function(e) {
+        // Add subtask button (for list items and detail views)
+        $('.pandat69-add-subtask-btn, .pandat69-add-subtask-detail-btn').off('click').on('click', function(e) {
             e.stopPropagation();
-            const taskId = $(this).closest('.pandat69-task-item').data('task-id');
-            addSubtask(taskId);
+            const taskId = $(this).data('task-id') || $(this).closest('.pandat69-task-item').data('task-id');
+            if (taskId) {
+                addSubtask(taskId);
+            }
         });
     
         // Show comments button 
         $('.pandat69-show-comments-btn').off('click').on('click', function(e) {
             e.stopPropagation();
             const taskId = $(this).data('task-id');
-            showTaskDetails(taskId);
+            if (taskId) {
+                showTaskDetails(taskId); // This shows comments in an expandable section
+            }
         });
         
         // Read more link for description
@@ -1925,22 +3108,49 @@ jQuery(document).ready(function($) {
             const $truncatedText = $descContainer.find('.pandat69-description-text');
             
             if ($fullDescription.is(':visible')) {
-                // Hide full description, show truncated
                 $fullDescription.hide();
                 $truncatedText.show();
                 $this.text('Read more');
             } else {
-                // Show full description, hide truncated
                 $fullDescription.show();
                 $truncatedText.hide();
                 $this.text('Show less');
             }
         });
     
-        // Task item click (no longer shows details, only a visual highlight)
-        $('.pandat69-task-item').off('click').on('click', function() {
-            // Toggle highlighting of selected task
+        // Task item click (for list view items, to select/highlight)
+        // Use a more specific selector if this causes issues with calendar task items
+        $('.pandat69-tab-all .pandat69-task-list .pandat69-task-item, .pandat69-tab-archive .pandat69-archive-task-list .pandat69-task-item').off('click.taskHighlight').on('click.taskHighlight', function(event) {
+            // Prevent triggering if a button inside the task item was clicked
+            if ($(event.target).closest('button, a, .pandat69-task-status, .pandat69-read-more').length) {
+                return;
+            }
             $(this).toggleClass('pandat69-task-selected');
+        });
+
+        // Week Calendar View Task Bar Click
+        $(document).off('click.weekCalendarTask').on('click.weekCalendarTask', '.pandat69-task-bar', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).data('task-id');
+            if (taskId) {
+                openTaskBarModal(taskId);
+            }
+        });
+
+        // Month Calendar View Task Bar Click
+        $(document).off('click.monthCalendarTask').on('click.monthCalendarTask', '.pandat69-month-spanning-task', function(e) {
+            e.stopPropagation();
+            const taskId = $(this).data('task-id');
+            if (taskId) {
+                openTaskBarModal(taskId);
+            }
+        });
+        
+        // Handle "more tasks" click - (currently just logs, can be expanded)
+        $(document).off('click.monthMoreTasks').on('click.monthMoreTasks', '.pandat69-month-more-tasks', function(e) {
+            e.stopPropagation();
+            // Could implement a day detail modal here
+            console.log('Show more tasks for this day (feature can be expanded)');
         });
     }
 
