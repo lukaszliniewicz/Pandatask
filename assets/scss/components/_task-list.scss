@@ -1,0 +1,550 @@
+/* Task List Styles */
+
+.pandat69-task-list-container {
+    margin-top: 20px;
+}
+
+.pandat69-task-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pandat69-task-item {
+    background-color: $white;
+    border: 1px solid $border-color;
+    margin-bottom: 10px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+    flex-wrap: wrap;
+    position: relative; // For subtask indicators
+
+    &:hover {
+        box-shadow: 0 2px 5px rgba(56, 77, 104, 0.1);
+    }
+
+    &.pandat69-archived-task {
+        background-color: $light-bg;
+        border-left: 3px solid #9e9e9e;
+        opacity: 0.85;
+    }
+
+    &.pandat69-overdue-task {
+        border-color: $danger-color;
+    }
+
+    &.pandat69-subtask {
+        margin-left: 30px;
+        position: relative;
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 0;
+            height: 50%;
+            width: 10px;
+            border-left: 2px dashed #ccc;
+            border-bottom: 2px dashed #ccc;
+        }
+    }
+}
+
+.pandat69-task-item-details {
+    flex-grow: 1;
+    margin-right: 15px;
+    position: relative;
+}
+
+.pandat69-subtask-indicator {
+    position: absolute;
+    left: -28px;
+    top: -4px;
+    color: $primary-color;
+    
+    .dashicons {
+        font-size: 30px;
+        height: auto;
+        width: auto;
+    }
+}
+
+.pandat69-task-item-name {
+    font-weight: bold;
+    color: $primary-color;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+
+    a {
+        text-decoration: none;
+        color: inherit;
+
+        &:hover {
+            text-decoration: underline;
+            color: $primary-color;
+        }
+    }
+}
+
+.pandat69-task-item-meta {
+    font-size: 0.9em;
+    color: $secondary-color;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 10px;
+
+    span {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    strong {
+        font-weight: 600;
+        margin-right: 3px;
+    }
+}
+
+/* Status Indicators */
+.pandat69-task-status {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    color: white !important;
+    text-transform: capitalize;
+    cursor: pointer;
+    border-radius: $border-radius;
+
+    &.pandat69-status-pending { background-color: $status-pending; }
+    &.pandat69-status-in-progress { background-color: $status-in-progress; }
+    &.pandat69-status-done { background-color: $status-done; }
+}
+
+.pandat69-project-label {
+    background-color: #eceff1;
+    color: #37474f;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em !important;
+    font-weight: 500;
+}
+
+.pandat69-recurring-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #f0f4f8;
+    color: #4a6284;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-right: 5px;
+    
+    .dashicons {
+        font-size: 14px;
+        width: auto;
+        height: auto;
+    }
+}
+
+/* User Avatars in Meta */
+.pandat69-meta-user-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+}
+
+.pandat69-meta-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #f0f4f8;
+    padding: 2px 8px 2px 3px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.pandat69-meta-user-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Footer & Actions */
+.pandat69-task-item-footer {
+    border-top: 1px solid $light-border-color;
+    margin-top: 10px;
+    padding-top: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pandat69-footer-left {
+    display: flex;
+    gap: 5px;
+}
+
+.pandat69-task-description {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: $medium-bg;
+    border-radius: $border-radius;
+    border: 1px solid $border-color;
+    
+    h4 {
+        margin: 0 0 10px 0;
+        font-size: 1em;
+    }
+}
+
+.pandat69-no-tasks {
+    padding: 15px;
+    color: $secondary-color;
+    text-align: center;
+    font-style: italic;
+    background-color: $light-bg;
+    border: 1px dashed $border-color;
+}
+
+/* Status Quick Change Dropdown */
+.pandat69-status-dropdown {
+    position: absolute;
+    background: $white;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 100;
+    margin-top: 5px;
+    width: 120px;
+}
+
+.pandat69-status-option {
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: center;
+    color: white;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 0.9;
+    }
+
+    &.pandat69-status-pending { background-color: $status-pending; }
+    &.pandat69-status-in-progress { background-color: $status-in-progress; }
+    &.pandat69-status-done { background-color: $status-done; }
+
+    &.pandat69-current-status {
+        position: relative;
+        &:after {
+            content: "\f147"; /* dashicons-yes */
+            font-family: dashicons;
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+        }
+    }
+}
+
+.pandat69-status-updated {
+    margin-left: 5px;
+    animation: fadeOut 2s forwards;
+    animation-delay: 1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+
+    .dashicons {
+        font-size: 14px;
+        vertical-align: middle;
+        color: $success-color;
+        width: auto;
+        height: auto;
+        line-height: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+/* User Board Group Headings in Compact View */
+.pandat69-compact-group-heading {
+    padding: 15px 10px 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    
+    &:first-child {
+        padding-top: 5px;
+    }
+}
+
+/* Compact List View Styles */
+.pandat69-compact-list-container {
+    margin-top: 20px;
+}
+
+.pandat69-compact-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid #e0e5eb;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.pandat69-compact-item {
+    display: grid;
+    /* Grid: DragHandle | Status | Name | Meta Info | Avatar | Menu */
+    grid-template-columns: 30px 30px 1fr auto auto 40px; 
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 10px;
+    transition: background-color 0.1s ease;
+    overflow: visible;
+    position: relative;
+
+    &:last-child {
+        border-bottom: none;
+    }
+
+    &:hover {
+        background-color: #f8f9fa;
+        
+        .pandat69-drag-handle { opacity: 1; }
+    }
+
+    &.pandat69-dnd-over {
+        background-color: #e6f7ff;
+        border: 2px dashed #1890ff;
+        margin-bottom: -1px; // Prevent jumping due to border
+    }
+}
+
+.pandat69-compact-status-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+.pandat69-drag-handle {
+    color: #ccc;
+    cursor: grab;
+    opacity: 0.3; // Hidden until hover
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &:hover { color: #333; }
+    &:active { cursor: grabbing; }
+}
+
+.pandat69-compact-name {
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    
+    &:hover {
+        color: #2271b1;
+    }
+
+    .pandat69-status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+
+    .pandat69-subtask-indicator {
+        margin-right: 8px;
+        color: #999;
+        font-size: 14px;
+    }
+}
+
+.pandat69-compact-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #666;
+    
+    span { 
+        display: flex; 
+        align-items: center; 
+        gap: 4px; 
+        
+        .dashicons {
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
+            vertical-align: middle;
+        }
+    }
+
+    .pandat69-meta-high-priority {
+        color: #e9b44c;
+        font-weight: 600;
+    }
+
+    .pandat69-meta-overdue {
+        color: #d63638;
+        font-weight: 600;
+    }
+}
+
+.pandat69-compact-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    img {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid #e0e5eb;
+    }
+}
+
+/* Kebab Menu Styles */
+.pandat69-kebab-menu-container {
+    position: relative;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pandat69-kebab-btn {
+    /* Strong reset */
+    appearance: none;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 6px;
+    cursor: pointer;
+    color: #999;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    width: 30px;
+    height: 30px;
+    
+    &:hover, &.active { 
+        background: #f0f0f0; 
+        color: #333; 
+    }
+
+    .dashicons {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+        line-height: 1;
+    }
+}
+
+.pandat69-kebab-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 5px;
+    background: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 4px;
+    z-index: 99999;
+    min-width: 180px;
+    padding: 5px 0;
+    text-align: left; /* Ensure alignment */
+    
+    /* Target buttons directly with high specificity inside dropdown */
+    button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important; /* Force left align */
+        text-align: left !important;
+        width: 100% !important;
+        padding: 10px 15px !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        color: #333 !important;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        margin: 0 !important;
+        cursor: pointer !important;
+        box-shadow: none !important;
+        text-transform: none !important;
+        
+        .dashicons {
+            margin-right: 12px !important;
+            margin-left: 0 !important;
+            font-size: 18px !important;
+            width: 18px !important;
+            height: 18px !important;
+            text-align: center !important;
+            color: #666 !important;
+            display: inline-block !important;
+            line-height: 1 !important;
+        }
+        
+        &:hover {
+            background-color: #f5f5f5 !important;
+            color: #000 !important;
+            
+            .dashicons {
+                color: #333 !important;
+            }
+        }
+        
+        &.danger { 
+            color: #d63638 !important;
+            border-top: 1px solid #eee !important;
+            margin-top: 2px !important;
+            
+            &:hover { background: #fff0f0 !important; }
+            .dashicons { color: #d63638 !important; }
+        }
+    }
+}
+
+/* Mobile adjustments for Compact View */
+@media (max-width: 600px) {
+    .pandat69-compact-item {
+        grid-template-columns: 30px 1fr 40px; /* Status | Name | Menu */
+        gap: 5px;
+    }
+    
+    .pandat69-drag-handle, 
+    .pandat69-compact-meta, 
+    .pandat69-compact-avatar {
+        display: none;
+    }
+}

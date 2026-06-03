@@ -1,0 +1,129 @@
+.pandat69-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 10px 15px;
+    background: $medium-bg;
+    border-radius: $border-radius;
+    margin-bottom: 20px;
+    border: 1px solid $border-color;
+
+    .pandat69-filter-group-left {
+        flex: 1;
+        max-width: 300px;
+        
+        .pandat69-search-input {
+            width: 100%;
+            margin: 0;
+            height: 36px;
+        }
+    }
+
+    .pandat69-filter-group-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pandat69-input,
+    .pandat69-select {
+        margin-bottom: 0;
+    }
+}
+
+/* Icon Filter Container */
+.pandat69-icon-filter {
+    position: relative;
+    display: inline-block;
+}
+
+/* 
+ * Shared Icon Button Style 
+ * Applies to Header buttons and Filter buttons to ensure identical look 
+ */
+.pandat69-header .pandat69-icon-button,
+.pandat69-filters .pandat69-icon-button,
+.pandat69-icon-filter .pandat69-icon-button {
+    height: 36px;
+    width: 36px;
+    min-width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $white;
+    border: 1px solid #ccc; /* Ensure consistent border */
+    border-radius: 3px; 
+    color: $secondary-color;
+    transition: all 0.2s;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: none;
+
+    &:hover, &.active {
+        color: $primary-color;
+        border-color: $primary-color;
+        background-color: $light-bg;
+    }
+
+    .dashicons {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+        line-height: 1;
+    }
+}
+
+.pandat69-filter-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 5px;
+    background: $white;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 180px;
+    overflow: hidden;
+    padding: 5px 0;
+
+    .pandat69-filter-item {
+        padding: 8px 15px;
+        font-size: 13px;
+        color: $primary-color;
+        cursor: pointer;
+        transition: background-color 0.1s ease;
+
+        &:hover {
+            background-color: $light-bg;
+            color: $primary-color;
+        }
+
+        &.selected {
+            background-color: #eef4f9;
+            color: #2271b1;
+            font-weight: 500;
+            position: relative;
+            
+            &::after {
+                content: "\f147"; /* dashicons-yes */
+                font-family: dashicons;
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+            }
+        }
+    }
+    
+    /* Fix for mobile viewport overflow */
+    @media (max-width: 480px) {
+        right: -10px; /* Slight offset compensation */
+        max-width: 220px; /* Limit width */
+        width: max-content;
+        
+        /* If specific dropdowns are still cut off, ensure they don't exceed screen width */
+        max-width: 90vw; 
+    }
+}

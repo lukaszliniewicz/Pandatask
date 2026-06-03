@@ -1,0 +1,127 @@
+/* User Autocomplete */
+.pandat69-user-autocomplete-container {
+    position: relative;
+    width: 100%;
+    min-height: 38px;
+}
+
+.pandat69-user-search-input {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.pandat69-user-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: $white;
+    border: 1px solid $border-color;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 0;
+    padding: 0;
+    display: none; // Hidden by default
+
+    .pandat69-searching,
+    .pandat69-no-results,
+    .pandat69-error {
+        padding: 8px 12px;
+        font-size: 0.9em;
+        color: $secondary-color;
+        font-style: italic;
+    }
+
+    .pandat69-error {
+        color: $danger-color;
+    }
+}
+
+.pandat69-user-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid $light-border-color;
+    color: $primary-color;
+    transition: background-color 0.15s ease;
+
+    &:last-child {
+        border-bottom: none;
+    }
+
+    &:hover {
+        background-color: $medium-bg;
+    }
+}
+
+.pandat69-selected-users-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    min-height: 0;
+}
+
+.pandat69-selected-user {
+    display: inline-flex;
+    align-items: center;
+    background: #eef2f7;
+    border: 1px solid #c0cbd9;
+    padding: 4px 10px 4px 12px;
+    font-size: 13px;
+    cursor: default;
+    color: $primary-color;
+    border-radius: 3px;
+    transition: background-color 0.15s ease;
+
+    .pandat69-remove-user {
+        margin-left: 6px;
+        font-weight: bold;
+        font-size: 14px;
+        color: $secondary-color;
+        cursor: pointer;
+        transition: color 0.15s ease;
+
+        &:hover {
+            color: $danger-color;
+        }
+    }
+}
+
+/* @Mention Autocomplete */
+.pandat69-mention-dropdown {
+    position: absolute;
+    background: $white;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 150002; // Higher than modal
+    max-height: 200px;
+    overflow-y: auto;
+    width: auto;
+    min-width: 180px;
+    display: none;
+
+    .pandat69-mention-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid $light-border-color;
+        color: $primary-color;
+        transition: background-color 0.15s ease;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &:hover,
+        &.active {
+            background-color: $medium-bg;
+        }
+    }
+
+    .pandat69-mention-highlight {
+        font-weight: bold;
+        color: $primary-color;
+    }
+}

@@ -1,0 +1,270 @@
+@import '../base/variables';
+
+.pandat69-layout-body {
+    display: flex;
+    position: relative;
+    align-items: flex-start;
+    gap: 0;
+    min-height: 600px;
+    overflow: hidden;
+}
+
+.pandat69-main-content {
+    flex-grow: 1;
+    min-width: 0;
+    width: 100%;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    
+    /* Added whitespace for desktop */
+    @media (min-width: 769px) {
+        padding-left: 20px; 
+    }
+}
+
+/* Sidebar Container */
+.pandat69-project-sidebar {
+    background-color: $white;
+    border-right: 1px solid $border-color;
+    height: 100%;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden; 
+    transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.2s ease;
+    
+    /* Desktop Expanded */
+    &.expanded {
+        width: 240px;
+        opacity: 1;
+        border-right: 1px solid $border-color;
+        visibility: visible;
+    }
+
+    /* Desktop Collapsed - COMPLETELY HIDDEN */
+    &.collapsed {
+        width: 0;
+        opacity: 0;
+        border-right: none;
+        padding: 0;
+        margin: 0;
+        visibility: hidden;
+        
+        * {
+            display: none !important; /* Stop rendering contents for performance */
+        }
+    }
+
+    /* Mobile Flyout Mode */
+    &.is-mobile {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        z-index: 999999;
+        width: 85%;
+        max-width: 300px;
+        background: #fff;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.2);
+        display: flex !important;
+        opacity: 1 !important;
+        border-right: none;
+        visibility: visible !important;
+
+        &.expanded {
+            transform: translateX(0);
+            width: 85%;
+        }
+
+        &.collapsed {
+            width: 85%; /* Keep width for animation */
+            transform: translateX(-100%);
+        }
+    }
+}
+
+/* Sidebar Header */
+.pandat69-sidebar-header {
+    padding: 15px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 50px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .pandat69-sidebar-title-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-grow: 1;
+        width: 100%;
+    }
+
+    .pandat69-add-project-mini-btn {
+        /* Scoped reset specifically for this icon */
+        appearance: none;
+        background: none;
+        border: none;
+        box-shadow: none;
+        padding: 4px;
+        cursor: pointer;
+        color: $secondary-color;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+
+        &:hover {
+            color: $primary-color;
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 3px;
+        }
+        
+        .dashicons {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+        }
+    }
+
+    /* Close button only visible on mobile */
+    .close-mobile {
+        margin-left: auto;
+    }
+
+    h3.pandat69-sidebar-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #78909c;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+}
+
+.pandat69-sidebar-list {
+    padding: 0 !important;
+    margin: 0 !important;
+    list-style: none !important;
+}
+
+.pandat69-sidebar-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    width: 100%;
+    padding: 10px 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: $secondary-color;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    font-weight: 500;
+    background: transparent;
+
+    .dashicons {
+        margin-right: 12px;
+        flex-shrink: 0;
+        color: #9ea9b5;
+        font-size: 18px;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+    }
+
+    &:hover {
+        background-color: #f5f7fa;
+        color: $primary-color;
+        
+        .dashicons {
+            color: $primary-color;
+        }
+    }
+
+    &.active {
+        background-color: #eef4f9;
+        color: #2271b1;
+        border-left-color: #2271b1;
+        
+        .dashicons {
+            color: #2271b1;
+        }
+        
+        .pandat69-sidebar-count {
+            background-color: #2271b1;
+            color: white;
+        }
+    }
+}
+
+.pandat69-sidebar-item-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+.pandat69-sidebar-project-deadline {
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+}
+
+.pandat69-sidebar-label {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pandat69-sidebar-count {
+    background: #e0e5eb;
+    color: $secondary-color;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.pandat69-sidebar-divider {
+    height: 1px;
+    background-color: #f0f0f0;
+    margin: 10px 0;
+}
+
+.pandat69-sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    
+    &::-webkit-scrollbar {
+        width: 5px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
+    }
+}
+
+.pandat69-sidebar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 999;
+    backdrop-filter: blur(1px);
+}

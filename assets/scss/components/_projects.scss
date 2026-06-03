@@ -1,0 +1,152 @@
+@import '../base/variables';
+
+/* Project List View */
+.pandat69-tab-projects .pandat69-header-actions {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid $border-color;
+}
+
+ul.pandat69-project-list-view {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+
+    li.pandat69-project-list-item {
+        background-color: $white;
+        border: 1px solid $border-color;
+        margin-bottom: 15px;
+        padding: 20px;
+        border-radius: $border-radius;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+}
+
+.pandat69-project-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid $light-border-color;
+}
+
+.pandat69-project-item-header-main {
+    flex-grow: 1;
+    min-width: 0;
+    margin-right: 15px;
+
+    h4 {
+        margin: 0 0 5px 0;
+        font-size: 1.4em;
+        color: $primary-color;
+        word-break: break-word;
+    }
+
+    p {
+        margin: 0;
+        font-size: 0.9em;
+        color: $secondary-color;
+        word-break: break-word;
+    }
+}
+
+.pandat69-project-item-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.pandat69-project-item-body {
+    padding: 15px 0;
+
+    .pandat69-detail-item {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+
+        strong {
+            font-weight: 600;
+            color: $primary-color;
+            min-width: 100px;
+        }
+    }
+}
+
+/* Tasks inside Project Item */
+.pandat69-project-task-list-container {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid $light-border-color;
+
+    h5 {
+        margin: 0 0 10px 0;
+        font-size: 1.1em;
+        color: $primary-color;
+    }
+}
+
+.pandat69-project-task-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+
+    li {
+        padding: 8px 10px;
+        border-bottom: 1px dashed $light-border-color;
+        background-color: $medium-bg;
+        border-radius: 3px;
+        margin-bottom: 5px;
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+}
+
+.pandat69-project-task-link {
+    text-decoration: none;
+    color: $primary-color;
+    font-weight: 500;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+/* No Projects State */
+.pandat69-no-projects {
+    padding: 20px;
+    text-align: center;
+    color: $secondary-color;
+    background-color: $medium-bg;
+    border: 1px dashed $border-color;
+    border-radius: $border-radius;
+}
+
+/* Project Form Styles (shared with task form styles, specific tweaks here) */
+.pandat69-project-form-container {
+    .pandat69-form-heading {
+        margin-top: 0;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid $border-color;
+        font-size: 1.3em;
+        color: $primary-color;
+    }
+}
+
+/* Sidebar List in Task Form/Filters */
+.pandat69-project-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pandat69-project-item {
+    // Style for smaller list if needed
+}

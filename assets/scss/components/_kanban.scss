@@ -1,0 +1,195 @@
+@import '../base/variables';
+
+.pandat69-kanban-board {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+.pandat69-kanban-column {
+    flex: 1;
+    min-width: 300px;
+    max-width: 340px;
+    background-color: transparent;
+    border-radius: $border-radius;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(80vh - 40px);
+}
+
+.pandat69-kanban-column-title {
+    padding: 12px 15px;
+    font-size: 1em;
+    font-weight: 600;
+    color: #44546f;
+    border-bottom: 1px solid #dcdfe4;
+    margin: 0;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.pandat69-kanban-column-content {
+    padding: 10px;
+    min-height: 100px;
+    overflow-y: auto;
+    flex-grow: 1;
+    border-radius: 0 0 $border-radius $border-radius;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+        background: #f4f5f7;
+        border-radius: 3px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: #c1c7d0;
+        border-radius: 3px;
+        &:hover { background: #a6c5e2; }
+    }
+}
+
+/* Kanban Card */
+.pandat69-kanban-card {
+    background-color: $white;
+    border-radius: 3px;
+    border: 1px solid #c1c7d0;
+    padding: 10px;
+    margin-bottom: 10px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    position: relative;
+
+    &:hover {
+        box-shadow: 0 4px 8px rgba(9,30,66,.15);
+        border-color: $primary-color;
+    }
+
+    &.pandat69-status-pending { border-left: 4px solid $status-pending; }
+    &.pandat69-status-in-progress { border-left: 4px solid $status-in-progress; }
+    &.pandat69-status-done { border-left: 4px solid $status-done; }
+
+    &.pandat69-overdue-task {
+        border-color: $danger-color;
+    }
+
+    &.pandat69-indented-subtask {
+        margin-left: 20px;
+        border-left-color: #78909c; // Distinct color for subtasks?
+    }
+}
+
+.pandat69-kanban-card-title {
+    font-weight: 600;
+    color: #172b4d;
+    margin-bottom: 8px;
+    font-size: 1em;
+    cursor: grab;
+}
+
+.pandat69-kanban-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.85em;
+    color: #5e6c84;
+    align-items: center;
+    margin-bottom: 8px;
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    .dashicons {
+        font-size: 16px;
+        width: auto;
+        height: auto;
+    }
+}
+
+.pandat69-kanban-card-users {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.pandat69-kanban-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid $light-border-color;
+
+    .pandat69-icon-button {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        
+        .dashicons {
+            font-size: 16px;
+        }
+    }
+}
+
+/* Indicators */
+.pandat69-kanban-subtask-label {
+    font-size: 0.8em;
+    color: #5e6c84;
+    margin-bottom: 8px;
+    padding: 4px 6px;
+    background-color: $medium-bg;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    
+    .dashicons {
+        flex-shrink: 0;
+    }
+}
+
+.pandat69-kanban-subtask-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    color: #5e6c84;
+    cursor: help;
+}
+
+/* Drag & Drop Placeholder */
+.pandat69-kanban-placeholder {
+    background-color: rgba(9,30,66,.08);
+    border: 1px dashed #c1c7d0;
+    height: 50px;
+    margin-bottom: 10px;
+    border-radius: 3px;
+}
+
+/* Fullscreen Overrides for Kanban */
+body.pandat69-fullscreen-body {
+    .pandat69-kanban-board {
+        min-height: calc(100vh - 150px);
+        flex-grow: 1;
+        align-items: stretch;
+    }
+    
+    .pandat69-kanban-column {
+        max-width: none;
+        max-height: none;
+        height: auto;
+    }
+    
+    .pandat69-kanban-column-content {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+}

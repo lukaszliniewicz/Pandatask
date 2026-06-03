@@ -1,0 +1,48 @@
+.aider*
+# --- Dependencies ---
+node_modules/
+/pnpm-store/
+vendor/
+
+# --- Production & Build ---
+# Standard build output directories
+dist/
+out/
+.next/
+
+# --- Environment Variables (Security) ---
+# NEVER commit these files as they may contain keys/secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# --- Testing ---
+coverage/
+lib-cov/
+
+# --- Runtime Data ---
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# --- Editor/IDE Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+.cecli*

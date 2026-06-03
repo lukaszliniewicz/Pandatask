@@ -1,0 +1,174 @@
+@import '../base/variables';
+
+.pandat69-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid $border-color;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    min-height: 50px; 
+}
+
+.pandat69-header-left {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    min-width: 0;
+}
+
+/* Sidebar toggle button in Header */
+.pandat69-header .pandat69-sidebar-toggle {
+    display: flex; /* Always visible now on both mobile and desktop */
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-right: 15px;
+    border: 1px solid #ccc;
+    background: $white;
+    border-radius: 3px;
+    cursor: pointer;
+    color: $secondary-color;
+    flex-shrink: 0;
+
+    &:hover {
+        border-color: $primary-color;
+        color: $primary-color;
+        background-color: $light-bg;
+    }
+
+    .dashicons {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+    }
+}
+
+.pandat69-header-title {
+    flex-grow: 1;
+    min-width: 0;
+    
+    h2 {
+        margin: 0;
+        font-size: 1.5em;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left; /* Ensure left align */
+        
+        @media (max-width: 600px) {
+            font-size: 1.2em;
+        }
+    }
+}
+
+.pandat69-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* ... existing view switcher styles ... */
+.pandat69-view-label {
+    margin-right: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: $secondary-color;
+    display: none;
+    
+    @media (min-width: 769px) {
+        display: inline-block;
+    }
+}
+
+/* Updated View Controls Group */
+.pandat69-view-controls-container {
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    margin-right: 15px;
+    position: relative;
+
+    .pandat69-icon-button {
+        background: transparent;
+        border: none;
+        width: 32px; 
+        height: 32px;
+        margin: 0 2px;
+        color: #a0a0a0; /* Lighter default color */
+        border-radius: 3px;
+        box-shadow: none;
+        transition: color 0.2s ease;
+        
+        &.active {
+            background: transparent;
+            color: $primary-color; /* Dark blue/primary when active */
+            box-shadow: none; 
+            font-weight: bold;
+        }
+
+        &:hover {
+            background: transparent;
+            color: $primary-color;
+        }
+    }
+}
+
+.pandat69-header-buttons {
+    display: flex;
+    gap: 8px;
+
+    .pandat69-icon-button {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        background: $white;
+        color: $secondary-color;
+        transition: all 0.2s ease;
+        
+        &:hover {
+            border-color: $primary-color;
+            color: $primary-color;
+            background-color: $light-bg;
+        }
+        
+        .dashicons {
+            font-size: 20px; /* Consistent icon size */
+        }
+    }
+}
+
+/* Fullscreen Specific Overrides to fix "off" look */
+body.pandat69-fullscreen-body {
+    .pandat69-header {
+        padding: 20px 30px; /* More breathing room */
+        background: $white;
+        border-bottom: 1px solid $border-color;
+        margin-bottom: 0; /* Remove bottom margin inside header, handle in container */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .pandat69-container {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        background: transparent;
+    }
+    
+    .pandat69-main-content {
+        padding: 20px 30px;
+    }
+}

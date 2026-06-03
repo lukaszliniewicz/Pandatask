@@ -1,0 +1,89 @@
+/* Best practice to prevent content overflow */
+.pandat69-admin-wrap {
+    overflow-wrap: break-word;
+    word-wrap: break-word; /* Legacy fallback */
+}
+
+/* Ensure images and other replaced content are responsive */
+.pandat69-admin-wrap img,
+.pandat69-admin-wrap video,
+.pandat69-admin-wrap iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+.pandat69-admin-wrap .pandat69-ai-step {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.pandat69-admin-wrap .pandat69-prompt-wrapper {
+    position: relative;
+}
+
+.pandat69-admin-wrap .pandat69-code-block {
+    background: #f7f7f7;
+    border: 1px solid #ccc;
+    padding: 15px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    color: #333;
+    font-family: monospace;
+}
+
+.pandat69-admin-wrap .pandat69-copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.pandat69-admin-wrap .pandat69-results-area {
+    background: #fdfdfd;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-top: 10px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.pandat69-admin-wrap .pandat69-result-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-left-width: 4px;
+    border-left-style: solid;
+}
+
+.pandat69-admin-wrap .pandat69-result-item.success {
+    border-left-color: #46b450;
+    background-color: #f6fbf7;
+}
+
+.pandat69-admin-wrap .pandat69-result-item.error {
+    border-left-color: #dc3232;
+    background-color: #fbeaea;
+}
+
+.pandat69-admin-wrap .pandat69-spinner {
+    margin-left: 10px;
+}
+
+.pandat69-admin-wrap .pandat69-result-item p strong .dashicons {
+    line-height: inherit;
+    height: auto;
+    width: auto;
+    font-size: inherit;
+    vertical-align: text-bottom;
+    font-family: dashicons;
+}
+
+.pandat69-admin-wrap .pandat69-result-item.success p strong .dashicons {
+    color: #46b450;
+}
+
+.pandat69-admin-wrap .pandat69-result-item.error p strong .dashicons {
+    color: #dc3232;
+}
