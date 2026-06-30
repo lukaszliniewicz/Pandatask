@@ -6,6 +6,8 @@
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
+    "test": "npm run test:phase2",
+    "test:phase2": "node --test tests/phase2-contract.test.mjs",
     "zip": "npm run build && shx rm -rf release && shx mkdir -p release/pandatask/assets/css release/pandatask/assets/js && shx cp pandatask.php README.txt release/pandatask/ && shx cp -r templates build src release/pandatask/ && shx cp assets/css/pandat69-admin-style.css release/pandatask/assets/css/ && shx cp assets/js/pandat69-admin.js release/pandatask/assets/js/ && cd release && bestzip ../pandatask.zip pandatask/ && cd .. && shx rm -rf release"
   },
   "author": "Lukasz Liniewicz",

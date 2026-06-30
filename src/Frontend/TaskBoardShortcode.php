@@ -23,7 +23,7 @@ class TaskBoardShortcode {
         
         // Output React mounting point
         return sprintf(
-            '<div class="pandat69-bug-tracker-container" id="pandat69-bug-tracker-%s" data-board-name="%s" data-default-assignee-id="%s"></div>',
+            '<div class="pandat69-bug-tracker-container pandat69-root" id="pandat69-bug-tracker-%s" data-board-name="%s" data-default-assignee-id="%s"></div>',
             esc_attr($board_name),
             esc_attr($board_name),
             esc_attr($default_assignee_id)
@@ -60,7 +60,7 @@ class TaskBoardShortcode {
         }
         
         // Output clean container for React to mount into
-        return '<div class="pandat69-container" ' . $attributes . '></div>';
+        return '<div class="pandat69-container pandat69-root" ' . $attributes . '></div>';
     }
     
     /**
