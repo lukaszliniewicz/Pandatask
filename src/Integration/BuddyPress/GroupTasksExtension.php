@@ -4,6 +4,8 @@
  */
 namespace Pandatask\Integration\BuddyPress;
 
+use Pandatask\Bootstrap\AssetRegistrar;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -116,6 +118,8 @@ class GroupTasksExtension extends \BP_Group_Extension {
      * Loads the template structure.
      */
     public function display_screen_callback() {
+        AssetRegistrar::enqueueFrontendAssetHandles();
+
         // Set the title for the page
         add_action( 'bp_template_title', array( $this, 'display_screen_title' ) );
         // Add the content display function

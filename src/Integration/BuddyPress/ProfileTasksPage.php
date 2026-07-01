@@ -4,6 +4,8 @@
  */
 namespace Pandatask\Integration\BuddyPress;
 
+use Pandatask\Bootstrap\AssetRegistrar;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -60,6 +62,8 @@ class ProfileTasksPage {
      * Callback function for the profile tab screen.
      */
     public function screen_function_callback() {
+        AssetRegistrar::enqueueFrontendAssetHandles();
+
         add_action( 'bp_template_content', array( $this, 'screen_content' ) );
         bp_core_load_template( apply_filters( 'bp_core_template_plugin', 'members/single/plugins' ) );
     }

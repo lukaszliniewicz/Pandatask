@@ -1,6 +1,8 @@
 <?php
 namespace Pandatask\Frontend;
 
+use Pandatask\Bootstrap\AssetRegistrar;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -18,12 +20,14 @@ class TaskBoardShortcode {
             'default_assignee_id' => 0,
         ), $atts, 'pandatask_bug_tracker' );
 
+        $this->enqueue_assets();
+
         $board_name = sanitize_key($atts['board_name']);
         $default_assignee_id = absint($atts['default_assignee_id']);
         
         // Output React mounting point
         return sprintf(
-            '<div class="pandat69-bug-tracker-container pandat69-root" id="pandat69-bug-tracker-%s" data-board-name="%s" data-default-assignee-id="%s"></div>',
+            '<div class="pandat69-bug-tracker-container pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask" id="pandat69-bug-tracker-%s" data-iarf-product="pandatask" data-iarf-app="pandatask" data-iarf-plugin="pandatask" data-iarf-product-kind="react-plugin" data-board-name="%s" data-default-assignee-id="%s"></div>',
             esc_attr($board_name),
             esc_attr($board_name),
             esc_attr($default_assignee_id)
@@ -42,9 +46,8 @@ class TaskBoardShortcode {
         $page_name = sanitize_title( $atts['page_name'] );
         $is_user_board = preg_match('/^user_(\d+)$/', $board_name);
         
-        // Ensure scripts are enqueued (in case shortcode is used in a widget or unusual place)
-        wp_enqueue_script( 'pandat69-bundle' );
-        wp_enqueue_style( 'pandat69-style' );
+        // Ensure scripts are enqueued in case the shortcode is rendered from a widget or another late path.
+        $this->enqueue_assets();
 
         $attributes = sprintf(
             'id="pandat69-container-%1$s" data-board-name="%1$s" data-is-user-board="%2$s"',
@@ -60,7 +63,11 @@ class TaskBoardShortcode {
         }
         
         // Output clean container for React to mount into
-        return '<div class="pandat69-container pandat69-root" ' . $attributes . '></div>';
+        return '<div class="pandat69-container pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask" data-iarf-product="pandatask" data-iarf-app="pandatask" data-iarf-plugin="pandatask" data-iarf-product-kind="react-plugin" ' . $attributes . '></div>';
+    }
+
+    private function enqueue_assets() {
+        AssetRegistrar::enqueueFrontendAssetHandles();
     }
     
     /**

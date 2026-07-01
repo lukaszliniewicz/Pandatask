@@ -8,6 +8,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createApiClient } from './api/client';
 import '../assets/scss/main.scss';
 
+const applyPandataskBoundary = (root) => {
+    if (!root) return;
+
+    root.classList.add(
+        'pandat69-root',
+        'iarf-app',
+        'iarf-app--pandatask',
+        'iarf-plugin',
+        'iarf-plugin--pandatask'
+    );
+    root.setAttribute('data-iarf-product', 'pandatask');
+    root.setAttribute('data-iarf-app', 'pandatask');
+    root.setAttribute('data-iarf-plugin', 'pandatask');
+    root.setAttribute('data-iarf-product-kind', 'react-plugin');
+};
+
 // Wrapper for simple components that need API context but not full TaskBoard
 const AppWrapper = ({ apiSettings, currentUser, children, boardName }) => {
     const queryClient = new QueryClient();
@@ -37,6 +53,8 @@ window.Pandatask = {
         // Merge passed settings with global defaults if needed
         const settings = apiSettings || window.pandatask_api_settings || {};
 
+        applyPandataskBoundary(container);
+
         // Ensure container is clean
         const root = createRoot(container);
         root.render(
@@ -51,6 +69,40 @@ window.Pandatask = {
             />
         );
         return () => root.unmount(); // Return cleanup function
+    },
+    mountFloatingBugReporter: (container, props = {}) => {
+        const {
+            boardName,
+            defaultAssigneeId,
+            apiSettings,
+            currentUser,
+            initialOpen = false
+        } = props;
+        const settings = apiSettings || window.pandatask_api_settings || {};
+        const resolvedBoardName = boardName || container?.dataset?.boardName;
+
+        applyPandataskBoundary(container);
+
+        const root = createRoot(container);
+        container.innerHTML = '';
+        root.render(
+            <AppWrapper
+                apiSettings={settings}
+                currentUser={currentUser || {
+                    id: settings.current_user_id,
+                    name: settings.current_user_display_name
+                }}
+                boardName={resolvedBoardName}
+            >
+                <FloatingBugReporter
+                    boardName={resolvedBoardName}
+                    defaultAssigneeId={defaultAssigneeId || container?.dataset?.defaultAssigneeId}
+                    initialOpen={initialOpen}
+                />
+            </AppWrapper>
+        );
+        container.dataset.reactMounted = "true";
+        return () => root.unmount();
     }
 };
 
@@ -67,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     boardRoots.forEach(root => {
         if (!root.dataset.reactMounted) {
             const { boardName } = root.dataset;
+            applyPandataskBoundary(root);
             const reactRoot = createRoot(root);
             root.innerHTML = '';
             reactRoot.render(
@@ -86,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bugRoots.forEach(root => {
         if (!root.dataset.reactMounted) {
             const { boardName, defaultAssigneeId } = root.dataset;
+            applyPandataskBoundary(root);
             const reactRoot = createRoot(root);
             root.innerHTML = '';
             reactRoot.render(
@@ -101,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const floatRoot = document.getElementById('pandat69-floating-bug-reporter-root');
     if (floatRoot && !floatRoot.dataset.reactMounted) {
         const { boardName, defaultAssigneeId } = floatRoot.dataset;
+        applyPandataskBoundary(floatRoot);
         const reactRoot = createRoot(floatRoot);
         // Do not clear innerHTML here as it's likely empty or hidden
         reactRoot.render(

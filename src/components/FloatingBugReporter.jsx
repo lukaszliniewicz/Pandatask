@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom';
 import Modal from './Modal';
 import TaskForm from './TaskForm';
 
-const FloatingBugReporter = ({ boardName, defaultAssigneeId }) => {
-    const [isOpen, setIsOpen] = useState(false);
+const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false }) => {
+    const [isOpen, setIsOpen] = useState(Boolean(initialOpen));
     const [position, setPosition] = useState({ top: 'auto', left: 'auto', bottom: '20px', right: '20px' });
     const widgetRef = useRef(null);
     const isDragging = useRef(false);

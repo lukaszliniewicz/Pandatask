@@ -2,13 +2,13 @@
 .pandat69-container,
 div.pandat69-container,
 #content .pandat69-container {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
+    font-family: var(--pandatask-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif);
+    background-color: var(--pandatask-surface-muted, #f9f9f9);
+    border: 1px solid var(--pandatask-border, #ddd);
     padding: 20px;
     margin-bottom: 20px;
     box-sizing: border-box;
-    color: #384D68;
+    color: var(--pandatask-primary, #384D68);
     position: relative;
     width: 100%;
     max-width: 100%;
@@ -42,7 +42,7 @@ div.pandat69-container,
         font-weight: inherit;
         color: inherit;
         text-transform: none;
-        letter-spacing: normal;
+        letter-spacing: 0;
         
         &:focus {
             outline: none;
@@ -73,9 +73,9 @@ div.pandat69-container,
         margin: 0;
         
         &:focus {
-            border-color: #384D68; // Primary color
+            border-color: var(--pandatask-primary, #384D68);
             outline: none;
-            box-shadow: 0 0 0 1px #384D68;
+            box-shadow: 0 0 0 1px var(--pandatask-primary, #384D68);
         }
     }
 
@@ -87,7 +87,7 @@ div.pandat69-container,
     h2 {
         margin: 0;
         font-size: 1.5em;
-        color: #384D68;
+        color: var(--pandatask-primary, #384D68);
         font-weight: 600;
         line-height: 1.3;
         padding: 0;

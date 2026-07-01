@@ -4,6 +4,8 @@
  */
 namespace Pandatask\Integration\BuddyPress;
 
+use Pandatask\Bootstrap\AssetRegistrar;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -96,6 +98,8 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
     }
     
     public function display_screen_callback() {
+        AssetRegistrar::enqueueFrontendAssetHandles();
+
         add_action( 'bp_template_title', function() { echo esc_html__( 'Bug Tracker', 'pandatask' ); } );
         add_action( 'bp_template_content', array( $this, 'display_screen_content' ) );
         bp_core_load_template( apply_filters( 'bp_core_template_plugin', 'groups/single/plugins' ) );

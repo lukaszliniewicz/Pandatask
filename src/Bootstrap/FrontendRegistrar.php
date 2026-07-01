@@ -71,6 +71,11 @@ final class FrontendRegistrar {
         $default_assignee_id = isset( $settings['assignee'] ) ? $settings['assignee'] : 0;
         ?>
         <div id="pandat69-floating-bug-reporter-root"
+             class="pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask"
+             data-iarf-product="pandatask"
+             data-iarf-app="pandatask"
+             data-iarf-plugin="pandatask"
+             data-iarf-product-kind="react-plugin"
              data-board-name="<?php echo esc_attr( $board_name ); ?>"
              data-default-assignee-id="<?php echo esc_attr( $default_assignee_id ); ?>">
         </div>
