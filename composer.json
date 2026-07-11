@@ -2,6 +2,12 @@
   "name": "lukaszliniewicz/pandatask",
   "description": "Development tooling for Pandatask plugin",
   "type": "project",
+  "authors": [
+    {
+      "name": "Lukasz Liniewicz",
+      "homepage": "https://github.com/lukaszliniewicz"
+    }
+  ],
   "require": {},
   "require-dev": {
     "dealerdirect/phpcodesniffer-composer-installer": "^1.1",
