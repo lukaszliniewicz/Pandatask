@@ -1,6 +1,6 @@
 {
   "name": "pandatask",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Adds a shortcode [task_board board_name=\"unique_board_id\"] to display a task management board.",
   "main": "build/main.js",
   "scripts": {

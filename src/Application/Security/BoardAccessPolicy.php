@@ -13,7 +13,7 @@ final class BoardAccessPolicy {
             return new WP_Error( 'rest_forbidden', 'Not logged in.', array( 'status' => 401 ) );
         }
 
-        if ( current_user_can( 'manage_options' ) ) {
+        if ( user_can( $user_id, 'manage_options' ) ) {
             return true;
         }
 
@@ -39,7 +39,7 @@ final class BoardAccessPolicy {
             return new WP_Error( 'rest_forbidden', 'Private board.', array( 'status' => 403 ) );
         }
 
-        if ( current_user_can( 'edit_posts' ) ) {
+        if ( user_can( $user_id, 'edit_posts' ) ) {
             return true;
         }
 

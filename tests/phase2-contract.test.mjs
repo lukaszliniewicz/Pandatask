@@ -134,3 +134,32 @@ test('Pandatask does not depend on external icon packages', () => {
 	assert.doesNotMatch(assets, /font-awesome|fontawesome|fortawesome/i);
 	assert.doesNotMatch(assetManifest, /font-awesome|fontawesome|fortawesome/i);
 });
+
+test('Pandatask protects task attachments without web-server-specific delivery', () => {
+	const plugin = fs.readFileSync(path.join(repoRoot, 'src/Plugin.php'), 'utf8');
+	const media = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Media/ProtectedAttachmentService.php'), 'utf8');
+	const tasks = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskService.php'), 'utf8');
+	const mutations = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskMutationService.php'), 'utf8');
+	const policy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/BoardAccessPolicy.php'), 'utf8');
+
+	assert.match(plugin, /ProtectedAttachmentService::registerHooks\(\)/);
+	assert.match(media, /pandatask\/v1.*protected-attachments/s);
+	assert.match(media, /dirname\(\s*rtrim\(\s*ABSPATH/);
+	assert.match(media, /pathIsPublic/);
+	assert.match(media, /hash_hmac\(\s*'sha256'/);
+	assert.match(media, /hash_equals/);
+	assert.match(media, /Accept-Ranges: bytes/);
+	assert.match(media, /Cache-Control: private, no-store/);
+	assert.match(media, /normalizePermissions/);
+	assert.match(media, /migrate-protected-attachments/);
+	assert.match(media, /isset\(\s*\$assoc_args\['write'\]\s*\)/);
+	assert.match(media, /findProtectedSourceForAttachment/);
+	assert.doesNotMatch(media, /X-Accel-Redirect/);
+	assert.match(tasks, /set_transient\([\s\S]*ProtectedAttachmentService::prepareTasks/);
+	assert.match(tasks, /ProtectedAttachmentService::prepareTask/);
+	assert.match(mutations, /ProtectedAttachmentService::syncTask\(\s*\$task_id\s*\)/);
+	assert.match(mutations, /ProtectedAttachmentService::deleteTaskFiles\(\s*\$task_id\s*\)/);
+	assert.match(policy, /user_can\(\s*\$user_id,\s*'manage_options'\s*\)/);
+	assert.match(policy, /user_can\(\s*\$user_id,\s*'edit_posts'\s*\)/);
+	assert.doesNotMatch(policy, /current_user_can/);
+});

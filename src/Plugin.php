@@ -7,6 +7,7 @@ use Pandatask\Bootstrap\CoreRegistrar;
 use Pandatask\Bootstrap\CronRegistrar;
 use Pandatask\Bootstrap\FrontendRegistrar;
 use Pandatask\Infrastructure\Scheduler\DeadlineNotificationHandler;
+use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Setup\DatabaseLifecycle;
 use Pandatask\Integration\BuddyPress\BuddyPressRegistrar;
 
@@ -41,6 +42,7 @@ final class Plugin {
     }
 
     public function boot() {
+        ProtectedAttachmentService::registerHooks();
         $this->core_registrar->register();
         $this->asset_registrar->register();
         $this->frontend_registrar->register();

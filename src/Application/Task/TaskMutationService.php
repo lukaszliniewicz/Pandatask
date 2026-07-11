@@ -7,6 +7,7 @@ use DateTime;
 use Exception;
 use Pandatask\Infrastructure\Notifications\BuddyPressNotifier;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
+use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\TaskCommandRepository;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
@@ -139,6 +140,8 @@ final class TaskMutationService {
         if ( ! $task_id ) {
             return false;
         }
+
+        ProtectedAttachmentService::syncTask( $task_id );
 
         $assigned_persons   = $data['assigned_persons'] ?? array();
         $supervisor_persons = $data['supervisor_persons'] ?? array();
@@ -440,6 +443,8 @@ final class TaskMutationService {
             }
         }
 
+        ProtectedAttachmentService::syncTask( $task_id );
+
         if ( $is_completing ) {
             $this->processDependencyCascade( $task_id );
         }
@@ -606,6 +611,7 @@ final class TaskMutationService {
         $this->repository->deleteTaskComments( $task_id );
         $this->repository->deleteTaskHistory( $task_id );
 
+        ProtectedAttachmentService::deleteTaskFiles( $task_id );
         $result = $this->repository->deleteTask( $task_id );
 
         if ( false !== $result && $task_to_delete ) {

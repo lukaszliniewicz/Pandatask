@@ -5,6 +5,7 @@ namespace Pandatask\Application\Task;
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Comment\CommentService;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
+use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
 
 final class TaskService {
@@ -49,13 +50,13 @@ final class TaskService {
         $cached_tasks  = get_transient( $transient_key );
 
         if ( false !== $cached_tasks ) {
-            return $cached_tasks;
+            return ProtectedAttachmentService::prepareTasks( $cached_tasks );
         }
 
         $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id );
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
-        return $tasks;
+        return ProtectedAttachmentService::prepareTasks( $tasks );
     }
 
     public function getTask( $task_id ) {
@@ -63,7 +64,7 @@ final class TaskService {
         $cached_task   = get_transient( $transient_key );
 
         if ( false !== $cached_task ) {
-            return $cached_task;
+            return ProtectedAttachmentService::prepareTask( $cached_task );
         }
 
         $task = $this->repository->findById( $task_id );
@@ -79,7 +80,7 @@ final class TaskService {
 
         set_transient( $transient_key, $task, 12 * HOUR_IN_SECONDS );
 
-        return $task;
+        return ProtectedAttachmentService::prepareTask( $task );
     }
 
     public function getTaskByName( $board_name, $task_name ) {
@@ -97,7 +98,7 @@ final class TaskService {
         $cached_tasks  = get_transient( $transient_key );
 
         if ( false !== $cached_tasks ) {
-            return $cached_tasks;
+            return ProtectedAttachmentService::prepareTasks( $cached_tasks );
         }
 
         $tasks = $this->repository->findForUserAcrossBoards( $user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates );
@@ -108,7 +109,7 @@ final class TaskService {
 
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
-        return $tasks;
+        return ProtectedAttachmentService::prepareTasks( $tasks );
     }
 
     public function getPotentialParentTasks( $board_name, $current_task_id = 0 ) {
