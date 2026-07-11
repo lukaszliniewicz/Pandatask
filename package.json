@@ -31,5 +31,10 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@tinymce/tinymce-react": "^6.3.0",
     "react-mentions": "^4.4.10"
+  },
+  "overrides": {
+    "react-mentions": {
+      "@babel/runtime": "^7.29.0"
+    }
   }
 }
