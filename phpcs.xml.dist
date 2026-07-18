@@ -9,7 +9,6 @@
     <arg name="warning-severity" value="0"/>
 
     <file>pandatask.php</file>
-    <file>includes</file>
     <file>src</file>
 
     <exclude-pattern>*/vendor/*</exclude-pattern>
