@@ -120,7 +120,11 @@ class AdminPage {
     }
 
     public function register_settings() {
-        register_setting('pandatask_settings_group', 'pandatask_bug_tracker_settings');
+        register_setting(
+            'pandatask_settings_group',
+            'pandatask_bug_tracker_settings',
+            array( 'sanitize_callback' => array( $this, 'sanitize_bug_tracker_settings' ) )
+        );
 
         add_settings_section(
             'pandatask_bug_tracker_section',
@@ -151,6 +155,27 @@ class AdminPage {
             array($this, 'render_bug_tracker_assignee_field'),
             'pandatask-settings',
             'pandatask_bug_tracker_section'
+        );
+    }
+
+    public function sanitize_bug_tracker_settings( $input ) {
+        $input      = is_array( $input ) ? $input : array();
+        $visibility = isset( $input['visibility'] ) ? sanitize_key( $input['visibility'] ) : 'off';
+        $board      = isset( $input['board'] ) ? sanitize_key( $input['board'] ) : '';
+        $assignee   = isset( $input['assignee'] ) ? absint( $input['assignee'] ) : 0;
+
+        if ( ! in_array( $visibility, array( 'off', 'logged_in', 'logged_out', 'both' ), true ) ) {
+            $visibility = 'off';
+        }
+
+        if ( $assignee && ! user_can( $assignee, 'manage_options' ) ) {
+            $assignee = 0;
+        }
+
+        return array(
+            'visibility' => $visibility,
+            'board'      => $board,
+            'assignee'   => $assignee,
         );
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useTaskMutations } from '../hooks/useTaskMutations';
+import { parseDate } from '../utils';
 
 const TaskItem = ({ task, onAction }) => {
     const { isStandalone } = useConfig();
@@ -44,7 +45,7 @@ const TaskItem = ({ task, onAction }) => {
     const isOverdue = !isArchived && 
                       (task.status === 'pending' || task.status === 'in-progress') &&
                       task.deadline && 
-                      new Date(task.deadline) < today;
+                      parseDate(task.deadline) < today;
 
     const itemClasses = `pandat69-task-item ${isArchived ? 'pandat69-archived-task' : ''} ${isSubtask ? 'pandat69-subtask' : ''} ${isOverdue ? 'pandat69-overdue-task' : ''}`;
 

@@ -22,7 +22,13 @@ final class CommentRouteHandler {
 
     public function create_comment( $request ) {
         $params  = RequestHelper::bodyParams( $request );
-        $comment = $this->comment_service->addComment( $request['task_id'], get_current_user_id(), $params['comment_text'] );
+        $comment_text = isset( $params['comment_text'] ) ? trim( wp_kses_post( $params['comment_text'] ) ) : '';
+
+        if ( '' === $comment_text ) {
+            return new WP_Error( 'rest_missing', __( 'Comment text is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        $comment = $this->comment_service->addComment( $request['task_id'], get_current_user_id(), $comment_text );
 
         if ( $comment ) {
             return new WP_REST_Response( array( 'comment' => $comment ), 201 );
@@ -33,8 +39,13 @@ final class CommentRouteHandler {
 
     public function update_comment( $request ) {
         $params = RequestHelper::bodyParams( $request );
+        $comment_text = isset( $params['comment_text'] ) ? trim( wp_kses_post( $params['comment_text'] ) ) : '';
 
-        if ( $this->comment_service->updateComment( $request['id'], $params['comment_text'] ) ) {
+        if ( '' === $comment_text ) {
+            return new WP_Error( 'rest_missing', __( 'Comment text is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        if ( $this->comment_service->updateComment( $request['id'], $comment_text ) ) {
             return new WP_REST_Response( array( 'comment' => $this->comment_service->getComment( $request['id'] ) ), 200 );
         }
 
@@ -54,7 +65,13 @@ final class CommentRouteHandler {
             throw new Exception( 'Task ID is required for create_comment.' );
         }
 
-        $comment = $this->comment_service->addComment( (int) $data['task_id'], get_current_user_id(), $data['comment_text'] );
+        $comment_text = isset( $data['comment_text'] ) ? trim( wp_kses_post( $data['comment_text'] ) ) : '';
+
+        if ( '' === $comment_text ) {
+            return new WP_Error( 'rest_missing', __( 'Comment text is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        $comment = $this->comment_service->addComment( (int) $data['task_id'], get_current_user_id(), $comment_text );
 
         if ( ! $comment ) {
             return new WP_Error( 'rest_error', 'Failed', array( 'status' => 500 ) );
@@ -70,7 +87,13 @@ final class CommentRouteHandler {
 
         $comment_id = (int) $data['id'];
 
-        if ( ! $this->comment_service->updateComment( $comment_id, $data['comment_text'] ) ) {
+        $comment_text = isset( $data['comment_text'] ) ? trim( wp_kses_post( $data['comment_text'] ) ) : '';
+
+        if ( '' === $comment_text ) {
+            return new WP_Error( 'rest_missing', __( 'Comment text is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        if ( ! $this->comment_service->updateComment( $comment_id, $comment_text ) ) {
             return new WP_Error( 'rest_error', 'Failed', array( 'status' => 500 ) );
         }
 

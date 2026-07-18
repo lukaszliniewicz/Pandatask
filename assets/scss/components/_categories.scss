@@ -1,117 +1,117 @@
-@import '../base/variables';
+@use "../base/variables" as *;
 
 /* Category Management Styles */
 
 .pandat69-category-list-container {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: 20px;
-    border: 1px solid $border-color;
-    padding: 10px;
-    background-color: $medium-bg;
-    border-radius: $border-radius;
+	max-height: 200px;
+	overflow-y: auto;
+	margin-bottom: 20px;
+	border: 1px solid $border-color;
+	padding: 10px;
+	background-color: $medium-bg;
+	border-radius: $border-radius;
 }
 
 .pandat69-category-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+	list-style: none;
+	padding: 0;
+	margin: 0;
 }
 
 .pandat69-category-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 8px;
-    border-bottom: 1px dashed $light-border-color;
-    background-color: $white;
-    margin-bottom: 5px;
-    border-radius: 3px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 5px 8px;
+	border-bottom: 1px dashed $light-border-color;
+	background-color: $white;
+	margin-bottom: 5px;
+	border-radius: 3px;
 
-    &:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-    }
+	&:last-child {
+		border-bottom: none;
+		margin-bottom: 0;
+	}
 }
 
 .pandat69-category-name {
-    color: $primary-color;
-    font-size: 14px;
+	color: $primary-color;
+	font-size: 14px;
 }
 
 .pandat69-delete-category-btn {
-    padding: 3px 6px;
-    font-size: 12px;
-    min-width: 20px;
-    min-height: 20px;
-    
-    &:hover {
-        background-color: $danger-color;
-        border-color: $danger-color;
-        color: $white;
-    }
+	padding: 3px 6px;
+	font-size: 12px;
+	min-width: 20px;
+	min-height: 20px;
+
+	&:hover {
+		background-color: $danger-color;
+		border-color: $danger-color;
+		color: $white;
+	}
 }
 
 .pandat69-add-category-form {
-    background-color: $medium-bg;
-    padding: 15px;
-    border-radius: $border-radius;
-    border: 1px solid $border-color;
+	background-color: $medium-bg;
+	padding: 15px;
+	border-radius: $border-radius;
+	border: 1px solid $border-color;
 
-    .pandat69-form-field {
-        margin-bottom: 10px;
-    }
-    
-    label {
-        font-weight: 600;
-        margin-bottom: 5px;
-        display: block;
-    }
+	.pandat69-form-field {
+		margin-bottom: 10px;
+	}
+
+	label {
+		font-weight: 600;
+		margin-bottom: 5px;
+		display: block;
+	}
 }
 
 /* Inline Category Form */
 .pandat69-category-input-group {
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    
-    .pandat69-select {
-        flex-grow: 1;
-    }
+	display: flex;
+	gap: 5px;
+	align-items: center;
+
+	.pandat69-select {
+		flex-grow: 1;
+	}
 }
 
 .pandat69-inline-category-form {
-    position: relative;
-    margin-top: 8px;
-    padding: 10px;
-    background: $medium-bg;
-    border: 1px solid $border-color;
-    border-radius: $border-radius;
-    overflow: hidden;
-    
-    .pandat69-input {
-        margin-right: 5px;
-    }
+	position: relative;
+	margin-top: 8px;
+	padding: 10px;
+	background: $medium-bg;
+	border: 1px solid $border-color;
+	border-radius: $border-radius;
+	overflow: hidden;
+
+	.pandat69-input {
+		margin-right: 5px;
+	}
 }
 
 .pandat69-inline-form-row {
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    
-    .pandat69-input {
-        flex-grow: 1;
-    }
-    
-    .pandat69-button {
-        padding: 6px 10px;
-        font-size: 13px;
-        height: 38px; // Match input height
-    }
+	display: flex;
+	gap: 5px;
+	align-items: center;
+
+	.pandat69-input {
+		flex-grow: 1;
+	}
+
+	.pandat69-button {
+		padding: 6px 10px;
+		font-size: 13px;
+		height: 38px; // Match input height
+	}
 }
 
 .pandat69-inline-form-message {
-    margin-top: 5px;
-    font-size: 12px;
-    padding: 5px;
+	margin-top: 5px;
+	font-size: 12px;
+	padding: 5px;
 }

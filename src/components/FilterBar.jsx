@@ -1,9 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useProjects } from '../hooks/useProjects';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSubtaskToggle, onToggleSubtasks, allSubtasksExpanded }) => {
     const { data: projects } = useProjects();
+    const [search, setSearch] = useState(filters.search || '');
+    const debouncedSearch = useDebouncedValue(search);
+
+    useEffect(() => {
+        if ((filters.search || '') !== debouncedSearch) {
+            onFilterChange('search', debouncedSearch);
+        }
+    }, [debouncedSearch, filters.search, onFilterChange]);
+
+    useEffect(() => {
+        setSearch(filters.search || '');
+    }, [filters.search]);
     
     // Helper for dropdowns
     const Dropdown = ({ icon, title, value, options, onChange }) => {
@@ -19,6 +32,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
         return (
             <div className="pandat69-icon-filter" ref={ref}>
                 <button 
+                    type="button"
                     className={`pandat69-icon-button ${value && value !== '' && value !== 'name_asc' ? 'active' : ''}`} 
                     onClick={() => setOpen(!open)}
                     title={title}
@@ -28,13 +42,14 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                 {open && (
                     <div className="pandat69-filter-dropdown">
                         {options.map(opt => (
-                            <div 
+                            <button
+                                type="button"
                                 key={opt.value} 
                                 className={`pandat69-filter-item ${value === opt.value ? 'selected' : ''}`}
                                 onClick={() => { onChange(opt.value); setOpen(false); }}
                             >
                                 {opt.label}
-                            </div>
+                            </button>
                         ))}
                     </div>
                 )}
@@ -49,8 +64,8 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     type="text" 
                     className="pandat69-input pandat69-search-input" 
                     placeholder="Search tasks..." 
-                    value={filters.search}
-                    onChange={(e) => onFilterChange('search', e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
 
@@ -100,6 +115,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                 {showSubtaskToggle && (
                     <div className="pandat69-icon-filter">
                         <button 
+                            type="button"
                             className={`pandat69-icon-button ${allSubtasksExpanded ? 'active' : ''}`}
                             onClick={onToggleSubtasks}
                             title={allSubtasksExpanded ? "Collapse Subtasks" : "Expand Subtasks"}

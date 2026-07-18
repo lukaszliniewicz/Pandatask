@@ -136,16 +136,28 @@ final class ProjectRepository {
         );
         $format         = array( '%s', '%s', '%s', '%s', '%s', '%s' );
 
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return false;
+        }
+
         $result = $wpdb->insert( $projects_table, $project_data, $format );
 
         if ( false === $result ) {
+            DatabaseContext::rollback();
             return false;
         }
 
         $project_id = $wpdb->insert_id;
 
-        $this->updateAssignments( $project_id, $data['assigned_persons'] ?? array(), 'assignee' );
-        $this->updateAssignments( $project_id, $data['supervisor_persons'] ?? array(), 'supervisor' );
+        if (
+            ! $this->updateAssignments( $project_id, $data['assigned_persons'] ?? array(), 'assignee' )
+            || ! $this->updateAssignments( $project_id, $data['supervisor_persons'] ?? array(), 'supervisor' )
+            || ! DatabaseContext::commit()
+        ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
 
         return $project_id;
     }
@@ -165,26 +177,34 @@ final class ProjectRepository {
             }
         }
 
-        if ( empty( $update_data ) ) {
-            if ( isset( $data['assigned_persons'] ) || isset( $data['supervisor_persons'] ) ) {
-                $this->updateAssignments( $project_id, $data['assigned_persons'] ?? array(), 'assignee' );
-                $this->updateAssignments( $project_id, $data['supervisor_persons'] ?? array(), 'supervisor' );
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return false;
+        }
+
+        if ( ! empty( $update_data ) ) {
+            $update_data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
+            $format[]                  = '%s';
+
+            if ( false === $wpdb->update( $projects_table, $update_data, array( 'id' => $project_id ), $format, array( '%d' ) ) ) {
+                DatabaseContext::rollback();
+
+                return false;
             }
-
-            return true;
         }
 
-        $update_data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
-        $format[]                  = '%s';
+        if ( isset( $data['assigned_persons'] ) && ! $this->updateAssignments( $project_id, $data['assigned_persons'], 'assignee' ) ) {
+            DatabaseContext::rollback();
 
-        $wpdb->update( $projects_table, $update_data, array( 'id' => $project_id ), $format, array( '%d' ) );
-
-        if ( isset( $data['assigned_persons'] ) || isset( $data['supervisor_persons'] ) ) {
-            $this->updateAssignments( $project_id, $data['assigned_persons'] ?? array(), 'assignee' );
-            $this->updateAssignments( $project_id, $data['supervisor_persons'] ?? array(), 'supervisor' );
+            return false;
         }
 
-        return true;
+        if ( isset( $data['supervisor_persons'] ) && ! $this->updateAssignments( $project_id, $data['supervisor_persons'], 'supervisor' ) ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
+
+        return DatabaseContext::commit();
     }
 
     public function delete( $project_id ) {
@@ -195,12 +215,28 @@ final class ProjectRepository {
         $assignments_table = $prefix . 'project_assignments';
         $tasks_table       = $prefix . 'tasks';
 
-        $wpdb->update( $tasks_table, array( 'project_id' => null ), array( 'project_id' => $project_id ), array( '%s' ), array( '%d' ) );
-        $wpdb->delete( $assignments_table, array( 'project_id' => $project_id ), array( '%d' ) );
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return false;
+        }
+
+        if (
+            false === $wpdb->update( $tasks_table, array( 'project_id' => null ), array( 'project_id' => $project_id ), array( '%s' ), array( '%d' ) )
+            || false === $wpdb->delete( $assignments_table, array( 'project_id' => $project_id ), array( '%d' ) )
+        ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
 
         $result = $wpdb->delete( $projects_table, array( 'id' => $project_id ), array( '%d' ) );
 
-        return false !== $result;
+        if ( false === $result || ! DatabaseContext::commit() ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
+
+        return true;
     }
 
     public function existsOnBoard( $project_id, $board_name ) {
@@ -236,20 +272,24 @@ final class ProjectRepository {
 
         if ( ! empty( $users_to_remove ) ) {
             $user_ids_safe_string = implode( ',', array_map( 'absint', $users_to_remove ) );
-            $wpdb->query(
+            $delete_result = $wpdb->query(
                 $wpdb->prepare(
                     "DELETE FROM {$assignments_table} WHERE project_id = %d AND role = %s AND user_id IN ($user_ids_safe_string)",
                     $project_id,
                     $role
                 )
             );
+
+            if ( false === $delete_result ) {
+                return false;
+            }
         }
 
         $users_to_add = array_diff( $new_user_ids, $current_user_ids );
 
         if ( ! empty( $users_to_add ) ) {
             foreach ( $users_to_add as $user_id ) {
-                $wpdb->insert(
+                $insert_result = $wpdb->insert(
                     $assignments_table,
                     array(
                         'project_id' => $project_id,
@@ -258,6 +298,10 @@ final class ProjectRepository {
                     ),
                     array( '%d', '%d', '%s' )
                 );
+
+                if ( false === $insert_result ) {
+                    return false;
+                }
             }
         }
 

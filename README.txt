@@ -2,8 +2,8 @@
 Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
-Tested up to: 6.8
-Stable tag: 1.0.9
+Tested up to: 7.0
+Stable tag: 1.0.11
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -53,7 +53,7 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 
 = Requirements =
 
-*   WordPress 5.0 or higher (tested up to 6.8)
+*   WordPress 5.0 or higher (tested up to 7.0)
 *   PHP 7.4 or higher
 *   BuddyPress (optional – required for group boards, profile tab, and BP notifications)
 
@@ -71,7 +71,7 @@ Add `[task_board board_name="project_alpha"]` to any page or post. Replace `"pro
 
 = How do permissions work? =
 
-Standard boards are accessible to any logged-in user with `edit_posts` capability. BuddyPress group boards require group membership. Private user boards (`user_{ID}`) are accessible only to the owner. Administrators (`manage_options`) have full access.
+Standard boards are accessible to logged-in users with `edit_posts`. BuddyPress group boards require group membership, and private user boards (`user_{ID}`) are accessible only to the owner. Task updates and deletions additionally require task participation, creation/ownership, board-management capability, or administrator privileges. The batch endpoint is administrator-only.
 
 = Can I have multiple boards? =
 
@@ -94,4 +94,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 5. Project sidebar filtering
 6. BuddyPress group Tasks tab
 
+== Changelog ==
 
+= 1.0.11 =
+
+* Harden REST authorization, public bug submission, content sanitization, and attachment handling.
+* Make task, project, and category mutations transactional and preserve omitted assignment fields on partial updates.
+* Remove task-list N+1 queries, add targeted cache invalidation and database indexes, and make report date filters index-friendly.
+* Improve React Query cache behavior, task hierarchy handling, accessibility, responsive listeners, date parsing, and modal focus management.
+* Split the frontend bundle into lazy-loaded chunks and remove unused dependencies and editor assets.
+* Add policy regression tests, JavaScript and Sass linting, WordPress security checks, PHPStan analysis, and continuous integration.

@@ -1,7 +1,8 @@
 import React from 'react';
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import KanbanColumn from './KanbanColumn';
 import { useTaskMutations } from '../hooks/useTaskMutations';
+import { wouldCreateTaskCycle } from '../utils';
 
 const KanbanView = ({ tasks, onTaskAction }) => {
     // Tasks might be null/undefined during loading
@@ -14,7 +15,8 @@ const KanbanView = ({ tasks, onTaskAction }) => {
                 distance: 8, // Require 8px movement before drag starts
             },
         }),
-        useSensor(TouchSensor)
+        useSensor(TouchSensor),
+        useSensor(KeyboardSensor)
     );
 
     const handleDragEnd = (event) => {
@@ -23,13 +25,14 @@ const KanbanView = ({ tasks, onTaskAction }) => {
         if (!over) return;
 
         const taskId = active.id;
-        const activeTask = safeTasks.find(t => t.id === taskId);
+        const activeTask = safeTasks.find((task) => Number(task.id) === Number(taskId));
         if (!activeTask) return;
 
         if (over.data.current?.type === 'Task') {
             const targetTaskId = over.id;
-            if (taskId === targetTaskId) return; 
-            if (activeTask.parent_task_id === targetTaskId) return;
+            if (Number(taskId) === Number(targetTaskId)) return;
+            if (Number(activeTask.parent_task_id) === Number(targetTaskId)) return;
+            if (wouldCreateTaskCycle(safeTasks, taskId, targetTaskId)) return;
 
             updateTask.mutate({ 
                 id: taskId, 

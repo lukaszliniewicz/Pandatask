@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useUsers } from '../hooks/useUsers';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
     const [search, setSearch] = useState('');
-    const { data: users, isLoading } = useUsers(search, overrideBoardName);
+    const debouncedSearch = useDebouncedValue(search.trim());
+    const { data: users, isLoading } = useUsers(debouncedSearch, overrideBoardName, selectedUserIds);
 
     const handleSearch = (e) => {
         setSearch(e.target.value);
@@ -31,13 +33,15 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
                 {selectedUsersDisplay.map(user => (
                     <span key={user.id} className="pandat69-selected-user">
                         {user.name} 
-                        <span 
+                        <button
+                            type="button"
                             className="pandat69-remove-user" 
                             onClick={() => toggleUser(user.id)}
+                            aria-label={`Remove ${user.name}`}
                             style={{ cursor: 'pointer', marginLeft: '5px' }}
                         >
                             &times;
-                        </span>
+                        </button>
                     </span>
                 ))}
             </div>
@@ -50,7 +54,7 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
                 onChange={handleSearch} 
             />
             
-            {isLoading && <div className="pandat69-loading-small">Searching...</div>}
+            {isLoading && <div className="pandat69-loading-small" aria-live="polite">Searching...</div>}
             
             {users && users.length > 0 && search.length > 0 && (
                 <ul className="pandat69-user-suggestions" style={{ display: 'block', position: 'relative', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', marginTop: '-1px' }}>
@@ -59,16 +63,17 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
                         if (isSelected) return null; // Hide already selected from suggestions
                         
                         return (
-                            <li 
-                                key={user.id} 
-                                className="pandat69-user-suggestion-item"
-                                onClick={() => {
-                                    toggleUser(user.id);
-                                    setSearch(''); // Clear search on select
-                                }}
-                                style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
-                            >
-                                {user.name}
+                            <li key={user.id} className="pandat69-user-suggestion-item">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        toggleUser(user.id);
+                                        setSearch('');
+                                    }}
+                                    style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee', width: '100%', textAlign: 'left' }}
+                                >
+                                    {user.name}
+                                </button>
                             </li>
                         );
                     })}

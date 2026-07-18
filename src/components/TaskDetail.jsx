@@ -5,7 +5,7 @@ import { useTaskHistory } from '../hooks/useTaskHistory';
 import { useCommentMutations } from '../hooks/useCommentMutations';
 import MentionTextarea from './MentionTextarea';
 import StatusBadge from './StatusBadge';
-import { formatDisplayDate } from '../utils';
+import { formatDisplayDate, parseDate, parseUtcDateTime } from '../utils';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
     const { data: task, isLoading, isError } = useTaskDetails(taskId);
@@ -250,7 +250,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                 </div>
                 <div className="pandat69-meta-box">
                     <label>Deadline</label>
-                    <div className={`val ${task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done' ? 'overdue' : ''}`}>
+                    <div className={`val ${task.deadline && parseDate(task.deadline) < new Date() && task.status !== 'done' ? 'overdue' : ''}`}>
                         <span className="dashicons dashicons-calendar-alt"></span>
                         {task.deadline || 'None'}
                     </div>
@@ -389,7 +389,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                                     <li key={entry.id}>
                                         <div className="history-change">{renderHistoryItem(entry)}</div>
                                         <div className="history-meta" style={{fontSize: '0.85em', color: '#999', marginTop: '4px'}}>
-                                            {formatDisplayDate(new Date(entry.changed_at))} at {new Date(entry.changed_at).toLocaleTimeString()}
+                                            {formatDisplayDate(parseUtcDateTime(entry.changed_at))} at {parseUtcDateTime(entry.changed_at).toLocaleTimeString()}
                                         </div>
                                     </li>
                                 ))

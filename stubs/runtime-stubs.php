@@ -20,6 +20,32 @@ if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', '/' );
 }
 
+if ( ! defined( 'PANDAT69_PLUGIN_DIR' ) ) {
+    define( 'PANDAT69_PLUGIN_DIR', '/' );
+}
+
+if ( ! defined( 'PANDAT69_PLUGIN_URL' ) ) {
+    define( 'PANDAT69_PLUGIN_URL', 'https://example.test/' );
+}
+
+if ( ! defined( 'PANDAT69_VERSION' ) ) {
+    define( 'PANDAT69_VERSION', 'test' );
+}
+
+if ( ! class_exists( 'WP_CLI' ) ) {
+    class WP_CLI {
+        public static function add_command( $name, $callable ) {}
+        public static function warning( $message ) {}
+        public static function line( $message ) {}
+    }
+}
+
+if ( ! function_exists( 'groups_is_user_member' ) ) {
+    function groups_is_user_member( $user_id, $group_id ) {
+        return false;
+    }
+}
+
 if ( ! function_exists( 'groups_is_user_mod' ) ) {
     function groups_is_user_mod( $user_id, $group_id ) {
         return false;

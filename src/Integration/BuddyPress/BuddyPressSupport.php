@@ -12,6 +12,24 @@ final class BuddyPressSupport {
         return self::isLoaded() && function_exists( 'bp_is_active' ) && bp_is_active( 'groups' );
     }
 
+    public static function groupFeatureEnabled( $group_id, $meta_key ) {
+        if ( ! $group_id || ! function_exists( 'groups_get_groupmeta' ) ) {
+            return false;
+        }
+
+        return '0' !== (string) groups_get_groupmeta( $group_id, $meta_key, true );
+    }
+
+    public static function sanitizeGroupAssignee( $group_id, $user_id ) {
+        $user_id = absint( $user_id );
+
+        if ( 0 === $user_id ) {
+            return 0;
+        }
+
+        return function_exists( 'groups_is_user_member' ) && groups_is_user_member( $user_id, $group_id ) ? $user_id : 0;
+    }
+
     public static function renderGroupMembersDropdown( $group_id, $name, $selected = 0 ) {
         if ( ! $group_id || ! function_exists( 'groups_get_group_members' ) ) {
             echo '<p>' . esc_html__( 'No members found or group not yet created.', 'pandatask' ) . '</p>';

@@ -36,7 +36,7 @@ final class RequestHelper {
         $task->description_rendered = '';
 
         if ( ! empty( $task->description ) ) {
-            $task->description_rendered = wpautop( do_shortcode( $task->description ) );
+            $task->description_rendered = wp_kses_post( wpautop( wp_kses_post( $task->description ) ) );
         }
 
         return $task;

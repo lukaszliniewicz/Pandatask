@@ -22,26 +22,6 @@ class GroupTasksExtension extends \BP_Group_Extension {
      * Constructor
      */
     public function __construct() {
-        // Get current group ID if available
-        $group_id = bp_is_group() ? bp_get_current_group_id() : 0; // Check if we are on a group page
-        
-        // Default to enabled for new groups or if no group context yet
-        $enabled = true; 
-        
-        // If we have a valid group ID, check the actual setting
-        if ($group_id > 0) {
-            $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
-            // If it's never been set, default to enabled ('1')
-            if ($enabled === '') {
-                $enabled = true; // Treat unset as enabled for logic below
-            } else {
-                $enabled = ($enabled === '1'); // Convert meta value to boolean
-            }
-        } else {
-             // On create screen, there's no group_id yet, rely on defaults/create_screen logic
-             $enabled = true;
-        }
-        
         $args = array(
             'slug'              => 'tasks',
             'name'              => __('Tasks', 'pandatask'), // Use __() for name, BP handles display
@@ -85,11 +65,7 @@ class GroupTasksExtension extends \BP_Group_Extension {
             return;
         }
         
-        // Check if tasks are enabled for this group ('1' means enabled)
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
-        
-        // Add the nav item only if enabled is explicitly '1'
-        if ($enabled === '1') {
+        if ( BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_tasks_enabled' ) ) {
             $group = groups_get_group($group_id);
             if (!$group) return; // Bail if group not found
     
@@ -148,9 +124,7 @@ class GroupTasksExtension extends \BP_Group_Extension {
             return;
         }
         
-        // Verify tasks are enabled for this group
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true);
-        if ($enabled !== '1') {
+        if ( ! BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_tasks_enabled' ) ) {
             echo '<div id="message" class="bp-feedback info"><span class="bp-icon" aria-hidden="true"></span><p>';
             // Use esc_html_e for safe HTML output
             esc_html_e('Tasks are currently disabled for this group.', 'pandatask');
@@ -226,7 +200,7 @@ class GroupTasksExtension extends \BP_Group_Extension {
         }
         
         // Check if tasks are enabled ('1' means enabled, other values or unset mean disabled)
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true) === '1';
+        $enabled = BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_tasks_enabled' );
         ?>
         <h4><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         

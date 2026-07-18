@@ -1,28 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import CompactTaskItem from './CompactTaskItem';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { useConfig } from '../context/ConfigContext';
+import { wouldCreateTaskCycle } from '../utils';
 
 const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
     const { updateTask } = useTaskMutations();
     const { boardName, currentUser } = useConfig();
-    const safeTasks = tasks || [];
+    const safeTasks = useMemo(() => tasks || [], [tasks]);
     
     const isUserBoard = boardName.startsWith('user_');
 
     // Set for Expanded IDs
     const [expandedIds, setExpandedIds] = useState(new Set());
 
-    // Sync with global toggle
+    const parentIdsRef = useRef([]);
+    parentIdsRef.current = Array.from(new Set(safeTasks.map((task) => Number(task.parent_task_id)).filter(Boolean)));
+
     useEffect(() => {
         if (allSubtasksExpanded) {
-            const allParentIds = safeTasks.filter(t => t.parent_task_id === null || t.parent_task_id === 0).map(t => t.id);
-            setExpandedIds(new Set(allParentIds));
+            setExpandedIds(new Set(parentIdsRef.current));
         } else {
             setExpandedIds(new Set());
         }
-    }, [allSubtasksExpanded, safeTasks]);
+    }, [allSubtasksExpanded]);
 
     const toggleExpand = (taskId) => {
         const newSet = new Set(expandedIds);
@@ -36,7 +38,8 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-        useSensor(TouchSensor)
+        useSensor(TouchSensor),
+        useSensor(KeyboardSensor)
     );
 
     // Build Hierarchy
@@ -147,11 +150,13 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
         if (!over) return;
 
         const taskId = active.id;
-        const activeTask = safeTasks.find(t => t.id === taskId);
+        const activeTask = safeTasks.find((task) => Number(task.id) === Number(taskId));
+        if (!activeTask) return;
         
         if (over.data.current?.type === 'Task' && taskId !== over.id) {
             const targetTaskId = over.id;
-            if (activeTask.parent_task_id === targetTaskId) return;
+            if (Number(activeTask.parent_task_id) === Number(targetTaskId)) return;
+            if (wouldCreateTaskCycle(safeTasks, taskId, targetTaskId)) return;
 
             updateTask.mutate({ 
                 id: taskId, 

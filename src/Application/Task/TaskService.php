@@ -60,11 +60,11 @@ final class TaskService {
     }
 
     public function getTask( $task_id ) {
-        $transient_key = 'pandat69_task_' . $task_id;
+        $transient_key = DatabaseContext::getTaskCacheKey( $task_id );
         $cached_task   = get_transient( $transient_key );
 
         if ( false !== $cached_task ) {
-            return ProtectedAttachmentService::prepareTask( $cached_task );
+            return $this->decorateTaskForViewer( $cached_task );
         }
 
         $task = $this->repository->findById( $task_id );
@@ -73,22 +73,31 @@ final class TaskService {
             return $task;
         }
 
-        $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
-        $task->comments           = $this->comment_service->getComments( $task_id, $task );
-        $task->history            = array();
         $task->description        = $task->description ?? '';
 
         set_transient( $transient_key, $task, 12 * HOUR_IN_SECONDS );
 
-        return ProtectedAttachmentService::prepareTask( $task );
+        return $this->decorateTaskForViewer( $task );
     }
 
     public function getTaskByName( $board_name, $task_name ) {
         return $this->repository->findIdByName( $board_name, $task_name );
     }
 
+    public function getTaskForAuthorization( $task_id ) {
+        return $this->repository->findAccessRecordById( (int) $task_id );
+    }
+
     public function isTaskOnBoard( $task_id, $board_name ) {
         return $this->repository->existsOnBoard( $task_id, $board_name );
+    }
+
+    public function wouldCreateParentCycle( $task_id, $parent_task_id ) {
+        return $this->repository->wouldCreateParentCycle( (int) $task_id, (int) $parent_task_id );
+    }
+
+    public function wouldCreateDependencyCycle( $task_id, $predecessor_id ) {
+        return $this->repository->wouldCreateDependencyCycle( (int) $task_id, (int) $predecessor_id );
     }
 
     public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false ) {
@@ -131,5 +140,15 @@ final class TaskService {
         $version = get_transient( 'pandat69_v_user_' . $user_id );
 
         return false === $version ? 1 : (int) $version;
+    }
+
+    private function decorateTaskForViewer( $canonical_task ) {
+        $task = clone $canonical_task;
+        $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
+        $task->comments = $this->comment_service->getComments( $task->id, $task );
+        $task->history = array();
+        $task->description = $task->description ?? '';
+
+        return ProtectedAttachmentService::prepareTask( $task );
     }
 }

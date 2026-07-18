@@ -1,77 +1,80 @@
 @media (max-width: 768px) {
-    .pandat69-layout-body {
-        display: block;
-    }
 
-    .pandat69-project-sidebar {
-        width: 80%;
-        max-width: 300px;
-    }
+	.pandat69-layout-body {
+		display: block;
+	}
 
-    .pandat69-form-row {
-        flex-direction: column;
-        gap: 15px;
-        margin-bottom: 0;
-    }
+	.pandat69-project-sidebar {
+		width: 80%;
+		max-width: 300px;
+	}
 
-    .pandat69-form-field-half {
-        margin-bottom: 15px;
-    }
+	.pandat69-form-row {
+		flex-direction: column;
+		gap: 15px;
+		margin-bottom: 0;
+	}
 
-    .pandat69-filters {
-        flex-direction: column;
-        align-items: stretch;
-        flex-wrap: wrap;
-    }
+	.pandat69-form-field-half {
+		margin-bottom: 15px;
+	}
 
-    .pandat69-filters .pandat69-input,
-    .pandat69-filters .pandat69-select {
-        margin-bottom: 10px;
-        max-width: none;
-        flex: initial; /* Reset flex property for vertical stacking */
-    }
+	.pandat69-filters {
+		flex-direction: column;
+		align-items: stretch;
+		flex-wrap: wrap;
+	}
 
-    .pandat69-toggle-container {
-        margin-left: 0;
-        margin-top: 0;
-    }
+	.pandat69-filters .pandat69-input,
+	.pandat69-filters .pandat69-select {
+		margin-bottom: 10px;
+		max-width: none;
+		flex: initial; /* Reset flex property for vertical stacking */
+	}
 
-    .pandat69-navigation-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
+	.pandat69-toggle-container {
+		margin-left: 0;
+		margin-top: 0;
+	}
 
-    .pandat69-view-switcher {
-        padding-left: 10px;
-    }
+	.pandat69-navigation-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 10px;
+	}
+
+	.pandat69-view-switcher {
+		padding-left: 10px;
+	}
 }
 
 @media (max-width: 600px) {
-    .pandat69-container {
-        padding: 15px 10px;
-    }
 
-    .pandat69-form-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
+	.pandat69-container {
+		padding: 15px 10px;
+	}
 
-    .pandat69-form-actions .pandat69-button {
-        width: 100%;
-    }
+	.pandat69-form-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
 
-    .pandat69-expandable-content {
-        padding: 15px 10px;
-    }
+	.pandat69-form-actions .pandat69-button {
+		width: 100%;
+	}
+
+	.pandat69-expandable-content {
+		padding: 15px 10px;
+	}
 }
 
 @media (max-width: 480px) {
-    .ui-datepicker {
-        left: 0 !important;
-        right: 0 !important;
-        width: calc(100% - 20px) !important;
-        margin-left: 10px !important;
-        margin-right: 10px !important;
-    }
+
+	.ui-datepicker {
+		left: 0 !important;
+		right: 0 !important;
+		width: calc(100% - 20px) !important;
+		margin-left: 10px !important;
+		margin-right: 10px !important;
+	}
 }

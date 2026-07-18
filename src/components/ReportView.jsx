@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { useReports } from '../hooks/useReports';
+import { parseUtcDateTime } from '../utils';
+
+const formatReportDate = (value) => {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    return parseUtcDateTime(value).toLocaleString();
+};
 
 const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
     <div className="pandat69-report-section">
@@ -10,7 +17,7 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
                     <li key={task.id}>
                         <span className="pandat69-report-item-title">{task.name}</span>
                         <div className="pandat69-report-item-meta">
-                            <span className={`dashicons dashicons-${icon}`}></span> {metaPrefix}: {task.created_at || task.completed_at || task.deadline}
+                            <span className={`dashicons dashicons-${icon}`}></span> {metaPrefix}: {formatReportDate(task.created_at || task.completed_at || task.deadline)}
                             {showOverdue && ` (${task.days_overdue} days overdue)`}
                         </div>
                         {task.assigned_user_names && (

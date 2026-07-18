@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { lazy, Suspense, useEffect, useState, useMemo } from 'react';
 import Header from './Header';
 import ViewSwitcher from './ViewSwitcher';
 import FilterBar from './FilterBar';
@@ -10,17 +10,19 @@ import OverviewView from './OverviewView';
 import ArchiveView from './ArchiveView';
 import ProjectsView from './ProjectsView';
 import CategoryManager from './CategoryManager';
-import ReportView from './ReportView';
 import Modal from './Modal';
-import TaskForm from './TaskForm';
-import TaskDetail from './TaskDetail';
-import ProjectForm from './ProjectForm';
 import ProjectSidebar from './ProjectSidebar';
 import RecurringDeleteModal from './RecurringDeleteModal';
 import { useTasks } from '../hooks/useTasks';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { generateGCalUrl } from '../utils';
 import { useConfig } from '../context/ConfigContext';
+
+const ProjectForm = lazy(() => import('./ProjectForm'));
+const ReportView = lazy(() => import('./ReportView'));
+const TaskDetail = lazy(() => import('./TaskDetail'));
+const TaskForm = lazy(() => import('./TaskForm'));
+const LoadingChunk = () => <div className="pandat69-loading">Loading...</div>;
 
 const Layout = () => {
     const [currentTab, setCurrentTab] = useState('tasks');
@@ -44,18 +46,18 @@ const Layout = () => {
     const { text } = useConfig(); // Get localized text
 
     // Resize handler to switch modes automatically
-    React.useEffect(() => {
+    useEffect(() => {
         const handleResize = () => {
             const mobile = window.innerWidth <= 768;
             setIsMobile(mobile);
-            if (mobile && isSidebarOpen) setIsSidebarOpen(false);
+            if (mobile) setIsSidebarOpen(false);
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [isSidebarOpen]);
+    }, []);
 
     // Deep Linking: Check for open_task param on mount
-    React.useEffect(() => {
+    useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const taskParam = params.get('open_task');
         if (taskParam) {
@@ -64,8 +66,9 @@ const Layout = () => {
                 setSelectedTaskId(taskId);
                 setIsDetailModalOpen(true);
             }
-            // Optional: Clean up URL
-            const newUrl = window.location.pathname;
+            params.delete('open_task');
+            const remainingQuery = params.toString();
+            const newUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`;
             window.history.replaceState({}, document.title, newUrl);
         }
     }, []);
@@ -218,7 +221,7 @@ const Layout = () => {
         setIsProjectModalOpen(true);
     };
 
-    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    const toggleSidebar = () => setIsSidebarOpen((isOpen) => !isOpen);
 
     return (
         <div className="pandat69-container">
@@ -256,12 +259,16 @@ const Layout = () => {
                                 { id: 'archive', label: 'Archive' },
                                 { id: 'report', label: 'Report' },
                             ].map(tab => (
-                                <li 
-                                    key={tab.id}
-                                    className={`pandat69-tab-item ${currentTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => setCurrentTab(tab.id)}
-                                >
-                                    {tab.label}
+                                <li key={tab.id}>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={currentTab === tab.id}
+                                        className={`pandat69-tab-item ${currentTab === tab.id ? 'active' : ''}`}
+                                        onClick={() => setCurrentTab(tab.id)}
+                                    >
+                                        {tab.label}
+                                    </button>
                                 </li>
                             ))}
                         </ul>
@@ -277,7 +284,7 @@ const Layout = () => {
                                         hideProjectSelect={true}
                                         showSubtaskToggle={currentView === 'compact'}
                                         allSubtasksExpanded={allSubtasksExpanded}
-                                        onToggleSubtasks={() => setAllSubtasksExpanded(!allSubtasksExpanded)}
+                                        onToggleSubtasks={() => setAllSubtasksExpanded((isExpanded) => !isExpanded)}
                                     />
                                     
                                     {isLoading && <div className="pandat69-loading">Loading...</div>}
@@ -320,7 +327,9 @@ const Layout = () => {
                             )}
 
                             {currentTab === 'report' && (
-                                <ReportView />
+                                <Suspense fallback={<LoadingChunk />}>
+                                    <ReportView />
+                                </Suspense>
                             )}
                         </div>
                     </div>
@@ -333,11 +342,13 @@ const Layout = () => {
                 onClose={handleCloseModal} 
                 title={editingTask ? 'Edit Task' : (taskFormDefaults.parent_task_id ? 'Add Subtask' : 'Add New Task')}
             >
-                <TaskForm 
-                    task={editingTask} 
-                    defaultValues={taskFormDefaults} 
-                    onClose={handleCloseModal} 
-                />
+                <Suspense fallback={<LoadingChunk />}>
+                    <TaskForm
+                        task={editingTask}
+                        defaultValues={taskFormDefaults}
+                        onClose={handleCloseModal}
+                    />
+                </Suspense>
             </Modal>
 
             {/* Task Detail Modal */}
@@ -347,15 +358,17 @@ const Layout = () => {
                 title="Task Details"
             >
                 {selectedTaskId && (
-                    <TaskDetail 
-                        taskId={selectedTaskId} 
-                        onEdit={(task) => {
-                            handleCloseModal();
-                            handleTaskAction('edit', task);
-                        }} 
-                        onAddSubtask={handleAddSubtask}
-                        onNavigate={handleNavigateTask}
-                    />
+                    <Suspense fallback={<LoadingChunk />}>
+                        <TaskDetail
+                            taskId={selectedTaskId}
+                            onEdit={(task) => {
+                                handleCloseModal();
+                                handleTaskAction('edit', task);
+                            }}
+                            onAddSubtask={handleAddSubtask}
+                            onNavigate={handleNavigateTask}
+                        />
+                    </Suspense>
                 )}
             </Modal>
 
@@ -365,7 +378,9 @@ const Layout = () => {
                 onClose={handleCloseModal}
                 title={editingProject ? 'Edit Project' : 'Add Project'}
             >
-                <ProjectForm project={editingProject} onClose={handleCloseModal} />
+                <Suspense fallback={<LoadingChunk />}>
+                    <ProjectForm project={editingProject} onClose={handleCloseModal} />
+                </Suspense>
             </Modal>
 
             {/* Category Manager Modal */}

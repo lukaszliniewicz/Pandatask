@@ -5,37 +5,55 @@ namespace Pandatask\Http\Rest\V1\Support;
 final class SchemaProvider {
 
     public function get_task_schema( $is_update = false ) {
-        return array(
+        $schema = array(
             'id'                  => array( 'description' => __( 'Unique identifier for the task.', 'pandatask' ), 'type' => 'integer', 'context' => array( 'view', 'edit', 'embed' ), 'readonly' => true ),
             'name'                => array( 'description' => __( 'The name of the task.', 'pandatask' ), 'type' => 'string', 'required' => ! $is_update, 'sanitize_callback' => 'sanitize_text_field' ),
             'description'         => array( 'description' => __( 'The description of the task.', 'pandatask' ), 'type' => 'string', 'sanitize_callback' => 'wp_kses_post' ),
-            'status'              => array( 'description' => __( 'The status of the task.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'pending', 'in-progress', 'done' ), 'default' => 'pending' ),
-            'priority'            => array( 'description' => __( 'Priority from 1 to 10.', 'pandatask' ), 'type' => 'integer', 'default' => 5 ),
-            'deadline'            => array( 'description' => __( 'Deadline in YYYY-MM-DD format.', 'pandatask' ), 'type' => 'string', 'format' => 'date' ),
-            'start_date'          => array( 'description' => __( 'Start date in YYYY-MM-DD format.', 'pandatask' ), 'type' => 'string', 'format' => 'date' ),
+            'status'              => array( 'description' => __( 'The status of the task.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'pending', 'in-progress', 'done' ) ),
+            'priority'            => array( 'description' => __( 'Priority from 1 to 10.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1, 'maximum' => 10 ),
+            'deadline'            => array( 'description' => __( 'Deadline in YYYY-MM-DD format.', 'pandatask' ), 'type' => 'string' ),
+            'start_date'          => array( 'description' => __( 'Start date in YYYY-MM-DD format.', 'pandatask' ), 'type' => 'string' ),
             'assigned_persons'    => array( 'description' => __( 'Array of user IDs assigned to the task.', 'pandatask' ), 'type' => 'array', 'items' => array( 'type' => 'integer' ) ),
             'supervisor_persons'  => array( 'description' => __( 'Array of user IDs supervising the task.', 'pandatask' ), 'type' => 'array', 'items' => array( 'type' => 'integer' ) ),
             'predecessors'        => array( 'description' => __( 'Array of parent task IDs that this task depends on.', 'pandatask' ), 'type' => 'array', 'items' => array( 'type' => 'integer' ) ),
             'category_id'         => array( 'description' => __( 'The ID of the category.', 'pandatask' ), 'type' => 'integer' ),
+            'project_id'          => array( 'description' => __( 'The ID of the project.', 'pandatask' ), 'type' => 'integer' ),
             'parent_task_id'      => array( 'description' => __( 'The ID of the parent task.', 'pandatask' ), 'type' => 'integer' ),
-            'is_recurring'        => array( 'description' => __( 'Whether the task is a recurring template.', 'pandatask' ), 'type' => 'boolean', 'default' => false ),
-            'recurrence_frequency'=> array( 'description' => __( 'Frequency of recurrence.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'weekly', 'monthly', 'custom_weekly' ) ),
+            'board_name'          => array( 'description' => __( 'Destination board for a task move.', 'pandatask' ), 'type' => 'string', 'sanitize_callback' => 'sanitize_key' ),
+            'task_type'           => array( 'description' => __( 'Task type.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'task', 'bug' ) ),
+            'bug_url'             => array( 'description' => __( 'Page associated with a bug report.', 'pandatask' ), 'type' => 'string', 'sanitize_callback' => 'esc_url_raw' ),
+            'archived'            => array( 'description' => __( 'Whether the task is archived.', 'pandatask' ), 'type' => 'boolean' ),
+            'notify_deadline'     => array( 'description' => __( 'Whether deadline notifications are enabled.', 'pandatask' ), 'type' => 'boolean' ),
+            'notify_days_before'  => array( 'description' => __( 'Days before the deadline to notify.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1, 'maximum' => 30 ),
+            'deadline_days_after_start' => array( 'description' => __( 'Dynamic deadline duration in days.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1 ),
+            'is_recurring'        => array( 'description' => __( 'Whether the task is a recurring template.', 'pandatask' ), 'type' => 'boolean' ),
+            'recurrence_frequency'=> array( 'description' => __( 'Frequency of recurrence.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'weekly', 'bi-weekly', 'monthly', 'custom_weekly' ) ),
             'recurrence_interval' => array( 'description' => __( 'Interval for recurrence.', 'pandatask' ), 'type' => 'integer' ),
             'recurrence_days'     => array( 'description' => __( 'Comma-separated days for custom weekly recurrence.', 'pandatask' ), 'type' => 'string' ),
-            'recurrence_ends_on'  => array( 'description' => __( 'Date the recurrence should end.', 'pandatask' ), 'type' => 'string', 'format' => 'date' ),
-            'attachment_type'     => array( 'description' => __( 'Type of attachment.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'file', 'link' ) ),
-            'attachment_url'      => array( 'description' => __( 'URL of the attachment.', 'pandatask' ), 'type' => 'string', 'format' => 'uri' ),
+            'recurrence_ends_on'  => array( 'description' => __( 'Date the recurrence should end.', 'pandatask' ), 'type' => 'string' ),
+            'attachment_type'     => array( 'description' => __( 'Type of attachment.', 'pandatask' ), 'type' => 'string', 'enum' => array( '', 'file', 'link' ) ),
+            'attachment_url'      => array( 'description' => __( 'URL of the attachment.', 'pandatask' ), 'type' => 'string' ),
             'attachment_post_id'  => array( 'description' => __( 'WP post ID of the attachment.', 'pandatask' ), 'type' => 'integer' ),
             'attachment_filename' => array( 'description' => __( 'Filename of the attachment.', 'pandatask' ), 'type' => 'string' ),
+            'default_assignee_id' => array( 'description' => __( 'Suggested default assignee.', 'pandatask' ), 'type' => 'integer' ),
         );
+
+        if ( ! $is_update ) {
+            $schema['status']['default']       = 'pending';
+            $schema['priority']['default']     = 5;
+            $schema['task_type']['default']    = 'task';
+            $schema['is_recurring']['default'] = false;
+        }
+
+        return $schema;
     }
 
     public function get_project_schema( $is_update = false ) {
         return array(
             'id'                 => array( 'description' => __( 'Unique identifier.', 'pandatask' ), 'type' => 'integer', 'context' => array( 'view', 'edit', 'embed' ), 'readonly' => true ),
-            'name'               => array( 'description' => __( 'The name of the project.', 'pandatask' ), 'type' => 'string', 'required' => ! $is_update ),
-            'description'        => array( 'type' => 'string', 'description' => __( 'Project description', 'pandatask' ) ),
-            'deadline'           => array( 'type' => 'string', 'format' => 'date', 'description' => __( 'Project deadline', 'pandatask' ) ),
+            'name'               => array( 'description' => __( 'The name of the project.', 'pandatask' ), 'type' => 'string', 'required' => ! $is_update, 'sanitize_callback' => 'sanitize_text_field' ),
+            'description'        => array( 'type' => 'string', 'description' => __( 'Project description', 'pandatask' ), 'sanitize_callback' => 'sanitize_textarea_field' ),
+            'deadline'           => array( 'type' => 'string', 'description' => __( 'Project deadline', 'pandatask' ) ),
             'assigned_persons'   => array( 'type' => 'array', 'items' => array( 'type' => 'integer' ), 'description' => __( 'Array of user IDs assigned to the project.', 'pandatask' ) ),
             'supervisor_persons' => array( 'type' => 'array', 'items' => array( 'type' => 'integer' ), 'description' => __( 'Array of user IDs supervising the project.', 'pandatask' ) ),
         );
@@ -44,7 +62,7 @@ final class SchemaProvider {
     public function get_category_schema() {
         return array(
             'id'   => array( 'description' => __( 'Unique identifier.', 'pandatask' ), 'type' => 'integer', 'context' => array( 'view', 'edit', 'embed' ), 'readonly' => true ),
-            'name' => array( 'description' => __( 'The name of the category.', 'pandatask' ), 'type' => 'string', 'required' => true ),
+            'name' => array( 'description' => __( 'The name of the category.', 'pandatask' ), 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
         );
     }
 
@@ -52,7 +70,7 @@ final class SchemaProvider {
         return array(
             'id'           => array( 'description' => __( 'Unique identifier.', 'pandatask' ), 'type' => 'integer', 'context' => array( 'view', 'edit', 'embed' ), 'readonly' => true ),
             'task_id'      => array( 'description' => __( 'The ID of the task.', 'pandatask' ), 'type' => 'integer', 'required' => ! $is_update ),
-            'comment_text' => array( 'description' => __( 'The content of the comment.', 'pandatask' ), 'type' => 'string', 'required' => true ),
+            'comment_text' => array( 'description' => __( 'The content of the comment.', 'pandatask' ), 'type' => 'string', 'required' => true, 'sanitize_callback' => 'wp_kses_post' ),
         );
     }
 

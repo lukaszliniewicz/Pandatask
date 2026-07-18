@@ -2,108 +2,112 @@
 .pandat69-container,
 div.pandat69-container,
 #content .pandat69-container {
-    font-family: var(--pandatask-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif);
-    background-color: var(--pandatask-surface-muted, #f9f9f9);
-    border: 1px solid var(--pandatask-border, #ddd);
-    padding: 20px;
-    margin-bottom: 20px;
-    box-sizing: border-box;
-    color: var(--pandatask-primary, #384D68);
-    position: relative;
-    width: 100%;
-    max-width: 100%;
-    overflow-wrap: break-word;
-    
-    /* Strict Reset for Box Sizing inside the app */
-    *, *:before, *:after {
-        box-sizing: border-box;
-    }
+	font-family: var(--pandatask-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif);
+	background-color: var(--pandatask-surface-muted, #f9f9f9);
+	border: 1px solid var(--pandatask-border, #ddd);
+	padding: 20px;
+	margin-bottom: 20px;
+	box-sizing: border-box;
+	color: var(--pandatask-primary, #384d68);
+	position: relative;
+	width: 100%;
+	max-width: 100%;
+	overflow-wrap: break-word;
 
-    /* 
-     * SCOPED TAG RESETS 
-     * Reset general tags to prevent theme styles from breaking layout 
+	/* Strict Reset for Box Sizing inside the app */
+	*,
+ *::before,
+ *::after {
+		box-sizing: border-box;
+	}
+
+	/*
+     * SCOPED TAG RESETS
+     * Reset general tags to prevent theme styles from breaking layout
      */
-    
-    /* Buttons: Reset appearance completely before applying classes */
-    button {
-        appearance: none;
-        -webkit-appearance: none;
-        background: transparent;
-        border: none;
-        border-radius: 0;
-        box-shadow: none;
-        text-shadow: none;
-        padding: 0;
-        margin: 0;
-        line-height: 1;
-        cursor: pointer;
-        font-family: inherit;
-        font-size: inherit;
-        font-weight: inherit;
-        color: inherit;
-        text-transform: none;
-        letter-spacing: 0;
-        
-        &:focus {
-            outline: none;
-        }
-    }
 
-    /* Inputs: Standardize */
-    input[type="text"], 
-    input[type="number"], 
-    input[type="date"], 
-    input[type="email"],
-    input[type="password"],
-    select, 
-    textarea {
-        background-color: #fff;
-        color: #333;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        box-shadow: none;
-        max-width: 100%;
-        height: auto;
-        min-height: 36px;
-        padding: 6px 10px;
-        font-size: 14px;
-        line-height: 1.5;
-        display: block;
-        width: 100%;
-        margin: 0;
-        
-        &:focus {
-            border-color: var(--pandatask-primary, #384D68);
-            outline: none;
-            box-shadow: 0 0 0 1px var(--pandatask-primary, #384D68);
-        }
-    }
+	/* Buttons: Reset appearance completely before applying classes */
+	button {
+		appearance: none;
+		-webkit-appearance: none;
+		background: transparent;
+		border: none;
+		border-radius: 0;
+		box-shadow: none;
+		text-shadow: none;
+		padding: 0;
+		margin: 0;
+		line-height: 1;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: inherit;
+		font-weight: inherit;
+		color: inherit;
+		text-transform: none;
+		letter-spacing: 0;
 
-    img, video, iframe {
-        max-width: 100%;
-        height: auto;
-    }
+		&:focus {
+			outline: none;
+		}
+	}
 
-    h2 {
-        margin: 0;
-        font-size: 1.5em;
-        color: var(--pandatask-primary, #384D68);
-        font-weight: 600;
-        line-height: 1.3;
-        padding: 0;
-        border: none;
-    }
+	/* Inputs: Standardize */
+	input[type="text"],
+	input[type="number"],
+	input[type="date"],
+	input[type="email"],
+	input[type="password"],
+	select,
+	textarea {
+		background-color: #fff;
+		color: #333;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		box-shadow: none;
+		max-width: 100%;
+		height: auto;
+		min-height: 36px;
+		padding: 6px 10px;
+		font-size: 14px;
+		line-height: 1.5;
+		display: block;
+		width: 100%;
+		margin: 0;
+
+		&:focus {
+			border-color: var(--pandatask-primary, #384d68);
+			outline: none;
+			box-shadow: 0 0 0 1px var(--pandatask-primary, #384d68);
+		}
+	}
+
+	img,
+ video,
+ iframe {
+		max-width: 100%;
+		height: auto;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1.5em;
+		color: var(--pandatask-primary, #384d68);
+		font-weight: 600;
+		line-height: 1.3;
+		padding: 0;
+		border: none;
+	}
 }
 
 /* Loading State */
 .pandat69-loading {
-    text-align: center;
-    padding: 20px;
-    color: #384D68;
-    font-weight: 500;
+	text-align: center;
+	padding: 20px;
+	color: #384d68;
+	font-weight: 500;
 }
 
 .pandat69-description {
-    font-size: 14px;
-    color: #666;
+	font-size: 14px;
+	color: #666;
 }

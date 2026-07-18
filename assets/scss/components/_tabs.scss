@@ -1,95 +1,100 @@
+@use "../base/variables" as *;
+
 .pandat69-tabs {
-    margin-bottom: 20px;
+	margin-bottom: 20px;
 }
 
 .pandat69-desktop-nav {
-    margin-bottom: 20px;
-    border-bottom: 1px solid #e0e5eb;
-    
-    @media (max-width: 768px) {
-        display: none;
-    }
+	margin-bottom: 20px;
+	border-bottom: 1px solid #e0e5eb;
+
+	@media (max-width: 768px) {
+		display: none;
+	}
 }
 
 .pandat69-navigation-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid $border-color;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 10px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-bottom: 1px solid $border-color;
+	margin-bottom: 20px;
+	flex-wrap: wrap;
+	gap: 10px;
 }
 
 .pandat69-tab-navigation {
-    display: flex;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    gap: 20px;
+	display: flex;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	gap: 20px;
 }
 
 .pandat69-tab-item {
-    padding: 10px 0;
-    cursor: pointer;
-    color: #5d6b7b;
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-    
-    &:hover {
-        color: #384D68;
-    }
-    
-    &.active {
-        color: #384D68;
-        border-bottom-color: #384D68;
-        font-weight: 600;
-    }
+	appearance: none;
+	background: transparent;
+	border: 0;
+	padding: 10px 0;
+	cursor: pointer;
+	color: #5d6b7b;
+	font-weight: 500;
+	border-bottom: 2px solid transparent;
+	transition: all 0.2s;
+
+	&:hover {
+		color: #384d68;
+	}
+
+	&.active {
+		color: #384d68;
+		border-bottom-color: #384d68;
+		font-weight: 600;
+	}
 }
 
 .pandat69-tab-content {
-    display: none;
-    padding: 0;
+	display: none;
+	padding: 0;
 
-    &.active {
-        display: block;
-    }
+	&.active {
+		display: block;
+	}
 }
 
 .pandat69-view-container {
-    display: none;
+	display: none;
 
-    &.active {
-        display: block;
-    }
+	&.active {
+		display: block;
+	}
 }
 
 .pandat69-view-switcher {
-    display: flex;
-    gap: 5px;
-    padding-right: 10px;
+	display: flex;
+	gap: 5px;
+	padding-right: 10px;
 }
 
 .pandat69-view-btn {
-    background-color: transparent;
-    border: 1px solid #ccc;
-    padding: 6px 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    border-radius: $border-radius;
+	background-color: transparent;
+	border: 1px solid #ccc;
+	padding: 6px 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	border-radius: $border-radius;
 
-    .dashicons {
-        font-size: 18px;
-        line-height: 1;
-    }
+	.dashicons {
+		font-size: 18px;
+		line-height: 1;
+	}
 
-    &.active {
-        background-color: $primary-color;
-        color: white;
-        border-color: $primary-color;
-    }
+	&.active {
+		background-color: $primary-color;
+		color: #fff;
+		border-color: $primary-color;
+	}
 }

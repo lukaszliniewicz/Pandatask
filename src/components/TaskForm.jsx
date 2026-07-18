@@ -54,7 +54,9 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
             notify_days_before: task?.notify_days_before || 3,
             parent_task_id: task?.parent_task_id || defaultValues.parent_task_id || '',
             is_recurring: task?.is_recurring == 1,
-            recurrence_frequency: task?.recurrence_frequency || 'weekly',
+            recurrence_frequency: task?.recurrence_frequency === 'weekly' && Number(task?.recurrence_interval) === 2
+                ? 'bi-weekly'
+                : (task?.recurrence_frequency || 'weekly'),
             recurrence_interval: task?.recurrence_interval || 1,
             recurrence_days: task?.recurrence_days ? task.recurrence_days.split(',') : [],
             recurrence_ends_on: task?.recurrence_ends_on || '',
@@ -264,7 +266,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                                     <button type="button" className="pandat69-button" disabled={createCategory.isPending} onClick={async () => {
                                         if (!newCategoryName.trim()) return;
                                         try {
-                                            const newCat = await createCategory.mutateAsync(newCategoryName);
+                                            const newCat = await createCategory.mutateAsync({ name: newCategoryName, boardName: targetBoard });
                                             setShowCategoryInput(false);
                                             setNewCategoryName('');
                                             setValue('category_id', newCat.id);

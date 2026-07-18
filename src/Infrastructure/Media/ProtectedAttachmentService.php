@@ -71,10 +71,10 @@ final class ProtectedAttachmentService {
         }
 
         self::saveRegistry( $task_id, $registry );
-        if ( ! self::hasPublicReference( $attachment_id ) ) {
-            self::removePublicFamily( $attachment_id );
-            $registry['public_removed'] = true;
-        }
+        // Never remove Media Library originals automatically. A selected attachment may
+        // be referenced outside post content (templates, options, drafts, CSS, or another
+        // plugin), so automatic unlinking is not a recoverable ownership boundary.
+        $registry['public_removed'] = false;
         self::saveRegistry( $task_id, $registry );
         return array( 'protected' => true, 'public_removed' => ! empty( $registry['public_removed'] ) );
     }
@@ -148,7 +148,7 @@ final class ProtectedAttachmentService {
     private static function streamFile( $request, $path, $mime_type, $filename ) {
         $size = (int) filesize( $path );
         $header = trim( (string) $request->get_header( 'range' ) );
-        if ( '' === $header && isset( $_SERVER['HTTP_RANGE'] ) ) $header = trim( (string) wp_unslash( $_SERVER['HTTP_RANGE'] ) );
+        if ( '' === $header && isset( $_SERVER['HTTP_RANGE'] ) ) $header = trim( sanitize_text_field( wp_unslash( $_SERVER['HTTP_RANGE'] ) ) );
         $range = self::parseRange( $header, $size );
         if ( is_wp_error( $range ) ) {
             status_header( 416 ); header( 'Content-Range: bytes */' . $size ); exit;
@@ -164,7 +164,8 @@ final class ProtectedAttachmentService {
         header( 'Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode( sanitize_file_name( $filename ) ) );
         header( 'X-Content-Type-Options: nosniff' ); header( 'X-Robots-Tag: noindex' );
         if ( $range['partial'] ) header( sprintf( 'Content-Range: bytes %d-%d/%d', $start, $start + $length - 1, $size ) );
-        if ( strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) !== 'HEAD' ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : 'get';
+        if ( 'head' !== $request_method ) {
             fseek( $handle, $start ); $remaining = $length;
             while ( $remaining > 0 && ! feof( $handle ) ) {
                 $chunk = fread( $handle, min( 1048576, $remaining ) );
@@ -244,22 +245,6 @@ final class ProtectedAttachmentService {
         $path = trailingslashit( wp_normalize_path( $path ) ); $uploads = wp_get_upload_dir();
         foreach ( array_filter( array( ABSPATH, defined( 'WP_CONTENT_DIR' ) ? WP_CONTENT_DIR : '', empty( $uploads['error'] ) ? $uploads['basedir'] : '' ) ) as $root ) if ( 0 === strpos( $path, trailingslashit( wp_normalize_path( $root ) ) ) ) return true;
         return false;
-    }
-
-    private static function hasPublicReference( $attachment_id ) {
-        global $wpdb;
-        $thumbnail_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->postmeta} pm INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id WHERE pm.meta_key = '_thumbnail_id' AND pm.meta_value = %d AND p.post_status = 'publish'", $attachment_id ) );
-        if ( $thumbnail_count > 0 ) return true;
-        $attached_file = get_attached_file( $attachment_id );
-        if ( ! $attached_file ) return false;
-        return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type <> 'attachment' AND post_content LIKE %s", '%' . $wpdb->esc_like( wp_basename( $attached_file ) ) . '%' ) ) > 0;
-    }
-
-    private static function removePublicFamily( $attachment_id ) {
-        $original = get_attached_file( $attachment_id ); $metadata = wp_get_attachment_metadata( $attachment_id ); $paths = array_filter( array( $original ) );
-        if ( $original && is_array( $metadata ) ) foreach ( (array) ( $metadata['sizes'] ?? array() ) as $size ) if ( ! empty( $size['file'] ) ) $paths[] = dirname( $original ) . '/' . $size['file'];
-        if ( $original && ! empty( $metadata['original_image'] ) ) $paths[] = dirname( $original ) . '/' . $metadata['original_image'];
-        foreach ( array_unique( $paths ) as $path ) if ( is_file( $path ) ) @unlink( $path );
     }
 
     private static function findProtectedSourceForAttachment( $attachment_id, $exclude_task_id ) {

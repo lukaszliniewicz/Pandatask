@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import Modal from './Modal';
-import TaskForm from './TaskForm';
+
+const TaskForm = lazy(() => import('./TaskForm'));
 
 const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false }) => {
     const [isOpen, setIsOpen] = useState(Boolean(initialOpen));
@@ -118,15 +119,17 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
             </div>
 
             <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Report an Issue">
-                <TaskForm 
-                    onClose={() => setIsOpen(false)}
-                    defaultTaskType="bug"
-                    defaultValues={{
-                        bug_url: window.location.href,
-                        description: getSystemInfo(),
-                        assigned_persons: defaultAssigneeId ? [parseInt(defaultAssigneeId, 10)] : []
-                    }}
-                />
+                <Suspense fallback={<div className="pandat69-loading">Loading...</div>}>
+                    <TaskForm
+                        onClose={() => setIsOpen(false)}
+                        defaultTaskType="bug"
+                        defaultValues={{
+                            bug_url: window.location.href,
+                            description: getSystemInfo(),
+                            assigned_persons: defaultAssigneeId ? [parseInt(defaultAssigneeId, 10)] : []
+                        }}
+                    />
+                </Suspense>
             </Modal>
         </>,
         document.body

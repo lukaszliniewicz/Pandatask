@@ -1,276 +1,293 @@
-@import '../base/variables';
+@use "../base/variables" as *;
 
 /* Bug Tracker Specific Styles */
 
 .pandat69-bug-tracker-container {
-    background-color: $light-bg;
-    padding: 20px;
-    border: 1px solid $border-color;
-    margin-bottom: 20px;
+	background-color: $light-bg;
+	padding: 20px;
+	border: 1px solid $border-color;
+	margin-bottom: 20px;
 }
 
 .pandat69-bug-tracker-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
 
-    h3 {
-        margin: 0;
-        font-size: 1.5em;
-        color: $primary-color;
-    }
+	h3 {
+		margin: 0;
+		font-size: 1.5em;
+		color: $primary-color;
+	}
 }
 
 /* Bug List */
 ul.pandat69-bug-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+	list-style: none;
+	padding: 0;
+	margin: 0;
 }
 
 .pandat69-bug-item {
-    background-color: $white;
-    border: 1px solid $border-color;
-    margin-bottom: 15px;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
-    cursor: pointer;
+	background-color: $white;
+	border: 1px solid $border-color;
+	margin-bottom: 15px;
+	transition: box-shadow 0.2s ease, border-color 0.2s ease;
+	cursor: pointer;
 
-    &:hover {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
+	&:hover {
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	}
 
-    &.active {
-        border-color: $primary-color;
-    }
+	&.active {
+		border-color: $primary-color;
+	}
 }
 
 .pandat69-bug-item-header {
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+	padding: 15px 20px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
 }
 
 .pandat69-bug-item-title-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-grow: 1;
-    min-width: 200px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-grow: 1;
+	min-width: 200px;
 
-    h4 {
-        margin: 0;
-        font-size: 1.2em;
-        font-weight: 600;
-        color: $primary-color;
-    }
+	h4 {
+		margin: 0;
+		font-size: 1.2em;
+		font-weight: 600;
+		color: $primary-color;
+	}
 }
 
 .pandat69-bug-item-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-shrink: 0;
 }
 
 .pandat69-bug-meta-item {
-    display: flex;
-    align-items: center;
-    color: $secondary-color;
-    
-    a {
-        color: $secondary-color;
-        &:hover { color: $primary-color; }
-    }
+	display: flex;
+	align-items: center;
+	color: $secondary-color;
+
+	a {
+		color: $secondary-color;
+
+		&:hover {
+			color: $primary-color;
+		}
+	}
 }
 
 /* Discussion Area */
 .pandat69-bug-discussion-container {
-    background-color: $medium-bg;
-    padding: 20px;
-    border-top: 1px solid $border-color;
+	background-color: $medium-bg;
+	padding: 20px;
+	border-top: 1px solid $border-color;
 }
 
 .pandat69-bug-discussion-section {
-    margin-bottom: 25px;
+	margin-bottom: 25px;
 
-    &:last-child {
-        margin-bottom: 0;
-    }
+	&:last-child {
+		margin-bottom: 0;
+	}
 
-    h4 {
-        margin: 0 0 10px 0;
-        font-size: 1.1em;
-        color: $primary-color;
-        padding-bottom: 5px;
-        border-bottom: 1px solid $border-color;
-    }
+	h4 {
+		margin: 0 0 10px 0;
+		font-size: 1.1em;
+		color: $primary-color;
+		padding-bottom: 5px;
+		border-bottom: 1px solid $border-color;
+	}
 }
 
 .pandat69-reporter-info {
-    padding: 10px;
-    background: $white;
-    border: 1px solid $light-border-color;
-    border-radius: 3px;
+	padding: 10px;
+	background: $white;
+	border: 1px solid $light-border-color;
+	border-radius: 3px;
 }
 
 .pandat69-reporter-name {
-    font-weight: bold;
-    color: $primary-color;
+	font-weight: 700;
+	color: $primary-color;
 }
 
 .pandat69-reporter-date {
-    margin-left: 10px;
-    color: $secondary-color;
-    font-size: 0.9em;
+	margin-left: 10px;
+	color: $secondary-color;
+	font-size: 0.9em;
 }
 
 .pandat69-bug-description-content,
 .pandat69-system-info-compact {
-    padding: 15px;
-    background: $white;
-    border: 1px solid $light-border-color;
-    border-radius: 3px;
-    line-height: 1.6;
-    color: $primary-color;
+	padding: 15px;
+	background: $white;
+	border: 1px solid $light-border-color;
+	border-radius: 3px;
+	line-height: 1.6;
+	color: $primary-color;
 }
 
 .pandat69-system-info-compact {
-    font-size: 0.9em;
-    color: $secondary-color;
-    p { margin: 0; }
+	font-size: 0.9em;
+	color: $secondary-color;
+
+	p {
+		margin: 0;
+	}
 }
 
 .pandat69-attachment-info {
-    padding: 10px;
-    background: $white;
-    border: 1px solid $light-border-color;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+	padding: 10px;
+	background: $white;
+	border: 1px solid $light-border-color;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 
-    a {
-        text-decoration: none;
-        color: $primary-color;
-        &:hover { text-decoration: underline; }
-    }
-    
-    .dashicons {
-        font-size: 20px;
-    }
+	a {
+		text-decoration: none;
+		color: $primary-color;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+
+	.dashicons {
+		font-size: 20px;
+	}
 }
 
 /* Comments */
 .pandat69-bug-comment-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+	list-style: none;
+	padding: 0;
+	margin: 0;
 }
 
 .pandat69-bug-comment-item {
-    display: flex;
-    gap: 15px;
-    padding: 15px;
-    border-bottom: 1px solid $border-color;
-    background: $white;
-    margin-bottom: -1px; // Collapse borders
+	display: flex;
+	gap: 15px;
+	padding: 15px;
+	border-bottom: 1px solid $border-color;
+	background: $white;
+	margin-bottom: -1px; // Collapse borders
 
-    &:first-child { border-top: 1px solid $border-color; border-radius: 4px 4px 0 0; }
-    &:last-child { border-bottom: 1px solid $border-color; border-radius: 0 0 4px 4px; margin-bottom: 0; }
+	&:first-child {
+		border-top: 1px solid $border-color;
+		border-radius: 4px 4px 0 0;
+	}
+
+	&:last-child {
+		border-bottom: 1px solid $border-color;
+		border-radius: 0 0 4px 4px;
+		margin-bottom: 0;
+	}
 }
 
 .pandat69-bug-comment-avatar img {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
 }
 
 .pandat69-bug-comment-content {
-    flex: 1;
+	flex: 1;
 }
 
 .pandat69-bug-comment-meta {
-    margin-bottom: 5px;
-    font-size: 0.9em;
-    color: $secondary-color;
+	margin-bottom: 5px;
+	font-size: 0.9em;
+	color: $secondary-color;
 }
 
 .pandat69-bug-comment-author {
-    font-weight: bold;
-    color: $primary-color;
+	font-weight: 700;
+	color: $primary-color;
 }
 
 .pandat69-bug-comment-date {
-    margin-left: 10px;
+	margin-left: 10px;
 }
 
 .pandat69-bug-comment-text {
-    line-height: 1.5;
-    white-space: pre-wrap;
+	line-height: 1.5;
+	white-space: pre-wrap;
 }
 
 /* Floating Reporter Widget */
 #pandat69-floating-bug-reporter {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 99999;
-    cursor: grab;
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	z-index: 99999;
+	cursor: grab;
 
-    &:active {
-        cursor: grabbing;
-    }
+	&:active {
+		cursor: grabbing;
+	}
 }
 
 .pandat69-floating-btn {
-    background-color: $white !important; 
-    color: $secondary-color !important;
-    border: 1px solid $border-color !important;
-    width: 40px !important;
-    height: 40px !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
-    cursor: pointer; /* Pointer for button specifically */
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease !important;
-    opacity: 0.7;
+	background-color: $white !important;
+	color: $secondary-color !important;
+	border: 1px solid $border-color !important;
+	width: 40px !important;
+	height: 40px !important;
+	padding: 0 !important;
+	border-radius: 50% !important;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+	cursor: pointer; /* Pointer for button specifically */
+	display: flex !important;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease !important;
+	opacity: 0.7;
 
-    &:hover {
-        background-color: $white !important;
-        color: $primary-color !important;
-        border-color: $primary-color !important;
-        opacity: 1;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-        transform: scale(1.05);
-    }
+	&:hover {
+		background-color: $white !important;
+		color: $primary-color !important;
+		border-color: $primary-color !important;
+		opacity: 1;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+		transform: scale(1.05);
+	}
 
-    .dashicons {
-        font-size: 20px;
-        line-height: 1;
-        width: auto;
-        height: auto;
-    }
+	.dashicons {
+		font-size: 20px;
+		line-height: 1;
+		width: auto;
+		height: auto;
+	}
 }
 
 /* Form Container */
 .pandat69-bug-form-container {
-    background: $white;
-    padding: 20px;
-    border: 1px solid $border-color;
-    margin-bottom: 20px;
-    border-radius: $border-radius;
-    
-    h3 {
-        margin-top: 0;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid $border-color;
-    }
+	background: $white;
+	padding: 20px;
+	border: 1px solid $border-color;
+	margin-bottom: 20px;
+	border-radius: $border-radius;
+
+	h3 {
+		margin-top: 0;
+		margin-bottom: 20px;
+		padding-bottom: 10px;
+		border-bottom: 1px solid $border-color;
+	}
 }

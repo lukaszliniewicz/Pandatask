@@ -12,6 +12,10 @@ final class ReportRepository {
         $assignments_table = $prefix . 'assignments';
         $users_table       = $wpdb->users;
         $today             = current_time( 'Y-m-d' );
+        $site_timezone     = wp_timezone();
+        $utc_timezone      = new \DateTimeZone( 'UTC' );
+        $range_start_utc   = ( new \DateTimeImmutable( $start_date . ' 00:00:00', $site_timezone ) )->setTimezone( $utc_timezone )->format( 'Y-m-d H:i:s' );
+        $range_end_utc     = ( new \DateTimeImmutable( $end_date . ' 00:00:00', $site_timezone ) )->modify( '+1 day' )->setTimezone( $utc_timezone )->format( 'Y-m-d H:i:s' );
 
         $tasks_added = $wpdb->get_results(
             $wpdb->prepare(
@@ -19,12 +23,12 @@ final class ReportRepository {
                  FROM {$tasks_table} t
                  LEFT JOIN {$assignments_table} a ON t.id = a.task_id AND a.role = 'assignee'
                  LEFT JOIN {$users_table} u ON a.user_id = u.ID
-                 WHERE t.board_name = %s AND DATE(t.created_at) BETWEEN %s AND %s
+                 WHERE t.board_name = %s AND t.created_at >= %s AND t.created_at < %s
                  GROUP BY t.id
-                 ORDER BY t.created_at DESC",
+                ORDER BY t.created_at DESC",
                 $board_name,
-                $start_date,
-                $end_date
+                $range_start_utc,
+                $range_end_utc
             )
         );
 
@@ -34,12 +38,12 @@ final class ReportRepository {
                  FROM {$tasks_table} t
                  LEFT JOIN {$assignments_table} a ON t.id = a.task_id AND a.role = 'assignee'
                  LEFT JOIN {$users_table} u ON a.user_id = u.ID
-                 WHERE t.board_name = %s AND t.status = 'done' AND t.completed_at IS NOT NULL AND DATE(t.completed_at) BETWEEN %s AND %s
+                 WHERE t.board_name = %s AND t.status = 'done' AND t.completed_at IS NOT NULL AND t.completed_at >= %s AND t.completed_at < %s
                  GROUP BY t.id
                  ORDER BY t.completed_at DESC",
                 $board_name,
-                $start_date,
-                $end_date
+                $range_start_utc,
+                $range_end_utc
             )
         );
 

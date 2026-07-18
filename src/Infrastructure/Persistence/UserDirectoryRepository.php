@@ -4,7 +4,7 @@ namespace Pandatask\Infrastructure\Persistence;
 
 final class UserDirectoryRepository {
 
-    public function findBuddyPressUsers( $search = '', $group_id = 0 ) {
+    public function findBuddyPressUsers( $search = '', $group_id = 0, $include = array() ) {
         if ( $group_id <= 0 || ! function_exists( 'bp_has_members' ) || ! function_exists( 'groups_get_group_members' ) ) {
             return array();
         }
@@ -13,7 +13,7 @@ final class UserDirectoryRepository {
         $group_members_result = groups_get_group_members(
             array(
                 'group_id'     => $group_id,
-                'per_page'     => 0,
+                'per_page'     => 50,
                 'search_terms' => $search ? sanitize_text_field( $search ) : false,
             )
         );
@@ -33,6 +33,7 @@ final class UserDirectoryRepository {
                 'search'         => $search ? '*' . esc_attr( $search ) . '*' : '',
                 'search_columns' => array( 'user_login', 'user_email', 'user_nicename', 'display_name' ),
                 'fields'         => array( 'ID', 'display_name' ),
+                'number'         => 50,
             )
         );
 
@@ -47,6 +48,26 @@ final class UserDirectoryRepository {
             );
         }
 
+        if ( $include ) {
+            $included_users = get_users(
+                array(
+                    'include' => array_map( 'absint', $include ),
+                    'fields'  => array( 'ID', 'display_name' ),
+                )
+            );
+
+            foreach ( $included_users as $user ) {
+                if ( ! groups_is_user_member( $user->ID, $group_id ) && ! user_can( $user->ID, 'manage_options' ) ) {
+                    continue;
+                }
+
+                $members[ $user->ID ] = array(
+                    'id'   => $user->ID,
+                    'name' => $user->display_name,
+                );
+            }
+        }
+
         uasort(
             $members,
             static function ( $left, $right ) {
@@ -57,7 +78,7 @@ final class UserDirectoryRepository {
         return array_values( $members );
     }
 
-    public function findWordPressUsers( $search = '' ) {
+    public function findWordPressUsers( $search = '', $include = array() ) {
         $args = array(
             'orderby' => 'display_name',
             'order'   => 'ASC',
@@ -74,12 +95,35 @@ final class UserDirectoryRepository {
         $formatted_users = array();
 
         foreach ( $users as $user ) {
-            $formatted_users[] = array(
+            $formatted_users[ $user->ID ] = array(
                 'id'   => $user->ID,
                 'name' => $user->display_name,
             );
         }
 
-        return $formatted_users;
+        if ( $include ) {
+            $included_users = get_users(
+                array(
+                    'include' => array_map( 'absint', $include ),
+                    'fields'  => array( 'ID', 'display_name' ),
+                )
+            );
+
+            foreach ( $included_users as $user ) {
+                $formatted_users[ $user->ID ] = array(
+                    'id'   => $user->ID,
+                    'name' => $user->display_name,
+                );
+            }
+        }
+
+        uasort(
+            $formatted_users,
+            static function ( $left, $right ) {
+                return strcasecmp( $left['name'], $right['name'] );
+            }
+        );
+
+        return array_values( $formatted_users );
     }
 }

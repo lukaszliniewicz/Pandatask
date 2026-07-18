@@ -91,6 +91,20 @@ final class TaskCommandRepository {
         return false !== $wpdb->delete( $history_table, array( 'task_id' => $task_id ), array( '%d' ) );
     }
 
+    public function deleteTaskRelationships( $task_id ) {
+        global $wpdb;
+
+        $relationships_table = DatabaseContext::getDbPrefix() . 'task_relationships';
+
+        return false !== $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$relationships_table} WHERE task_id = %d OR predecessor_id = %d",
+                $task_id,
+                $task_id
+            )
+        );
+    }
+
     public function deleteTask( $task_id ) {
         global $wpdb;
 
@@ -187,7 +201,7 @@ final class TaskCommandRepository {
             $wpdb->prepare(
                 "SELECT * FROM {$tasks_table}
                  WHERE status = 'pending'
-                 AND start_date = %s
+                 AND start_date <= %s
                  AND archived = 0",
                 $today
             )
@@ -203,7 +217,8 @@ final class TaskCommandRepository {
             $wpdb->prepare(
                 "SELECT * FROM {$tasks_table}
                  WHERE is_recurring = 1
-                 AND deadline < %s
+                 AND deadline IS NOT NULL
+                 AND (status = 'done' OR deadline < %s)
                  AND (recurrence_ends_on IS NULL OR recurrence_ends_on >= %s)",
                 $today,
                 $today

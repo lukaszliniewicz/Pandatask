@@ -48,6 +48,7 @@ final class BuddyPressRegistrar {
 
     public function clearWritableBoardsCache( $group_id, $user_id ) {
         if ( $user_id > 0 ) {
+            delete_transient( 'pandat69_writable_boards_v2_' . $user_id );
             delete_transient( 'pandat69_writable_boards_' . $user_id );
         }
     }

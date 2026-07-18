@@ -1,344 +1,362 @@
+@use "../base/variables" as *;
+
 /* Comments Styles */
 .pandat69-view-modal-comments,
 .pandat69-task-comments {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid $border-color;
+	margin-top: 20px;
+	padding-top: 15px;
+	border-top: 1px solid $border-color;
 
-    h4 {
-        margin-top: 0;
-        margin-bottom: 15px;
-        font-size: 1.1em;
-        color: $primary-color;
-    }
+	h4 {
+		margin-top: 0;
+		margin-bottom: 15px;
+		font-size: 1.1em;
+		color: $primary-color;
+	}
 }
 
 .pandat69-comment-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 15px 0;
-    max-height: 300px;
-    overflow-y: auto;
-    background-color: $medium-bg;
-    padding: 10px;
-    border-radius: $border-radius;
-    border: 1px solid $border-color;
+	list-style: none;
+	margin: 0 0 15px 0;
+	max-height: 300px;
+	overflow-y: auto;
+	background-color: $medium-bg;
+	padding: 10px;
+	border-radius: $border-radius;
+	border: 1px solid $border-color;
 }
 
 .pandat69-comment-item {
-    display: flex;
-    gap: 15px;
-    align-items: flex-start;
-    padding: 15px;
-    background-color: $white;
-    border: 1px solid $border-color;
-    border-radius: $border-radius;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+	display: flex;
+	gap: 15px;
+	align-items: flex-start;
+	padding: 15px;
+	background-color: $white;
+	border: 1px solid $border-color;
+	border-radius: $border-radius;
+	margin-bottom: 10px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 
-    &:last-child {
-        margin-bottom: 0;
-    }
+	&:last-child {
+		margin-bottom: 0;
+	}
 }
 
 .pandat69-comment-avatar {
-    flex-shrink: 0;
-    
-    img, .avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-    }
+	flex-shrink: 0;
+
+	img,
+ .avatar {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+	}
 }
 
 .pandat69-comment-content {
-    flex: 1;
-    min-width: 0;
+	flex: 1;
+	min-width: 0;
 }
 
 .pandat69-comment-meta {
-    margin-bottom: 5px;
-    font-size: 0.9em;
-    color: $secondary-color;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+	margin-bottom: 5px;
+	font-size: 0.9em;
+	color: $secondary-color;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
 }
 
 .pandat69-comment-author {
-    font-weight: bold;
-    color: $primary-color;
+	font-weight: 700;
+	color: $primary-color;
 }
 
 .pandat69-comment-date {
-    margin-left: auto;
-    font-size: 0.85em;
+	margin-left: auto;
+	font-size: 0.85em;
 }
 
 .pandat69-comment-text {
-    line-height: 1.5;
-    color: $primary-color;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-    
-    p:first-child { margin-top: 0; }
-    p:last-child { margin-bottom: 0; }
+	line-height: 1.5;
+	color: $primary-color;
+	overflow-wrap: break-word;
+	white-space: pre-wrap;
+
+	p:first-child {
+		margin-top: 0;
+	}
+
+	p:last-child {
+		margin-bottom: 0;
+	}
 }
 
 .pandat69-add-comment-form {
-    margin-top: 20px;
+	margin-top: 20px;
 }
 
 .pandat69-comment-actions {
-    display: flex;
-    gap: 5px;
-    justify-content: flex-end;
-    margin-top: 10px;
-    
-    .pandat69-icon-button {
-        width: 24px;
-        height: 24px;
-        min-width: 24px;
-        min-height: 24px;
-        padding: 0;
-        background: transparent;
-        border: none;
-        color: $secondary-color;
-        
-        &:hover {
-            color: $primary-color;
-            background: #f0f0f0;
-        }
-        
-        &.pandat69-button-danger:hover {
-            color: $danger-color;
-        }
-        
-        .dashicons {
-            font-size: 16px;
-        }
-    }
+	display: flex;
+	gap: 5px;
+	justify-content: flex-end;
+	margin-top: 10px;
+
+	.pandat69-icon-button {
+		width: 24px;
+		height: 24px;
+		min-width: 24px;
+		min-height: 24px;
+		padding: 0;
+		background: transparent;
+		border: none;
+		color: $secondary-color;
+
+		&:hover {
+			color: $primary-color;
+			background: #f0f0f0;
+		}
+
+		&.pandat69-button-danger:hover {
+			color: $danger-color;
+		}
+
+		.dashicons {
+			font-size: 16px;
+		}
+	}
 }
 
 /* History Specific Styles */
 .pandat69-history-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+	list-style: none;
+	padding: 0;
+	margin: 0;
 
-    li {
-        padding: 10px 0;
-        border-bottom: 1px solid $light-border-color;
-        &:last-child { border-bottom: none; }
-    }
+	li {
+		padding: 10px 0;
+		border-bottom: 1px solid $light-border-color;
+
+		&:last-child {
+			border-bottom: none;
+		}
+	}
 }
 
 .history-complex-item {
-    font-size: 0.95em;
-    color: $primary-color;
+	font-size: 0.95em;
+	color: $primary-color;
 }
 
 .history-sub-list {
-    list-style: disc;
-    margin: 5px 0 5px 20px;
-    padding: 0;
-    color: $secondary-color;
-    
-    li {
-        padding: 2px 0;
-        border: none;
-    }
+	list-style: disc;
+	margin: 5px 0 5px 20px;
+	padding: 0;
+	color: $secondary-color;
+
+	li {
+		padding: 2px 0;
+		border: none;
+	}
 }
 
 .history-comment {
-    font-style: italic;
-    color: $secondary-color;
-    margin-top: 4px;
-    padding-left: 10px;
-    border-left: 2px solid $light-border-color;
+	font-style: italic;
+	color: $secondary-color;
+	margin-top: 4px;
+	padding-left: 10px;
+	border-left: 2px solid $light-border-color;
 }
 
 /* Interactive Status Dot */
 .pandat69-status-dot-interactive {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.2s;
-    border: 2px solid transparent;
-    
-    &:hover {
-        transform: scale(1.2);
-        box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
-    }
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	cursor: pointer;
+	transition: transform 0.2s;
+	border: 2px solid transparent;
+
+	&:hover {
+		transform: scale(1.2);
+		box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+	}
 }
 
 /* Status Dropdown */
 .pandat69-status-badge-wrapper {
-    position: relative;
-    display: inline-block;
+	position: relative;
+	display: inline-block;
 }
 
 .pandat69-status-dropdown-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 5px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 100;
-    min-width: 140px;
-    
-    .pandat69-status-option {
-        padding: 8px 12px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        
-        &:hover { background: #f5f5f5; }
-        
-        .dot {
-            width: 8px; height: 8px; border-radius: 50%;
-        }
-    }
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 5px;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 100;
+	min-width: 140px;
+
+	.pandat69-status-option {
+		padding: 8px 12px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+
+		&:hover {
+			background: #f5f5f5;
+		}
+
+		.dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+		}
+	}
 }
 
 /* Expand Arrow */
 .pandat69-expand-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    color: #999;
-    transition: transform 0.2s;
-    
-    &.expanded {
-        transform: rotate(90deg);
-        color: #333;
-    }
-    
-    .dashicons { font-size: 16px; width: 16px; height: 16px; }
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 4px;
+	color: #999;
+	transition: transform 0.2s;
+
+	&.expanded {
+		transform: rotate(90deg);
+		color: #333;
+	}
+
+	.dashicons {
+		font-size: 16px;
+		width: 16px;
+		height: 16px;
+	}
 }
 
 .pandat69-compact-name-cell {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    overflow: hidden; /* Ensure text truncates properly */
-    
-    /* Ensure the title container inside here takes remaining space */
-    .pandat69-compact-title {
-        flex: 1;
-        min-width: 0; /* Enable truncation flex child */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: flex;
-        align-items: center;
-        
-        /* Apply indent fix here specifically if the icon is direct child */
-        .dashicons-subdirectory-arrow-right {
-            margin-right: 4px;
-            font-size: 14px;
-            width: 14px;
-            height: 14px;
-            color: #aaa;
-            line-height: 1;
-        }
-    }
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	overflow: hidden; /* Ensure text truncates properly */
+
+	/* Ensure the title container inside here takes remaining space */
+	.pandat69-compact-title {
+		flex: 1;
+		min-width: 0; /* Enable truncation flex child */
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: flex;
+		align-items: center;
+
+		/* Apply indent fix here specifically if the icon is direct child */
+		.dashicons-subdirectory-arrow-right {
+			margin-right: 4px;
+			font-size: 14px;
+			width: 14px;
+			height: 14px;
+			color: #aaa;
+			line-height: 1;
+		}
+	}
 }
 
 /* Fix: Compact View Subtask Expander */
 .pandat69-compact-expander {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
 }
 
 .pandat69-expand-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    color: #a0a0a0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s ease, color 0.2s ease;
-    width: 20px;
-    height: 20px;
-    
-    .dashicons {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-    }
-    
-    &:hover {
-        color: $primary-color;
-        background-color: rgba(0,0,0,0.05);
-        border-radius: 3px;
-    }
-    
-    &.expanded {
-        transform: rotate(90deg);
-        color: $primary-color;
-    }
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	color: #a0a0a0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.2s ease, color 0.2s ease;
+	width: 20px;
+	height: 20px;
+
+	.dashicons {
+		font-size: 18px;
+		width: 18px;
+		height: 18px;
+	}
+
+	&:hover {
+		color: $primary-color;
+		background-color: rgba(0, 0, 0, 0.05);
+		border-radius: 3px;
+	}
+
+	&.expanded {
+		transform: rotate(90deg);
+		color: $primary-color;
+	}
 }
 
 /* Fix: Status Dropdown Visibility */
 .pandat69-status-dropdown-menu,
 .pandat69-status-dropdown {
-    background-color: $white;
-    border: 1px solid $border-color;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-radius: $border-radius;
-    padding: 5px 0;
-    z-index: 1000;
-    
-    .pandat69-status-option {
-        padding: 8px 12px;
-        cursor: pointer;
-        color: $primary-color;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background-color: transparent;
-        
-        &:hover {
-            background-color: $light-bg;
-        }
-        
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            flex-shrink: 0;
-        }
+	background-color: $white;
+	border: 1px solid $border-color;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	border-radius: $border-radius;
+	padding: 5px 0;
+	z-index: 1000;
 
-        &.pandat69-status-pending,
-        &.pandat69-status-in-progress,
-        &.pandat69-status-done {
-            background-color: transparent;
-            color: $primary-color;
-            border-radius: 0;
-            margin: 0;
-            text-align: left;
-            
-            &:hover {
-                background-color: $light-bg;
-                opacity: 1;
-            }
-        }
-    }
+	.pandat69-status-option {
+		padding: 8px 12px;
+		cursor: pointer;
+		color: $primary-color;
+		font-size: 13px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: transparent;
+
+		&:hover {
+			background-color: $light-bg;
+		}
+
+		.dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			display: inline-block;
+			flex-shrink: 0;
+		}
+
+		&.pandat69-status-pending,
+		&.pandat69-status-in-progress,
+		&.pandat69-status-done {
+			background-color: transparent;
+			color: $primary-color;
+			border-radius: 0;
+			margin: 0;
+			text-align: left;
+
+			&:hover {
+				background-color: $light-bg;
+				opacity: 1;
+			}
+		}
+	}
 }

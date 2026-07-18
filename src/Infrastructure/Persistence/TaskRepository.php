@@ -4,6 +4,8 @@ namespace Pandatask\Infrastructure\Persistence;
 
 final class TaskRepository {
 
+    private $hydrated_users = array();
+
     public function isBlocked( $task_id ) {
         global $wpdb;
 
@@ -115,13 +117,7 @@ final class TaskRepository {
 
         $results = $wpdb->get_results( $wpdb->prepare( $sql_select . $sql_where . $sql_group_order, ...$params ) );
 
-        foreach ( $results as $task ) {
-            $task->category_name  = $task->category_name ?? null;
-            $task->predecessors   = $this->findPredecessors( $task->id, $tasks_table );
-            $task->predecessor_ids = wp_list_pluck( $task->predecessors, 'id' );
-            $task->is_blocked     = $this->isBlocked( $task->id );
-            $this->hydrateUsers( $task );
-        }
+        $this->hydrateTaskCollection( $results, $tasks_table );
 
         return $results;
     }
@@ -165,7 +161,44 @@ final class TaskRepository {
 
         $task->category_name = $task->category_name ?? null;
         $task->creator_id    = isset( $task->creator_id ) ? (int) $task->creator_id : 0;
+        $task->predecessors = $this->findPredecessors( $task->id, $tasks_table );
+        $task->predecessor_ids = array_map( 'intval', wp_list_pluck( $task->predecessors, 'id' ) );
+        $task->is_blocked = $this->isBlocked( $task->id );
         $this->hydrateUsers( $task );
+
+        return $task;
+    }
+
+    public function findAccessRecordById( $task_id ) {
+        global $wpdb;
+
+        $prefix = DatabaseContext::getDbPrefix();
+        $tasks_table = $prefix . 'tasks';
+        $assignments_table = $prefix . 'assignments';
+        $history_table = $prefix . 'task_history';
+
+        $task = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT t.id, t.board_name,
+                    GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN a.user_id END) AS assigned_user_ids,
+                    GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN a.user_id END) AS supervisor_user_ids,
+                    MIN(CASE WHEN h.field_changed = 'task_created' THEN h.user_id END) AS creator_id
+                 FROM {$tasks_table} t
+                 LEFT JOIN {$assignments_table} a ON a.task_id = t.id
+                 LEFT JOIN {$history_table} h ON h.task_id = t.id AND h.field_changed = 'task_created'
+                 WHERE t.id = %d
+                 GROUP BY t.id, t.board_name",
+                $task_id
+            )
+        );
+
+        if ( ! $task ) {
+            return null;
+        }
+
+        $task->assigned_user_ids = ! empty( $task->assigned_user_ids ) ? array_map( 'intval', explode( ',', $task->assigned_user_ids ) ) : array();
+        $task->supervisor_user_ids = ! empty( $task->supervisor_user_ids ) ? array_map( 'intval', explode( ',', $task->supervisor_user_ids ) ) : array();
+        $task->creator_id = (int) $task->creator_id;
 
         return $task;
     }
@@ -198,6 +231,66 @@ final class TaskRepository {
         );
 
         return $count > 0;
+    }
+
+    public function wouldCreateParentCycle( $task_id, $parent_task_id ) {
+        global $wpdb;
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $visited = array();
+        $current_id = (int) $parent_task_id;
+
+        while ( $current_id > 0 && ! isset( $visited[ $current_id ] ) ) {
+            if ( $current_id === (int) $task_id ) {
+                return true;
+            }
+
+            $visited[ $current_id ] = true;
+            $current_id = (int) $wpdb->get_var(
+                $wpdb->prepare( "SELECT parent_task_id FROM {$tasks_table} WHERE id = %d", $current_id )
+            );
+        }
+
+        return false;
+    }
+
+    public function wouldCreateDependencyCycle( $task_id, $predecessor_id ) {
+        global $wpdb;
+
+        $relationships_table = DatabaseContext::getDbPrefix() . 'task_relationships';
+        $target_id = (int) $task_id;
+        $frontier = array( (int) $predecessor_id );
+        $visited = array();
+
+        while ( ! empty( $frontier ) ) {
+            $current_id = (int) array_pop( $frontier );
+
+            if ( $current_id === $target_id ) {
+                return true;
+            }
+
+            if ( $current_id <= 0 || isset( $visited[ $current_id ] ) ) {
+                continue;
+            }
+
+            $visited[ $current_id ] = true;
+            $next_ids = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT predecessor_id FROM {$relationships_table} WHERE task_id = %d",
+                    $current_id
+                )
+            );
+
+            foreach ( $next_ids as $next_id ) {
+                $next_id = (int) $next_id;
+
+                if ( ! isset( $visited[ $next_id ] ) ) {
+                    $frontier[] = $next_id;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false ) {
@@ -275,10 +368,10 @@ final class TaskRepository {
 
         $results = $wpdb->get_results( $sql );
 
+        $this->hydrateTaskCollection( $results, $tasks_table );
+
         foreach ( $results as $task ) {
-            $task->category_name = $task->category_name ?? null;
-            $task->creator_id    = $task->creator_id ? (int) $task->creator_id : 0;
-            $this->hydrateUsers( $task );
+            $task->creator_id = $task->creator_id ? (int) $task->creator_id : 0;
         }
 
         return $results;
@@ -288,20 +381,102 @@ final class TaskRepository {
         global $wpdb;
 
         $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
-        $sql         = $wpdb->prepare(
-            "SELECT id, name FROM {$tasks_table}
-             WHERE board_name = %s AND archived = 0",
-            $board_name
+        $tasks = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, name, parent_task_id FROM {$tasks_table}
+                 WHERE board_name = %s AND archived = 0
+                 ORDER BY name ASC",
+                $board_name
+            )
         );
 
-        if ( $current_task_id > 0 ) {
-            $sql .= $wpdb->prepare( ' AND id != %d', $current_task_id );
-            $sql .= $wpdb->prepare( " AND id NOT IN (SELECT id FROM {$tasks_table} WHERE parent_task_id = %d)", $current_task_id );
+        if ( $current_task_id <= 0 ) {
+            return $tasks;
         }
 
-        $sql .= ' ORDER BY name ASC';
+        $excluded_ids = array( (int) $current_task_id => true );
+        $changed = true;
 
-        return $wpdb->get_results( $sql );
+        while ( $changed ) {
+            $changed = false;
+
+            foreach ( $tasks as $task ) {
+                $parent_id = (int) $task->parent_task_id;
+
+                if ( $parent_id > 0 && isset( $excluded_ids[ $parent_id ] ) && ! isset( $excluded_ids[ (int) $task->id ] ) ) {
+                    $excluded_ids[ (int) $task->id ] = true;
+                    $changed = true;
+                }
+            }
+        }
+
+        return array_values( array_filter( $tasks, static function ( $task ) use ( $excluded_ids ) {
+            return ! isset( $excluded_ids[ (int) $task->id ] );
+        } ) );
+    }
+
+    private function hydrateTaskCollection( $tasks, $tasks_table ) {
+        global $wpdb;
+
+        if ( empty( $tasks ) ) {
+            return;
+        }
+
+        $task_ids = array_values( array_filter( array_map( 'absint', wp_list_pluck( $tasks, 'id' ) ) ) );
+        $task_ids_sql = implode( ',', $task_ids );
+        $rel_table = DatabaseContext::getDbPrefix() . 'task_relationships';
+        $relationship_rows = $wpdb->get_results(
+            "SELECT r.task_id, t.id, t.name, t.status, t.archived
+             FROM {$rel_table} r
+             INNER JOIN {$tasks_table} t ON r.predecessor_id = t.id
+             WHERE r.task_id IN ({$task_ids_sql})"
+        );
+        $relationships_by_task = array();
+
+        foreach ( $relationship_rows as $relationship ) {
+            $relationships_by_task[ (int) $relationship->task_id ][] = $relationship;
+        }
+
+        $all_user_ids = array();
+
+        foreach ( $tasks as $task ) {
+            foreach ( array( $task->assigned_user_ids ?? '', $task->supervisor_user_ids ?? '' ) as $csv ) {
+                $all_user_ids = array_merge( $all_user_ids, array_map( 'absint', array_filter( explode( ',', (string) $csv ) ) ) );
+            }
+        }
+
+        $all_user_ids = array_values( array_unique( array_filter( $all_user_ids ) ) );
+
+        if ( ! empty( $all_user_ids ) && function_exists( 'cache_users' ) ) {
+            cache_users( $all_user_ids );
+        }
+
+        $this->hydrated_users = array();
+
+        foreach ( $tasks as $task ) {
+            $relationships = $relationships_by_task[ (int) $task->id ] ?? array();
+            $task->category_name = $task->category_name ?? null;
+            $task->predecessors = array_map( static function ( $relationship ) {
+                return (object) array(
+                    'id'     => (int) $relationship->id,
+                    'name'   => $relationship->name,
+                    'status' => $relationship->status,
+                );
+            }, $relationships );
+            $task->predecessor_ids = array_map( 'intval', wp_list_pluck( $task->predecessors, 'id' ) );
+            $task->is_blocked = false;
+
+            foreach ( $relationships as $relationship ) {
+                if ( 'done' !== $relationship->status && empty( $relationship->archived ) ) {
+                    $task->is_blocked = true;
+                    break;
+                }
+            }
+
+            $this->hydrateUsers( $task );
+        }
+
+        $this->hydrated_users = array();
     }
 
     private function findPredecessors( $task_id, $tasks_table ) {
@@ -339,18 +514,26 @@ final class TaskRepository {
                 continue;
             }
 
+            if ( isset( $this->hydrated_users[ $user_id ] ) ) {
+                $users[]          = $this->hydrated_users[ $user_id ];
+                $final_user_ids[] = (string) $user_id;
+                continue;
+            }
+
             $user_data = get_userdata( $user_id );
 
             if ( ! $user_data ) {
                 continue;
             }
 
-            $users[] = (object) array(
+            $hydrated_user = (object) array(
                 'id'     => (string) $user_id,
                 'name'   => $user_data->display_name,
                 'avatar' => get_avatar_url( $user_id, array( 'size' => 24, 'default' => 'mystery' ) ),
             );
-            $final_user_ids[] = (string) $user_id;
+            $this->hydrated_users[ $user_id ] = $hydrated_user;
+            $users[]                            = $hydrated_user;
+            $final_user_ids[]                   = (string) $user_id;
         }
 
         return array( $users, $final_user_ids );

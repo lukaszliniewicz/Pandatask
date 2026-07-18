@@ -5,17 +5,13 @@ namespace Pandatask\Application\Comment;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\CommentRepository;
-use Pandatask\Infrastructure\Persistence\TaskRepository;
 
 final class CommentService {
 
     private $repository;
 
-    private $task_repository;
-
-    public function __construct( $repository = null, $task_repository = null ) {
-        $this->repository      = $repository ?: new CommentRepository();
-        $this->task_repository = $task_repository ?: new TaskRepository();
+    public function __construct( $repository = null ) {
+        $this->repository = $repository ?: new CommentRepository();
     }
 
     public function getComments( $task_id, $task = null ) {
@@ -75,12 +71,6 @@ final class CommentService {
     }
 
     private function invalidateTaskCaches( $task_id ) {
-        delete_transient( 'pandat69_task_' . $task_id );
-
-        $task = $this->task_repository->findById( $task_id );
-
-        if ( $task ) {
-            DatabaseContext::invalidateBoardCache( $task->board_name );
-        }
+        DatabaseContext::invalidateTaskCache( $task_id );
     }
 }

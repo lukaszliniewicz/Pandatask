@@ -17,18 +17,46 @@ final class DatabaseContext {
         return false === $version ? 1 : (int) $version;
     }
 
-    public static function invalidateBoardCache( $board_name ) {
-        self::incrementBoardCacheVersion( $board_name, 'tasks' );
-        self::incrementBoardCacheVersion( $board_name, 'categories' );
-        self::incrementBoardCacheVersion( $board_name, 'projects' );
-        self::incrementBoardCacheVersion( $board_name, 'parent_tasks' );
-        self::incrementBoardCacheVersion( $board_name, 'reports' );
+    public static function invalidateBoardCache( $board_name, $types = null ) {
+        $allowed_types = array( 'tasks', 'categories', 'projects', 'parent_tasks', 'reports' );
+        $types         = null === $types ? $allowed_types : array_intersect( (array) $types, $allowed_types );
+
+        foreach ( $types as $type ) {
+            self::incrementBoardCacheVersion( $board_name, $type );
+        }
     }
 
     public static function invalidateUserCache( $user_id ) {
         if ( $user_id > 0 ) {
             self::incrementUserCacheVersion( $user_id );
         }
+    }
+
+    public static function getTaskCacheKey( $task_id ) {
+        return 'pandat69_task_v2_' . (int) $task_id;
+    }
+
+    public static function invalidateTaskCache( $task_id ) {
+        delete_transient( self::getTaskCacheKey( $task_id ) );
+        delete_transient( 'pandat69_task_' . (int) $task_id );
+    }
+
+    public static function beginTransaction() {
+        global $wpdb;
+
+        return false !== $wpdb->query( 'START TRANSACTION' );
+    }
+
+    public static function commit() {
+        global $wpdb;
+
+        return false !== $wpdb->query( 'COMMIT' );
+    }
+
+    public static function rollback() {
+        global $wpdb;
+
+        return false !== $wpdb->query( 'ROLLBACK' );
     }
 
     private static function incrementBoardCacheVersion( $board_name, $type = 'tasks' ) {

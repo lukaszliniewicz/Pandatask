@@ -20,13 +20,11 @@ final class CoreRegistrar {
 
         BuddyPressNotifier::init();
 
+        DatabaseLifecycle::updateDbCheck();
+
         if ( is_admin() ) {
             $admin = new AdminPage();
             $admin->register();
-        }
-
-        if ( is_admin() ) {
-            DatabaseLifecycle::updateDbCheck();
         }
     }
 

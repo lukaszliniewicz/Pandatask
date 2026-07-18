@@ -28,7 +28,7 @@ final class CategoryRepository {
         }
 
         $data = array(
-            'board_name' => sanitize_text_field( $board_name ),
+            'board_name' => sanitize_key( $board_name ),
             'name'       => $name,
         );
 
@@ -60,7 +60,11 @@ final class CategoryRepository {
         $categories_table = $prefix . 'categories';
         $tasks_table      = $prefix . 'tasks';
 
-        $wpdb->update(
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return false;
+        }
+
+        $task_update_result = $wpdb->update(
             $tasks_table,
             array( 'category_id' => null ),
             array(
@@ -71,6 +75,12 @@ final class CategoryRepository {
             array( '%d', '%s' )
         );
 
+        if ( false === $task_update_result ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
+
         $result = $wpdb->delete(
             $categories_table,
             array(
@@ -80,7 +90,13 @@ final class CategoryRepository {
             array( '%d', '%s' )
         );
 
-        return false !== $result;
+        if ( false === $result || ! DatabaseContext::commit() ) {
+            DatabaseContext::rollback();
+
+            return false;
+        }
+
+        return true;
     }
 
     public function existsOnBoard( $category_id, $board_name ) {

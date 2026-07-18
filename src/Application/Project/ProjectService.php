@@ -53,7 +53,7 @@ final class ProjectService {
         $project_id = $this->repository->create( $data );
 
         if ( $project_id ) {
-            DatabaseContext::invalidateBoardCache( $data['board_name'] );
+            DatabaseContext::invalidateBoardCache( $data['board_name'], array( 'projects' ) );
         }
 
         return $project_id;
@@ -64,7 +64,7 @@ final class ProjectService {
         $result  = $this->repository->update( $project_id, $data );
 
         if ( $result && $project ) {
-            DatabaseContext::invalidateBoardCache( $project->board_name );
+            DatabaseContext::invalidateBoardCache( $project->board_name, array( 'projects', 'tasks' ) );
             delete_transient( 'pandat69_project_' . $project_id );
         }
 
@@ -81,7 +81,7 @@ final class ProjectService {
         $result = $this->repository->delete( $project_id );
 
         if ( $result ) {
-            DatabaseContext::invalidateBoardCache( $project->board_name );
+            DatabaseContext::invalidateBoardCache( $project->board_name, array( 'projects', 'tasks', 'parent_tasks' ) );
             delete_transient( 'pandat69_project_' . $project_id );
         }
 

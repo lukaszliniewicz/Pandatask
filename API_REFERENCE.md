@@ -4,7 +4,7 @@
 
 ## Authentication
 
-All endpoints require the user to be authenticated via WordPress cookies (i.e., logged in). Permission checks are performed on each endpoint to ensure the user has the right to access or modify the requested resource.
+Endpoints require WordPress cookie authentication unless the administrator has explicitly enabled the constrained public bug-submission route for the requester's logged-in/logged-out state. Permission checks are performed for each board or resource. Administrative directory, AI, and batch endpoints require `manage_options`.
 
 ---
 
@@ -12,7 +12,7 @@ All endpoints require the user to be authenticated via WordPress cookies (i.e., 
 
 If you are an AI agent or building an automation script, follow these best practices:
 
-1.  **Use Batching:** Always prefer the `POST /batch` endpoint for modifying data. It reduces network overhead and allows you to perform sequences of operations (e.g., creating a category and then assigning a new task to it).
+1.  **Use Batching for trusted administration:** Administrators may use `POST /batch` to reduce network overhead for sequences of operations. Other clients must use the resource endpoints so object-level permissions are enforced.
 2.  **Context First:** Before performing updates, fetch the relevant context (Users, Categories, Projects) to ensure you use valid IDs.
     -   Users: `GET /users`
     -   Projects: `GET /boards/{board_name}/projects`
@@ -99,7 +99,7 @@ If you are an AI agent or building an automation script, follow these best pract
 ### 1. Execute Multiple Actions
 
 -   **Endpoint:** `POST /batch`
--   **Description:** Executes a series of actions in a single API call. This is the preferred method for agentic workflows.
+-   **Description:** Executes a series of trusted administrative actions in a single API call.
 -   **Body Parameters:**
     -   `actions` (array, required): An array of action objects.
         -   **Supported Actions:**
@@ -112,7 +112,7 @@ If you are an AI agent or building an automation script, follow these best pract
         -   `board_name` (string): Required for `create_*` actions and `delete_category`.
         -   `data` (object): The payload. Matches the body parameters of the corresponding single endpoint.
             -   For `update_*` and `delete_*` actions, `id` must be included in `data`.
--   **Permissions:** User must be logged in. Individual sub-actions inherit the permission check of the corresponding endpoint.
+-   **Permissions:** Administrator only (`manage_options`).
 
 -   **Example Request Body:**
     ```json

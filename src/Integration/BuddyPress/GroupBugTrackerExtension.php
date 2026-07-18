@@ -17,24 +17,6 @@ if ( ! class_exists( 'BP_Group_Extension' ) ) {
 class GroupBugTrackerExtension extends \BP_Group_Extension {
     
     public function __construct() {
-        $group_id = bp_is_group() ? bp_get_current_group_id() : 0;
-        
-        $enabled = true; 
-        $default_assignee = 0;
-        
-        if ($group_id > 0) {
-            $enabled = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_enabled', true);
-            $default_assignee = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_assignee', true);
-
-            if ($enabled === '') {
-                $enabled = true;
-            } else {
-                $enabled = ($enabled === '1');
-            }
-        } else {
-             $enabled = true;
-        }
-        
         $args = array(
             'slug'              => 'bug-tracker',
             'name'              => __('Bug Tracker', 'pandatask'),
@@ -72,9 +54,7 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
             return;
         }
         
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_enabled', true);
-        
-        if ($enabled === '1') {
+        if ( BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_bug_tracker_enabled' ) ) {
             $group = groups_get_group($group_id);
             if (!$group) return;
     
@@ -113,8 +93,7 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
             return;
         }
         
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_enabled', true);
-        if ($enabled !== '1') {
+        if ( ! BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_bug_tracker_enabled' ) ) {
             echo '<div id="message" class="bp-feedback info"><p>' . esc_html__('The bug tracker is currently disabled for this group.', 'pandatask') . '</p></div>';
             return;
         }
@@ -161,7 +140,9 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
         groups_update_groupmeta($group_id, 'pandat69_bug_tracker_enabled', $enabled);
 
         if (isset($_POST['pandat69_bug_tracker_assignee'])) {
-            groups_update_groupmeta($group_id, 'pandat69_bug_tracker_assignee', absint($_POST['pandat69_bug_tracker_assignee']));
+            $assignee_value = sanitize_text_field( wp_unslash( $_POST['pandat69_bug_tracker_assignee'] ) );
+            $assignee_id = BuddyPressSupport::sanitizeGroupAssignee( $group_id, $assignee_value );
+            groups_update_groupmeta( $group_id, 'pandat69_bug_tracker_assignee', $assignee_id );
         }
     }
     
@@ -175,7 +156,7 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
             $group_id = bp_get_current_group_id();
         }
         
-        $enabled = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_enabled', true) === '1';
+        $enabled = BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_bug_tracker_enabled' );
         $default_assignee_id = groups_get_groupmeta($group_id, 'pandat69_bug_tracker_assignee', true);
         ?>
         <h4><?php esc_html_e('Bug Tracker Settings', 'pandatask'); ?></h4>
@@ -222,7 +203,9 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
         groups_update_groupmeta($group_id, 'pandat69_bug_tracker_enabled', $enabled);
         
         if (isset($_POST['pandat69_bug_tracker_assignee'])) {
-            groups_update_groupmeta($group_id, 'pandat69_bug_tracker_assignee', absint($_POST['pandat69_bug_tracker_assignee']));
+            $assignee_value = sanitize_text_field( wp_unslash( $_POST['pandat69_bug_tracker_assignee'] ) );
+            $assignee_id = BuddyPressSupport::sanitizeGroupAssignee( $group_id, $assignee_value );
+            groups_update_groupmeta( $group_id, 'pandat69_bug_tracker_assignee', $assignee_id );
         }
 
         bp_core_add_message(__('Bug Tracker settings saved successfully.', 'pandatask'));

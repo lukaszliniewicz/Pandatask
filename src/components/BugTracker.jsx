@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { useTasks } from '../hooks/useTasks';
 import TaskList from './TaskList';
 import Modal from './Modal';
-import TaskForm from './TaskForm';
-import TaskDetail from './TaskDetail';
+
+const TaskForm = lazy(() => import('./TaskForm'));
+const TaskDetail = lazy(() => import('./TaskDetail'));
 
 const BugTracker = ({ boardName, defaultAssigneeId }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -49,13 +50,15 @@ const BugTracker = ({ boardName, defaultAssigneeId }) => {
                 onClose={() => setIsFormOpen(false)}
                 title="Submit a New Issue"
             >
-                <TaskForm 
-                    onClose={() => setIsFormOpen(false)}
-                    defaultTaskType="bug"
-                    defaultValues={{
-                        assigned_persons: defaultAssigneeId ? [parseInt(defaultAssigneeId, 10)] : []
-                    }}
-                />
+                <Suspense fallback={<div className="pandat69-loading">Loading...</div>}>
+                    <TaskForm
+                        onClose={() => setIsFormOpen(false)}
+                        defaultTaskType="bug"
+                        defaultValues={{
+                            assigned_persons: defaultAssigneeId ? [parseInt(defaultAssigneeId, 10)] : []
+                        }}
+                    />
+                </Suspense>
             </Modal>
 
             <Modal
@@ -63,7 +66,11 @@ const BugTracker = ({ boardName, defaultAssigneeId }) => {
                 onClose={() => setSelectedTaskId(null)}
                 title="Issue Details"
             >
-                {selectedTaskId && <TaskDetail taskId={selectedTaskId} />}
+                {selectedTaskId && (
+                    <Suspense fallback={<div className="pandat69-loading">Loading...</div>}>
+                        <TaskDetail taskId={selectedTaskId} />
+                    </Suspense>
+                )}
             </Modal>
         </div>
     );

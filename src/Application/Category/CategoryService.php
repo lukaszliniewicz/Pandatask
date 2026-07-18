@@ -32,7 +32,7 @@ final class CategoryService {
         $category_id = $this->repository->create( $board_name, $category_name );
 
         if ( $category_id ) {
-            DatabaseContext::invalidateBoardCache( $board_name );
+            DatabaseContext::invalidateBoardCache( $board_name, array( 'categories' ) );
         }
 
         return $category_id;
@@ -42,7 +42,7 @@ final class CategoryService {
         $result = $this->repository->delete( $category_id, $board_name );
 
         if ( $result ) {
-            DatabaseContext::invalidateBoardCache( $board_name );
+            DatabaseContext::invalidateBoardCache( $board_name, array( 'categories', 'tasks', 'parent_tasks' ) );
         }
 
         return $result;

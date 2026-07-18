@@ -2,10 +2,10 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.9  
+**Version:** 1.0.11
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
-**Tested up to:** WordPress 6.8  
+**Tested up to:** WordPress 7.0
 **Contributors:** lukaszliniewicz
 
 ---
@@ -308,7 +308,8 @@ See [`API_REFERENCE.md`](API_REFERENCE.md) for detailed schemas and examples.
 | Task (via API) | Board access + assigned/supervisor/creator |
 | Comment management | Comment author, group admin/mod, or `manage_options` |
 | AI assistant | `manage_options` |
-| Public bug submission | Enabled in settings + visibility allows logged-out users |
+| Batch execution | `manage_options` |
+| Public bug submission | Enabled in settings + configured visibility allows the requester session |
 
 ---
 
@@ -351,5 +352,3 @@ The plugin exposes `window.Pandatask.mountBoard(container, props)` for external 
 - WordPress 5.0+
 - PHP 7.4+
 - BuddyPress (optional, for group/profiles/notifications features)
-
-

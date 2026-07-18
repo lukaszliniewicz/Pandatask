@@ -150,6 +150,7 @@ class DeadlineNotificationHandler {
 
         foreach ($results as $task) {
             if (empty($task->assigned_and_supervisor_users)) {
+                $task_mutation_service->updateTask($task->id, ['missed_deadline_notified' => 1], '', 0);
                 continue;
             }
 
@@ -158,6 +159,7 @@ class DeadlineNotificationHandler {
             $all_users = array_unique(array_filter(array_map('absint', $all_users)));
 
             if (empty($all_users)) {
+                $task_mutation_service->updateTask($task->id, ['missed_deadline_notified' => 1], '', 0);
                 continue;
             }
 
@@ -173,7 +175,7 @@ class DeadlineNotificationHandler {
             }
 
             // After notifying all users for this task, set the flag.
-            $task_mutation_service->updateTask($task->id, ['missed_deadline_notified' => 1]);
+            $task_mutation_service->updateTask($task->id, ['missed_deadline_notified' => 1], '', 0);
         }
     }
 

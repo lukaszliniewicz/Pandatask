@@ -32,7 +32,8 @@ final class RestApi {
             $comment_route_handler,
             $report_route_handler,
             $ai_prompt_route_handler,
-            $batch_action_handler
+            $batch_action_handler,
+            $schema_provider
         );
     }
 

@@ -27,12 +27,12 @@ final class BatchActionHandler {
         $results = array();
 
         foreach ( $actions as $action_item ) {
-            $action             = $action_item['action'] ?? '';
+            $action             = sanitize_key( $action_item['action'] ?? '' );
             $data               = $action_item['data'] ?? array();
             $board_name         = $action_item['board_name'] ?? ( $data['board_name'] ?? null );
             $is_success         = false;
             $result_message     = '';
-            $action_description = $action . ' (' . esc_html( $data['name'] ?? $data['id'] ?? 'N/A' ) . ')';
+            $action_description = $action . ' (' . sanitize_text_field( $data['name'] ?? $data['id'] ?? 'N/A' ) . ')';
 
             try {
                 $response_data = $this->executeBatchAction( $action, $data, $board_name );
@@ -54,7 +54,7 @@ final class BatchActionHandler {
             $results[] = array(
                 'success'            => $is_success,
                 'action_description' => $action_description,
-                'message'            => esc_html( $result_message ),
+                'message'            => wp_strip_all_tags( $result_message ),
             );
         }
 
@@ -97,7 +97,7 @@ final class BatchActionHandler {
                 return $this->comment_route_handler->delete_comment_from_batch( $data );
 
             default:
-                throw new Exception( 'Unknown action: ' . $action );
+                throw new Exception( 'Unknown batch action.' );
         }
     }
 }

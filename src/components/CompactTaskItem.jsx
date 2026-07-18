@@ -3,6 +3,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import StatusBadge from './StatusBadge';
 import { useTaskMutations } from '../hooks/useTaskMutations';
+import { parseDate } from '../utils';
 
 const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand, onAction }) => {
     const { updateTask } = useTaskMutations();
@@ -100,7 +101,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
 
             <div className="pandat69-compact-meta">
                 {task.deadline && (
-                    <span title="Deadline" className={new Date(task.deadline) < new Date() && task.status !== 'done' ? 'pandat69-meta-overdue' : ''}>
+                    <span title="Deadline" className={parseDate(task.deadline) < new Date() && task.status !== 'done' ? 'pandat69-meta-overdue' : ''}>
                         <span className="dashicons dashicons-calendar-alt"></span> {task.deadline}
                     </span>
                 )}

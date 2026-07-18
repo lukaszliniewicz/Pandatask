@@ -43,8 +43,9 @@ final class DirectoryRouteHandler {
     public function get_users( $request ) {
         $search     = $request['search'] ?? '';
         $board_name = $request['board_name'] ?? '';
+        $include    = array_slice( array_values( array_unique( array_filter( array_map( 'absint', (array) ( $request['include'] ?? array() ) ) ) ) ), 0, 50 );
 
-        $users = $this->user_directory_service->getUsersForBoard( $board_name, $search );
+        $users = $this->user_directory_service->getUsersForBoard( $board_name, $search, $include );
 
         return new WP_REST_Response( array( 'users' => $users ), 200 );
     }

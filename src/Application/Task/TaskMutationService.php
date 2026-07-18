@@ -5,12 +5,14 @@ namespace Pandatask\Application\Task;
 use DateInterval;
 use DateTime;
 use Exception;
+use Throwable;
 use Pandatask\Infrastructure\Notifications\BuddyPressNotifier;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\TaskCommandRepository;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
+use WP_Error;
 
 final class TaskMutationService {
 
@@ -135,13 +137,22 @@ final class TaskMutationService {
             $format[19] = '%s';
         }
 
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return new WP_Error( 'pandatask_transaction_failed', __( 'The task could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
+        }
+
+        try {
         $task_id = $this->repository->insertTask( $task_data, $format );
 
         if ( ! $task_id ) {
-            return false;
+            throw new Exception( 'Failed to insert the task.' );
         }
 
-        ProtectedAttachmentService::syncTask( $task_id );
+        $attachment_result = ProtectedAttachmentService::syncTask( $task_id );
+
+        if ( is_wp_error( $attachment_result ) ) {
+            throw new Exception( $attachment_result->get_error_message() );
+        }
 
         $assigned_persons   = $data['assigned_persons'] ?? array();
         $supervisor_persons = $data['supervisor_persons'] ?? array();
@@ -156,7 +167,9 @@ final class TaskMutationService {
                     continue;
                 }
 
-                $this->repository->insertTaskRelationship( $task_id, $predecessor_id );
+                if ( ! $this->repository->insertTaskRelationship( $task_id, $predecessor_id ) ) {
+                    throw new Exception( 'Failed to create a task dependency.' );
+                }
             }
         }
 
@@ -170,6 +183,23 @@ final class TaskMutationService {
 
         $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
         $creator_id         = get_current_user_id();
+
+        if ( ! $this->history_service->addEntry( $task_id, $creator_id, 'task_created', '', $task_data['name'] ) ) {
+            throw new Exception( 'Failed to create task history.' );
+        }
+
+        if ( ! DatabaseContext::commit() ) {
+            throw new Exception( 'The task could not be committed.' );
+        }
+        } catch ( Throwable $exception ) {
+            DatabaseContext::rollback();
+
+            if ( ! empty( $task_id ) ) {
+                ProtectedAttachmentService::deleteTaskFiles( $task_id );
+            }
+
+            return new WP_Error( 'pandatask_create_failed', __( 'The task could not be created.', 'pandatask' ), array( 'status' => 500 ) );
+        }
 
         if ( ! empty( $assignment_changes['assignee']['added'] ) ) {
             $new_assignee_ids     = array_keys( $assignment_changes['assignee']['added'] );
@@ -197,7 +227,7 @@ final class TaskMutationService {
             }
         }
 
-        DatabaseContext::invalidateBoardCache( $task_data['board_name'] );
+        DatabaseContext::invalidateBoardCache( $task_data['board_name'], array( 'tasks', 'parent_tasks', 'reports' ) );
         delete_transient( 'pandat69_all_board_names' );
 
         $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons ) );
@@ -205,8 +235,6 @@ final class TaskMutationService {
         foreach ( $all_affected_users as $user_id ) {
             DatabaseContext::invalidateUserCache( (int) $user_id );
         }
-
-        $this->history_service->addEntry( $task_id, get_current_user_id(), 'task_created', '', $task_data['name'] );
 
         return $task_id;
     }
@@ -222,7 +250,7 @@ final class TaskMutationService {
 
         if ( isset( $data['status'] ) && ( 'in-progress' === $data['status'] || 'done' === $data['status'] ) ) {
             if ( $this->task_repository->isBlocked( $task_id ) ) {
-                return false;
+                return new WP_Error( 'pandatask_task_blocked', __( 'Complete all predecessor tasks before changing this task to that status.', 'pandatask' ), array( 'status' => 409 ) );
             }
         }
 
@@ -334,6 +362,24 @@ final class TaskMutationService {
             }
         }
 
+        if ( array_key_exists( 'is_recurring', $data ) && empty( $data['is_recurring'] ) ) {
+            foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on' ) as $field ) {
+                if ( ! array_key_exists( $field, $update_data ) ) {
+                    $format[] = '%s';
+                }
+                $update_data[ $field ] = null;
+            }
+        }
+
+        if ( array_key_exists( 'attachment_type', $data ) && empty( $data['attachment_type'] ) ) {
+            foreach ( array( 'attachment_url', 'attachment_post_id', 'attachment_filename' ) as $field ) {
+                if ( ! array_key_exists( $field, $update_data ) ) {
+                    $format[] = '%s';
+                }
+                $update_data[ $field ] = null;
+            }
+        }
+
         if ( isset( $update_data['deadline_days_after_start'] ) ) {
             $start_date_for_calc = $update_data['start_date'] ?? $current_task->start_date;
 
@@ -385,6 +431,11 @@ final class TaskMutationService {
             }
         }
 
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return new WP_Error( 'pandatask_transaction_failed', __( 'The task update could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
+        }
+
+        try {
         if ( isset( $data['predecessors'] ) ) {
             $new_predecessors = array_map( 'absint', (array) $data['predecessors'] );
             $new_predecessors = array_unique( array_filter( $new_predecessors ) );
@@ -393,7 +444,9 @@ final class TaskMutationService {
             $to_remove        = array_diff( $current_rels, $new_predecessors );
 
             foreach ( $to_remove as $predecessor_id ) {
-                $this->repository->deleteTaskRelationship( $task_id, $predecessor_id );
+                if ( ! $this->repository->deleteTaskRelationship( $task_id, $predecessor_id ) ) {
+                    throw new Exception( 'Failed to remove a task dependency.' );
+                }
                 $changes_for_buffer[] = array( 'field' => 'dependency_removed', 'from' => $predecessor_id, 'to' => '', 'comment' => $change_comment );
             }
 
@@ -402,13 +455,22 @@ final class TaskMutationService {
                     continue;
                 }
 
-                $this->repository->insertTaskRelationship( $task_id, $predecessor_id );
+                if ( ! $this->repository->insertTaskRelationship( $task_id, $predecessor_id ) ) {
+                    throw new Exception( 'Failed to add a task dependency.' );
+                }
                 $changes_for_buffer[] = array( 'field' => 'dependency_added', 'from' => '', 'to' => $predecessor_id, 'comment' => $change_comment );
             }
         }
 
+        $assignment_changes = array(
+            'assignee'   => array( 'added' => array(), 'removed' => array() ),
+            'supervisor' => array( 'added' => array(), 'removed' => array() ),
+        );
+
         if ( isset( $data['assigned_persons'] ) || isset( $data['supervisor_persons'] ) ) {
-            $assignment_changes = $this->updateTaskAssignments( $task_id, $data['assigned_persons'] ?? array(), $data['supervisor_persons'] ?? array() );
+            $assigned_persons = isset( $data['assigned_persons'] ) ? $data['assigned_persons'] : ( $current_task->assigned_user_ids ?? array() );
+            $supervisor_persons = isset( $data['supervisor_persons'] ) ? $data['supervisor_persons'] : ( $current_task->supervisor_user_ids ?? array() );
+            $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
 
             foreach ( $assignment_changes['assignee']['added'] as $name ) {
                 $changes_for_buffer[] = array( 'field' => 'assignee_added', 'from' => '', 'to' => $name, 'comment' => $change_comment );
@@ -432,18 +494,40 @@ final class TaskMutationService {
         if ( ! empty( $update_data ) ) {
             $update_data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
             $format[]                  = '%s';
-            $this->repository->updateTask( $task_id, $update_data, $format );
+            $update_result = $this->repository->updateTask( $task_id, $update_data, $format );
+
+            if ( false === $update_result ) {
+                throw new Exception( 'The task database update failed.' );
+            }
 
             if ( isset( $update_data['board_name'] ) && $update_data['board_name'] !== $current_task->board_name ) {
-                DatabaseContext::invalidateBoardCache( $current_task->board_name );
-                DatabaseContext::invalidateBoardCache( $update_data['board_name'] );
                 $changes_for_buffer[] = array( 'field' => 'board_name', 'from' => $current_task->board_name, 'to' => $update_data['board_name'] );
-            } else {
-                DatabaseContext::invalidateBoardCache( $current_task->board_name );
             }
         }
 
-        ProtectedAttachmentService::syncTask( $task_id );
+        if ( ! DatabaseContext::commit() ) {
+            throw new Exception( 'The task database update could not be committed.' );
+        }
+        } catch ( Throwable $exception ) {
+            DatabaseContext::rollback();
+
+            return new WP_Error( 'pandatask_update_failed', __( 'The task could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
+        }
+
+        DatabaseContext::invalidateTaskCache( $task_id );
+        DatabaseContext::invalidateBoardCache( $current_task->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
+
+        if ( isset( $update_data['board_name'] ) && $update_data['board_name'] !== $current_task->board_name ) {
+            DatabaseContext::invalidateBoardCache( $update_data['board_name'], array( 'tasks', 'parent_tasks', 'reports' ) );
+        }
+
+        $attachment_result = ProtectedAttachmentService::syncTask( $task_id );
+
+        if ( is_wp_error( $attachment_result ) ) {
+            return $attachment_result;
+        }
+
+        $this->sendAssignmentNotifications( $task_id, $assignment_changes, $actor_id );
 
         if ( $is_completing ) {
             $this->processDependencyCascade( $task_id );
@@ -471,14 +555,14 @@ final class TaskMutationService {
             wp_schedule_single_event( time() + ( 5 * MINUTE_IN_SECONDS ), 'pandatask_process_buffered_changes', array( $task_id, $actor_id ) );
         }
 
-        delete_transient( 'pandat69_task_' . $task_id );
-        DatabaseContext::invalidateBoardCache( $current_task->board_name );
-
         $old_users = array_merge(
             ! empty( $current_task->assigned_user_ids ) ? $current_task->assigned_user_ids : array(),
             ! empty( $current_task->supervisor_user_ids ) ? $current_task->supervisor_user_ids : array()
         );
-        $new_users = array_merge( $data['assigned_persons'] ?? array(), $data['supervisor_persons'] ?? array() );
+        $new_users = array_merge(
+            isset( $data['assigned_persons'] ) ? $data['assigned_persons'] : ( $current_task->assigned_user_ids ?? array() ),
+            isset( $data['supervisor_persons'] ) ? $data['supervisor_persons'] : ( $current_task->supervisor_user_ids ?? array() )
+        );
         $all_affected_users = array_unique( array_merge( $old_users, $new_users ) );
 
         foreach ( $all_affected_users as $user_id ) {
@@ -595,42 +679,61 @@ final class TaskMutationService {
                 );
 
                 $result = $this->repository->updateTask( $task_id, $update_data, array( '%s', '%s', '%s', '%s' ) );
+
+                if ( false === $result ) {
+                    return new WP_Error( 'pandatask_update_failed', __( 'The recurring task could not be advanced.', 'pandatask' ), array( 'status' => 500 ) );
+                }
+
                 $this->history_service->addEntry( $task_id, get_current_user_id(), 'recurring_instance_skipped', 'Skipped instance for ' . $task_to_delete->start_date );
 
-                delete_transient( 'pandat69_task_' . $task_id );
-                DatabaseContext::invalidateBoardCache( $task_to_delete->board_name );
+                DatabaseContext::invalidateTaskCache( $task_id );
+                DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
 
-                return false !== $result;
+                return true;
             }
         }
 
-        $this->history_service->addEntry( $task_id, get_current_user_id(), 'task_deleted', $task_to_delete->name );
-        delete_transient( 'pandat69_task_' . $task_id );
+        if ( ! DatabaseContext::beginTransaction() ) {
+            return new WP_Error( 'pandatask_transaction_failed', __( 'The task deletion could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
+        }
 
-        $this->repository->deleteTaskAssignments( $task_id );
-        $this->repository->deleteTaskComments( $task_id );
-        $this->repository->deleteTaskHistory( $task_id );
+        try {
+            if (
+                ! $this->repository->deleteTaskAssignments( $task_id )
+                || ! $this->repository->deleteTaskComments( $task_id )
+                || ! $this->repository->deleteTaskHistory( $task_id )
+                || ! $this->repository->deleteTaskRelationships( $task_id )
+                || false === $this->repository->unlinkChildTasks( $task_id )
+                || false === $this->repository->deleteTask( $task_id )
+            ) {
+                throw new Exception( 'A related task record could not be deleted.' );
+            }
 
+            if ( ! DatabaseContext::commit() ) {
+                throw new Exception( 'The task deletion could not be committed.' );
+            }
+        } catch ( Throwable $exception ) {
+            DatabaseContext::rollback();
+
+            return new WP_Error( 'pandatask_delete_failed', __( 'The task could not be deleted.', 'pandatask' ), array( 'status' => 500 ) );
+        }
+
+        DatabaseContext::invalidateTaskCache( $task_id );
         ProtectedAttachmentService::deleteTaskFiles( $task_id );
-        $result = $this->repository->deleteTask( $task_id );
+        DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
 
-        if ( false !== $result && $task_to_delete ) {
-            $this->repository->unlinkChildTasks( $task_id );
-            DatabaseContext::invalidateBoardCache( $task_to_delete->board_name );
+        $all_affected_users = array_unique(
+            array_merge(
+                ! empty( $task_to_delete->assigned_user_ids ) ? $task_to_delete->assigned_user_ids : array(),
+                ! empty( $task_to_delete->supervisor_user_ids ) ? $task_to_delete->supervisor_user_ids : array()
+            )
+        );
 
-            $all_affected_users = array_unique(
-                array_merge(
-                    ! empty( $task_to_delete->assigned_user_ids ) ? $task_to_delete->assigned_user_ids : array(),
-                    ! empty( $task_to_delete->supervisor_user_ids ) ? $task_to_delete->supervisor_user_ids : array()
-                )
-            );
-
-            foreach ( $all_affected_users as $user_id ) {
-                DatabaseContext::invalidateUserCache( (int) $user_id );
-            }
+        foreach ( $all_affected_users as $user_id ) {
+            DatabaseContext::invalidateUserCache( (int) $user_id );
         }
 
-        return false !== $result;
+        return true;
     }
 
     public function processDependencyCascade( $completed_task_id ) {
@@ -737,8 +840,8 @@ final class TaskMutationService {
 
             $this->repository->updateTask( $task->id, $update_data, array( '%s', '%s', '%s', '%s' ) );
 
-            delete_transient( 'pandat69_task_' . $task->id );
-            DatabaseContext::invalidateBoardCache( $task->board_name );
+            DatabaseContext::invalidateTaskCache( $task->id );
+            DatabaseContext::invalidateBoardCache( $task->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
         }
     }
 
@@ -752,6 +855,23 @@ final class TaskMutationService {
         );
     }
 
+    private function sendAssignmentNotifications( $task_id, $assignment_changes, $actor_id ) {
+        foreach ( array( 'assignee', 'supervisor' ) as $role ) {
+            $added_user_ids = array_map( 'intval', array_keys( $assignment_changes[ $role ]['added'] ?? array() ) );
+            $recipient_ids = array_values( array_diff( $added_user_ids, array( (int) $actor_id ) ) );
+
+            if ( empty( $recipient_ids ) ) {
+                continue;
+            }
+
+            EmailNotifier::send_assignment_notification( $task_id, $recipient_ids, $role );
+
+            foreach ( $recipient_ids as $user_id ) {
+                BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $actor_id, $role );
+            }
+        }
+    }
+
     private function updateTaskRoleAssignments( $task_id, $user_ids, $role = 'assignee' ) {
         $changes = array( 'added' => array(), 'removed' => array() );
 
@@ -762,7 +882,9 @@ final class TaskMutationService {
         $users_to_remove  = array_diff( $current_user_ids, $new_user_ids );
 
         if ( ! empty( $users_to_remove ) ) {
-            $this->repository->deleteRoleAssignments( $task_id, $role, $users_to_remove );
+            if ( ! $this->repository->deleteRoleAssignments( $task_id, $role, $users_to_remove ) ) {
+                throw new Exception( 'Failed to remove task assignments.' );
+            }
 
             foreach ( $users_to_remove as $removed_user_id ) {
                 $user = get_userdata( $removed_user_id );
@@ -774,7 +896,9 @@ final class TaskMutationService {
 
         if ( ! empty( $users_to_add ) ) {
             foreach ( $users_to_add as $user_id ) {
-                $this->repository->insertRoleAssignment( $task_id, $user_id, $role );
+                if ( ! $this->repository->insertRoleAssignment( $task_id, $user_id, $role ) ) {
+                    throw new Exception( 'Failed to add a task assignment.' );
+                }
                 $user = get_userdata( $user_id );
                 $changes['added'][ $user_id ] = $user ? $user->display_name : 'User ' . $user_id;
             }

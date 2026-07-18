@@ -1,146 +1,153 @@
-@import '../base/variables';
+@use "sass:color";
+@use "../base/variables" as *;
 
 .pandat69-report-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: flex-end;
-    padding: 15px;
-    background-color: $medium-bg;
-    border-radius: $border-radius;
-    margin-bottom: 20px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 15px;
+	align-items: flex-end;
+	padding: 15px;
+	background-color: $medium-bg;
+	border-radius: $border-radius;
+	margin-bottom: 20px;
 }
 
 .pandat69-report-field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
 
-    label {
-        font-weight: 600;
-        font-size: 14px;
-        color: $primary-color;
-    }
+	label {
+		font-weight: 600;
+		font-size: 14px;
+		color: $primary-color;
+	}
 }
 
 .pandat69-report-custom-dates {
-    display: flex; // Hidden initially via style attribute or JS toggling
-    gap: 15px;
-    align-items: flex-end;
+	display: flex; // Hidden initially via style attribute or JS toggling
+	gap: 15px;
+	align-items: flex-end;
 }
 
 #pandat69-generate-report-btn {
-    background-color: $primary-color;
-    color: $white;
+	background-color: $primary-color;
+	color: $white;
 
-    &:hover {
-        background-color: darken($primary-color, 10%);
-    }
+	&:hover {
+		background-color: color.adjust($primary-color, $lightness: -10%);
+	}
 }
 
 .pandat69-report-results {
-    margin-top: 20px;
+	margin-top: 20px;
 }
 
 .pandat69-report-section {
-    background-color: $white;
-    border: 1px solid $border-color;
-    border-radius: $border-radius;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+	background-color: $white;
+	border: 1px solid $border-color;
+	border-radius: $border-radius;
+	padding: 20px;
+	margin-bottom: 20px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 
-    h4 {
-        margin-top: 0;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid $border-color;
-        font-size: 1.2em;
-        color: $primary-color;
-    }
+	h4 {
+		margin-top: 0;
+		margin-bottom: 15px;
+		padding-bottom: 10px;
+		border-bottom: 1px solid $border-color;
+		font-size: 1.2em;
+		color: $primary-color;
+	}
 }
 
 .pandat69-report-list {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
+	list-style: none;
+	padding-left: 0;
+	margin: 0;
 
-    li {
-        padding: 12px 15px;
-        margin-bottom: 8px;
-        line-height: 1.5;
-        background-color: $white;
-        border: 1px solid #e9ecef;
-        border-radius: 4px;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
+	li {
+		padding: 12px 15px;
+		margin-bottom: 8px;
+		line-height: 1.5;
+		background-color: $white;
+		border: 1px solid #e9ecef;
+		border-radius: 4px;
+		transition: background-color 0.2s ease, border-color 0.2s ease;
 
-        &:nth-child(even) {
-            background-color: #f8f9fa;
-        }
+		&:nth-child(even) {
+			background-color: #f8f9fa;
+		}
 
-        &:hover {
-            background-color: #f1f3f5;
-            border-color: #dee2e6;
-        }
+		&:hover {
+			background-color: #f1f3f5;
+			border-color: #dee2e6;
+		}
 
-        &:last-child {
-            margin-bottom: 0;
-        }
-    }
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
 }
 
 .pandat69-report-item-title {
-    display: block;
-    font-weight: 600;
-    color: $primary-color;
+	display: block;
+	font-weight: 600;
+	color: $primary-color;
 }
 
 .pandat69-report-item-meta {
-    display: block;
-    font-size: 0.9em;
-    color: $secondary-color;
-    margin-top: 4px;
+	display: block;
+	font-size: 0.9em;
+	color: $secondary-color;
+	margin-top: 4px;
 
-    .dashicons {
-        margin-right: 5px;
-        width: 14px;
-        text-align: center;
-        vertical-align: middle;
-    }
+	.dashicons {
+		margin-right: 5px;
+		width: 14px;
+		text-align: center;
+		vertical-align: middle;
+	}
 }
 
 /* Color coding for icons */
-.pandat69-report-section:nth-of-type(1) .pandat69-report-item-meta .dashicons { color: $success-color; } /* Added */
-.pandat69-report-section:nth-of-type(2) .pandat69-report-item-meta .dashicons { color: $info-color; } /* Completed */
-.pandat69-report-section:nth-of-type(3) .pandat69-report-item-meta .dashicons { color: $danger-color; } /* Missed */
+.pandat69-report-section:nth-of-type(1) .pandat69-report-item-meta .dashicons {
+	color: $success-color;
+} /* Added */
+.pandat69-report-section:nth-of-type(2) .pandat69-report-item-meta .dashicons {
+	color: $info-color;
+} /* Completed */
+.pandat69-report-section:nth-of-type(3) .pandat69-report-item-meta .dashicons {
+	color: $danger-color;
+} /* Missed */
 
 /* Style for the 'Tasks per person' list to be simpler */
 .pandat69-report-section:nth-of-type(4) .pandat69-report-list li {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 0;
-    background-color: transparent;
-    border-bottom: 1px solid #e9ecef;
+	padding: 8px 12px;
+	border: none;
+	border-radius: 0;
+	background-color: transparent;
+	border-bottom: 1px solid #e9ecef;
 
-    &:hover {
-        background-color: #f1f3f5;
-    }
+	&:hover {
+		background-color: #f1f3f5;
+	}
 
-    &:last-child {
-        border-bottom: none;
-    }
+	&:last-child {
+		border-bottom: none;
+	}
 }
 
 .pandat69-report-assigned {
-    font-size: 0.85em;
-    color: #6c757d;
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px dashed $border-color;
+	font-size: 0.85em;
+	color: #6c757d;
+	margin-top: 6px;
+	padding-top: 6px;
+	border-top: 1px dashed $border-color;
 
-    .dashicons {
-        vertical-align: middle;
-        margin-right: 5px;
-        color: #6c757d;
-    }
+	.dashicons {
+		vertical-align: middle;
+		margin-right: 5px;
+		color: #6c757d;
+	}
 }

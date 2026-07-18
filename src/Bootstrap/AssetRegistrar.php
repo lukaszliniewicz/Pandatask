@@ -54,8 +54,9 @@ final class AssetRegistrar {
 
         wp_enqueue_style( 'pandat69-style' );
 
-        wp_enqueue_editor();
-        wp_enqueue_media();
+        if ( current_user_can( 'upload_files' ) ) {
+            wp_enqueue_media();
+        }
 
         wp_enqueue_script( 'pandat69-bundle' );
     }
@@ -270,7 +271,7 @@ final class AssetRegistrar {
 
         wp_localize_script(
             'pandat69-admin-script',
-            'pandat69_admin_object',
+            'pandataskAdminSettings',
             array(
                 'root'  => esc_url_raw( rest_url( 'pandatask/v1/' ) ),
                 'nonce' => wp_create_nonce( 'wp_rest' ),

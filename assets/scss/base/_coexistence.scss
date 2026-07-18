@@ -4,15 +4,15 @@
 .pandat69-bug-tracker-container,
 #pandat69-floating-bug-reporter-root,
 [data-iarf-plugin="pandatask"] {
-    --pandatask-ui-font-family: var(--pandatask-font-family, var(--iarf-font-body, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
-    --pandatask-ui-control-height-sm: 32px;
-    --pandatask-ui-control-height-md: 38px;
-    --pandatask-ui-radius-sm: var(--pandatask-radius, var(--iarf-radius-sm, 4px));
-    --pandatask-ui-focus-ring: 0 0 0 2px color-mix(in srgb, var(--pandatask-primary) 22%, transparent);
+	--pandatask-ui-font-family: var(--pandatask-font-family, var(--iarf-font-body, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
+	--pandatask-ui-control-height-sm: 32px;
+	--pandatask-ui-control-height-md: 38px;
+	--pandatask-ui-radius-sm: var(--pandatask-radius, var(--iarf-radius-sm, 4px));
+	--pandatask-ui-focus-ring: 0 0 0 2px color-mix(in srgb, var(--pandatask-primary) 22%, transparent);
 
-    font-family: var(--pandatask-ui-font-family);
-    color: var(--pandatask-primary);
-    line-height: 1.5;
+	font-family: var(--pandatask-ui-font-family);
+	color: var(--pandatask-primary);
+	line-height: 1.5;
 }
 
 .pandat69-root,
@@ -31,7 +31,7 @@
 #pandat69-floating-bug-reporter-root *,
 #pandat69-floating-bug-reporter-root *::before,
 #pandat69-floating-bug-reporter-root *::after {
-    box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 .pandat69-root :where(button, input, select, textarea),
@@ -39,8 +39,8 @@
 .pandat69-bug-tracker-container :where(button, input, select, textarea),
 #pandat69-floating-bug-reporter-root :where(button, input, select, textarea),
 [data-iarf-plugin="pandatask"] :where(button, input, select, textarea) {
-    font: inherit;
-    letter-spacing: 0;
+	font: inherit;
+	letter-spacing: 0;
 }
 
 .pandat69-root :where(button, [type="button"], [type="submit"], [role="button"]),
@@ -48,10 +48,10 @@
 .pandat69-bug-tracker-container :where(button, [type="button"], [type="submit"], [role="button"]),
 #pandat69-floating-bug-reporter-root :where(button, [type="button"], [type="submit"], [role="button"]),
 [data-iarf-plugin="pandatask"] :where(button, [type="button"], [type="submit"], [role="button"]) {
-    appearance: none;
-    -webkit-appearance: none;
-    text-transform: none;
-    text-shadow: none;
+	appearance: none;
+	-webkit-appearance: none;
+	text-transform: none;
+	text-shadow: none;
 }
 
 .pandat69-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
@@ -59,9 +59,9 @@
 .pandat69-bug-tracker-container :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 #pandat69-floating-bug-reporter-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 [data-iarf-plugin="pandatask"] :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-    max-width: 100%;
-    min-height: var(--pandatask-ui-control-height-md);
-    color: var(--pandatask-primary);
+	max-width: 100%;
+	min-height: var(--pandatask-ui-control-height-md);
+	color: var(--pandatask-primary);
 }
 
 .pandat69-root :where(h1, h2, h3, h4, h5, h6),
@@ -69,10 +69,10 @@
 .pandat69-bug-tracker-container :where(h1, h2, h3, h4, h5, h6),
 #pandat69-floating-bug-reporter-root :where(h1, h2, h3, h4, h5, h6),
 [data-iarf-plugin="pandatask"] :where(h1, h2, h3, h4, h5, h6) {
-    font-family: var(--pandatask-ui-font-family);
-    color: var(--pandatask-primary);
-    line-height: 1.2;
-    letter-spacing: 0;
+	font-family: var(--pandatask-ui-font-family);
+	color: var(--pandatask-primary);
+	line-height: 1.2;
+	letter-spacing: 0;
 }
 
 .pandat69-button,
@@ -80,18 +80,18 @@
 .pandat69-icon-button-clean,
 .pandat69-form-tab,
 .pandat69-floating-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    font-family: var(--pandatask-ui-font-family);
-    letter-spacing: 0;
-    text-align: center;
-    text-decoration: none;
-    text-transform: none;
+	appearance: none;
+	-webkit-appearance: none;
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	font-family: var(--pandatask-ui-font-family);
+	letter-spacing: 0;
+	text-align: center;
+	text-decoration: none;
+	text-transform: none;
 }
 
 .pandat69-button:focus-visible,
@@ -99,8 +99,8 @@
 .pandat69-icon-button-clean:focus-visible,
 .pandat69-form-tab:focus-visible,
 .pandat69-floating-btn:focus-visible {
-    outline: 0;
-    box-shadow: var(--pandatask-ui-focus-ring);
+	outline: 0;
+	box-shadow: var(--pandatask-ui-focus-ring);
 }
 
 .pandat69-root :where(.dashicons),
@@ -108,10 +108,10 @@
 .pandat69-bug-tracker-container :where(.dashicons),
 #pandat69-floating-bug-reporter-root :where(.dashicons),
 [data-iarf-plugin="pandatask"] :where(.dashicons) {
-    width: 1em;
-    height: 1em;
-    font-size: 1.25em;
-    line-height: 1;
-    flex: 0 0 auto;
-    vertical-align: -0.12em;
+	width: 1em;
+	height: 1em;
+	font-size: 1.25em;
+	line-height: 1;
+	flex: 0 0 auto;
+	vertical-align: -0.12em;
 }

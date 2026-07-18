@@ -22,7 +22,13 @@ final class CategoryRouteHandler {
 
     public function create_category( $request ) {
         $params = RequestHelper::bodyParams( $request );
-        $id     = $this->category_service->addCategory( $request['board_name'], $params['name'] );
+        $name = sanitize_text_field( $params['name'] ?? '' );
+
+        if ( '' === $name ) {
+            return new WP_Error( 'rest_missing', __( 'Category name is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        $id = $this->category_service->addCategory( $request['board_name'], $name );
 
         if ( ! $id ) {
             return new WP_Error( 'rest_error', 'Failed', array( 'status' => 500 ) );
@@ -32,7 +38,7 @@ final class CategoryRouteHandler {
             return new WP_REST_Response( array( 'message' => 'Category added', 'id' => $id ), 201 );
         }
 
-        return new WP_REST_Response( array( 'category' => array( 'id' => $id, 'name' => $params['name'] ) ), 201 );
+        return new WP_REST_Response( array( 'category' => array( 'id' => $id, 'name' => $name ) ), 201 );
     }
 
     public function delete_category( $request ) {
@@ -48,7 +54,13 @@ final class CategoryRouteHandler {
             throw new Exception( '`board_name` is required for create actions.' );
         }
 
-        $category_id = $this->category_service->addCategory( $board_name, $data['name'] );
+        $name = sanitize_text_field( $data['name'] ?? '' );
+
+        if ( '' === $name ) {
+            return new WP_Error( 'rest_missing', __( 'Category name is required.', 'pandatask' ), array( 'status' => 400 ) );
+        }
+
+        $category_id = $this->category_service->addCategory( sanitize_key( $board_name ), $name );
 
         if ( ! $category_id ) {
             return new WP_Error( 'rest_error', 'Failed', array( 'status' => 500 ) );
@@ -57,7 +69,7 @@ final class CategoryRouteHandler {
         return array(
             'category' => array(
                 'id'   => $category_id,
-                'name' => $data['name'],
+                'name' => $name,
             ),
         );
     }

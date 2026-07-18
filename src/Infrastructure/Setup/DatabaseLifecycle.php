@@ -6,8 +6,11 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
+    private const DB_VERSION = '1.0.11';
+
     public static function activate() {
         self::createTables();
+        update_option( 'pandat69_db_version', self::DB_VERSION );
     }
 
     public static function createTables() {
@@ -70,7 +73,10 @@ final class DatabaseLifecycle {
             KEY archived (archived),
             KEY parent_task_id (parent_task_id),
             KEY is_recurring (is_recurring),
-            KEY missed_deadline_notified (missed_deadline_notified)
+            KEY missed_deadline_notified (missed_deadline_notified),
+            KEY board_active_status_deadline (board_name, archived, status, deadline),
+            KEY board_created (board_name, created_at),
+            KEY board_completed (board_name, status, completed_at)
         ) $charset_collate;";
         dbDelta( $sql_tasks );
 
@@ -117,7 +123,8 @@ final class DatabaseLifecycle {
             PRIMARY KEY  (id),
             UNIQUE KEY task_user_role (task_id, user_id, role),
             KEY task_id (task_id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY user_task_role (user_id, task_id, role)
         ) $charset_collate;";
         dbDelta( $sql_assignments );
 
@@ -130,7 +137,8 @@ final class DatabaseLifecycle {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY task_id (task_id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY task_created (task_id, created_at)
         ) $charset_collate;";
         dbDelta( $sql_comments );
 
@@ -145,7 +153,8 @@ final class DatabaseLifecycle {
             changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY task_id (task_id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY task_field (task_id, field_changed)
         ) $charset_collate;";
         dbDelta( $sql_task_history );
 
@@ -167,7 +176,7 @@ final class DatabaseLifecycle {
     public static function updateDbCheck() {
         $current_version = get_option( 'pandat69_db_version', '1.0.0' );
 
-        if ( ! version_compare( $current_version, '1.0.9', '<' ) ) {
+        if ( ! version_compare( $current_version, self::DB_VERSION, '<' ) ) {
             return;
         }
 
@@ -187,6 +196,6 @@ final class DatabaseLifecycle {
             $wpdb->query( "ALTER TABLE $table_tasks ADD COLUMN notify_days_before INT UNSIGNED NOT NULL DEFAULT 3" );
         }
 
-        update_option( 'pandat69_db_version', '1.0.9' );
+        update_option( 'pandat69_db_version', self::DB_VERSION );
     }
 }

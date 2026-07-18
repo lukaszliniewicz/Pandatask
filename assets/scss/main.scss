@@ -5,30 +5,29 @@
  */
 
 // 1. Base
-@import 'base/variables';
-@import 'base/coexistence';
-@import 'base/base';
-@import 'base/forms';
+@use "base/variables";
+@use "base/coexistence";
+@use "base/base";
+@use "base/forms";
 
 // 2. Layouts
-@import 'layouts/header';
-@import 'layouts/filters';
+@use "layouts/header";
+@use "layouts/filters";
 
 // 3. Components
-@import 'components/tabs';
-@import 'components/task-list';
-@import 'components/modal';
-@import 'components/autocomplete';
-@import 'components/kanban';
-@import 'components/calendar';
-@import 'components/comments';
-@import 'components/task-details';
-@import 'components/categories';
-@import 'components/projects';
-@import 'components/reports';
-@import 'components/bug-tracker';
-@import 'components/datepicker';
-@import 'components/sidebar';
+@use "components/tabs";
+@use "components/task-list";
+@use "components/modal";
+@use "components/autocomplete";
+@use "components/kanban";
+@use "components/calendar";
+@use "components/comments";
+@use "components/task-details";
+@use "components/categories";
+@use "components/projects";
+@use "components/reports";
+@use "components/bug-tracker";
+@use "components/sidebar";
 
 // 4. Responsive
-@import 'layouts/responsive';
+@use "layouts/responsive";

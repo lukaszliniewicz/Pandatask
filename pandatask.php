@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Pandatask
  * Description:       Adds a shortcode [task_board board_name="unique_board_id"] to display a task management board.
- * Version:           1.0.10
+ * Version:           1.0.11
  * Author:            Lukasz Liniewicz
  * Author URI:        https://github.com/lukaszliniewicz
  * Plugin URI:        https://github.com/lukaszliniewicz/Pandatask
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'PANDAT69_VERSION' ) ) {
-    define( 'PANDAT69_VERSION', '1.0.10' );
+    define( 'PANDAT69_VERSION', '1.0.11' );
 }
 
 if ( ! defined( 'PANDAT69_PLUGIN_DIR' ) ) {

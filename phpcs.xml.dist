@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="Pandatask">
-    <description>Fast PHP syntax lint using PHPCS.</description>
+    <description>PHP syntax and WordPress security checks.</description>
 
     <arg name="basepath" value="."/>
     <arg name="colors"/>
@@ -16,4 +16,8 @@
     <exclude-pattern>*/build/*</exclude-pattern>
 
     <rule ref="Generic.PHP.Syntax"/>
+    <rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+    <rule ref="WordPress.Security.NonceVerification"/>
+    <rule ref="WordPress.Security.EscapeOutput"/>
+    <rule ref="WordPress.Security.SafeRedirect"/>
 </ruleset>

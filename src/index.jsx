@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import TaskBoard from './components/TaskBoard';
 import BugTracker from './components/BugTracker';
@@ -26,16 +26,16 @@ const applyPandataskBoundary = (root) => {
 
 // Wrapper for simple components that need API context but not full TaskBoard
 const AppWrapper = ({ apiSettings, currentUser, children, boardName }) => {
-    const queryClient = new QueryClient();
-    const apiClient = createApiClient(apiSettings);
+    const queryClient = useMemo(() => new QueryClient(), []);
+    const apiClient = useMemo(() => createApiClient(apiSettings), [apiSettings]);
     
-    const config = {
+    const config = useMemo(() => ({
         boardName,
         apiClient,
         currentUser,
         isStandalone: true,
         text: apiSettings.text || {}
-    };
+    }), [apiClient, apiSettings.text, boardName, currentUser]);
 
     return (
         <ConfigProvider config={config}>
@@ -55,7 +55,7 @@ window.Pandatask = {
 
         applyPandataskBoundary(container);
 
-        // Ensure container is clean
+        container.replaceChildren();
         const root = createRoot(container);
         root.render(
             <TaskBoard
@@ -83,8 +83,8 @@ window.Pandatask = {
 
         applyPandataskBoundary(container);
 
+        container.replaceChildren();
         const root = createRoot(container);
-        container.innerHTML = '';
         root.render(
             <AppWrapper
                 apiSettings={settings}
@@ -120,8 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!root.dataset.reactMounted) {
             const { boardName } = root.dataset;
             applyPandataskBoundary(root);
+            root.replaceChildren();
             const reactRoot = createRoot(root);
-            root.innerHTML = '';
             reactRoot.render(
                 <TaskBoard 
                     boardName={boardName} 
@@ -140,8 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!root.dataset.reactMounted) {
             const { boardName, defaultAssigneeId } = root.dataset;
             applyPandataskBoundary(root);
+            root.replaceChildren();
             const reactRoot = createRoot(root);
-            root.innerHTML = '';
             reactRoot.render(
                 <AppWrapper apiSettings={apiSettings} currentUser={currentUser} boardName={boardName}>
                     <BugTracker boardName={boardName} defaultAssigneeId={defaultAssigneeId} />
@@ -156,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (floatRoot && !floatRoot.dataset.reactMounted) {
         const { boardName, defaultAssigneeId } = floatRoot.dataset;
         applyPandataskBoundary(floatRoot);
+        floatRoot.replaceChildren();
         const reactRoot = createRoot(floatRoot);
         // Do not clear innerHTML here as it's likely empty or hidden
         reactRoot.render(
