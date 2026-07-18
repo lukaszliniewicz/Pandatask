@@ -30,7 +30,17 @@ function __( $message ) {
 }
 
 class WP_Error {
-    public function __construct( public $code = '', public $message = '', public $data = array() ) {}
+    public $code;
+
+    public $message;
+
+    public $data;
+
+    public function __construct( $code = '', $message = '', $data = array() ) {
+        $this->code    = $code;
+        $this->message = $message;
+        $this->data    = $data;
+    }
 }
 
 function assert_same( $expected, $actual, $message ) {
@@ -72,7 +82,11 @@ $task = (object) array(
 );
 
 $task_service = new class( $task ) {
-    public function __construct( private $task ) {}
+    private $task;
+
+    public function __construct( $task ) {
+        $this->task = $task;
+    }
     public function getTaskForAuthorization( $task_id ) {
         return 41 === $task_id ? $this->task : null;
     }
