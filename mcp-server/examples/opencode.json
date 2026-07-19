@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pandatask": {
+      "type": "local",
+      "command": ["node", "C:/absolute/path/to/Pandatask/mcp-server/dist/src/index.js"],
+      "enabled": true,
+      "environment": {
+        "PANDATASK_URL": "{env:PANDATASK_URL}",
+        "PANDATASK_USERNAME": "{env:PANDATASK_USERNAME}",
+        "PANDATASK_APP_PASSWORD": "{env:PANDATASK_APP_PASSWORD}",
+        "PANDATASK_DRY_RUN": "{env:PANDATASK_DRY_RUN}"
+      }
+    }
+  }
+}

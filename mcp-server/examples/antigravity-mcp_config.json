@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "pandatask": {
+      "command": "node",
+      "args": ["C:/absolute/path/to/Pandatask/mcp-server/dist/src/index.js"],
+      "env": {
+        "PANDATASK_URL": "https://example.com",
+        "PANDATASK_USERNAME": "wordpress-user",
+        "PANDATASK_APP_PASSWORD": "replace-with-app-password",
+        "PANDATASK_DRY_RUN": "true"
+      }
+    }
+  }
+}

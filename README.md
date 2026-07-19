@@ -258,6 +258,14 @@ The action types supported: `create_task`, `update_task`, `delete_task`, `create
 
 ---
 
+## MCP Server
+
+The repository includes a production-ready local MCP server in [`mcp-server/`](mcp-server/) for Codex, Antigravity, OpenCode, and other stdio MCP clients. It uses a dedicated WordPress Application Password over HTTPS and exposes 40 annotated tools spanning optimized board context, daily briefings, deadline/workload summaries, dependency-aware project plans, task/project/category/comment CRUD, assignments, schedules, archives, reports, bulk operations, and administrator batches.
+
+Every mutation supports per-call `dry_run`; `PANDATASK_DRY_RUN=true` enforces preview-only behavior for the whole server process. See [`mcp-server/README.md`](mcp-server/README.md) for setup, client configuration, security boundaries, and the full tool catalog.
+
+---
+
 ## Full-Screen Mode
 
 Adds a virtual page at `/pandatask-fullscreen/?board_name=...` via a WordPress rewrite rule. The template renders the board without any theme chrome. Permission checks are enforced for BuddyPress group boards.

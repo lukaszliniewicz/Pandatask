@@ -1,0 +1,30 @@
+{
+  "name": "@iarf/pandatask-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for managing Pandatask through its authenticated WordPress REST API",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "pandatask-mcp": "dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && node --watch dist/src/index.js",
+    "start": "node dist/src/index.js",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}
