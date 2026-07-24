@@ -23,6 +23,29 @@ final class DirectoryRouteHandler {
         return new WP_REST_Response( array( 'boards' => $boards ), 200 );
     }
 
+    public function get_meta( $request ) {
+        $timezone = wp_timezone();
+
+        return new WP_REST_Response(
+            array(
+                'plugin_version'   => defined( 'PANDAT69_VERSION' ) ? PANDAT69_VERSION : '',
+                'today'            => wp_date( 'Y-m-d' ),
+                'now'              => wp_date( DATE_ATOM ),
+                'timezone'         => $timezone->getName(),
+                'is_administrator' => current_user_can( 'manage_options' ),
+                'capabilities'     => array(
+                    'idempotency'    => true,
+                    'task_pagination' => true,
+                ),
+                'limits'           => array(
+                    'task_page_size_max' => 500,
+                    'idempotency_ttl_seconds' => DAY_IN_SECONDS,
+                ),
+            ),
+            200
+        );
+    }
+
     public function get_boards( $request ) {
         $search = $request['search'];
         $boards = $this->board_service->getAllBoardNames();

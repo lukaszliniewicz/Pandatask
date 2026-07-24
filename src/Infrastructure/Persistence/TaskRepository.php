@@ -24,7 +24,7 @@ final class TaskRepository {
         return $count > 0;
     }
 
-    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null ) {
+    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0 ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -113,6 +113,12 @@ final class TaskRepository {
             }
         } else {
             $sql_group_order .= ' ORDER BY t.name ASC';
+        }
+
+        if ( $limit > 0 ) {
+            $sql_group_order .= ' LIMIT %d OFFSET %d';
+            $params[]         = min( 500, max( 1, (int) $limit ) );
+            $params[]         = max( 0, (int) $offset );
         }
 
         $results = $wpdb->get_results( $wpdb->prepare( $sql_select . $sql_where . $sql_group_order, ...$params ) );
@@ -293,7 +299,7 @@ final class TaskRepository {
         return false;
     }
 
-    public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false ) {
+    public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0 ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -364,6 +370,10 @@ final class TaskRepository {
             $sql  .= " ORDER BY t.{$sort_by} {$order}";
         } else {
             $sql .= ' ORDER BY t.name ASC';
+        }
+
+        if ( $limit > 0 ) {
+            $sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', min( 500, max( 1, (int) $limit ) ), max( 0, (int) $offset ) );
         }
 
         $results = $wpdb->get_results( $sql );

@@ -1,6 +1,6 @@
 {
   "name": "@iarf/pandatask-mcp-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for managing Pandatask through its authenticated WordPress REST API",
   "license": "GPL-2.0-or-later",
   "type": "module",
@@ -14,7 +14,8 @@
     "start": "node dist/src/index.js",
     "test": "npm run build && node --test dist/test/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "npm run typecheck && npm test"
+    "audit:production": "node scripts/audit-production.mjs",
+    "check": "npm run typecheck && npm test && npm run audit:production"
   },
   "engines": {
     "node": ">=20.11"

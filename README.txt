@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.11
+Stable tag: 1.0.12
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.12 =
+
+* Add REST metadata, task pagination, and 24-hour per-user idempotency for authenticated mutations.
+* Make MCP summaries site-timezone aware, exclude recurring templates from actionable totals, and prevent duplicate private-board briefing counts.
+* Add project-plan dependency preflight, retry/resume keys, rollback on unkeyed failures, progress notifications, bounded concurrency, and response-size limits.
+* Add stable MCP output envelopes and schemas, typed administrator batches, richer tool guidance, and core/full/admin tool profiles.
 
 = 1.0.11 =
 

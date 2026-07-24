@@ -180,8 +180,8 @@ if ( ! empty( $missing_assets ) ) {
     $failures[] = 'Missing packaged assets: ' . implode( ', ', $missing_assets );
 }
 
-if ( '1.0.11' !== $result['plugin_version'] || '1.0.11' !== $result['db_version'] ) {
-    $failures[] = 'Plugin or database version is not 1.0.11.';
+if ( '1.0.12' !== $result['plugin_version'] || '1.0.11' !== $result['db_version'] ) {
+    $failures[] = 'Plugin version is not 1.0.12 or database version is not 1.0.11.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

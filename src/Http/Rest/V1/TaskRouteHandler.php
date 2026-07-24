@@ -62,6 +62,8 @@ final class TaskRouteHandler {
         $private_only      = isset( $params['private_only'] ) && 'true' === $params['private_only'];
         $include_templates = isset( $params['include_templates'] ) && 'true' === $params['include_templates'];
         $task_type_filter  = $params['task_type_filter'] ?? '';
+        $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 0;
+        $offset            = max( 0, (int) ( $params['offset'] ?? 0 ) );
 
         $last_underscore_pos = strrpos( $sort, '_' );
 
@@ -82,7 +84,7 @@ final class TaskRouteHandler {
                 return new WP_Error( 'rest_forbidden', 'Access denied', array( 'status' => 403 ) );
             }
 
-            $tasks = $this->task_service->getTasksForUserAcrossBoards( $board_user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates );
+            $tasks = $this->task_service->getTasksForUserAcrossBoards( $board_user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit, $offset );
         } else {
             $date_filter    = '';
             $start_date     = '';
@@ -93,12 +95,24 @@ final class TaskRouteHandler {
                 $filter_user_id = get_current_user_id();
             }
 
-            $tasks = $this->task_service->getTasks( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $filter_user_id );
+            $tasks = $this->task_service->getTasks( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $filter_user_id, $limit, $offset );
         }
 
         RequestHelper::renderTaskCollection( $tasks );
 
-        return new WP_REST_Response( array( 'tasks' => $tasks ), 200 );
+        return new WP_REST_Response(
+            array(
+                'tasks'      => $tasks,
+                'pagination' => array(
+                    'limit'     => $limit ?: null,
+                    'offset'    => $offset,
+                    'returned'  => count( $tasks ),
+                    'has_more'  => $limit > 0 && count( $tasks ) === $limit,
+                    'next_offset' => $limit > 0 && count( $tasks ) === $limit ? $offset + $limit : null,
+                ),
+            ),
+            200
+        );
     }
 
     public function create_task( $request ) {

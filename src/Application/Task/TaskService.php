@@ -43,7 +43,7 @@ final class TaskService {
         return $this->mutation_service->deleteTask( (int) $task_id, $delete_scope );
     }
 
-    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null ) {
+    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0 ) {
         $version       = DatabaseContext::getBoardCacheVersion( $board_name, 'tasks' );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_tasks_{$board_name}_{$version}_{$args_key}";
@@ -53,7 +53,7 @@ final class TaskService {
             return ProtectedAttachmentService::prepareTasks( $cached_tasks );
         }
 
-        $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id );
+        $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id, $limit, $offset );
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
         return ProtectedAttachmentService::prepareTasks( $tasks );
@@ -100,7 +100,7 @@ final class TaskService {
         return $this->repository->wouldCreateDependencyCycle( (int) $task_id, (int) $predecessor_id );
     }
 
-    public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false ) {
+    public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0 ) {
         $version       = $this->getUserCacheVersion( $user_id );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_user_tasks_{$user_id}_{$version}_{$args_key}";
@@ -110,7 +110,7 @@ final class TaskService {
             return ProtectedAttachmentService::prepareTasks( $cached_tasks );
         }
 
-        $tasks = $this->repository->findForUserAcrossBoards( $user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates );
+        $tasks = $this->repository->findForUserAcrossBoards( $user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit, $offset );
 
         foreach ( $tasks as $task ) {
             $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );

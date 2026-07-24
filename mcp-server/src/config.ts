@@ -6,6 +6,9 @@ export interface PandataskConfig {
   defaultDryRun: boolean;
   timeoutMs: number;
   allowInsecureHttp: boolean;
+  toolProfile: 'core' | 'full' | 'admin';
+  maxConcurrency: number;
+  maxCollectionItems: number;
 }
 
 export class ConfigurationError extends Error {
@@ -36,6 +39,23 @@ function booleanValue(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
   throw new ConfigurationError(`Invalid boolean value: ${value}`);
+}
+
+function boundedInteger(env: NodeJS.ProcessEnv, name: string, fallback: number, minimum: number, maximum: number): number {
+  const raw = env[name]?.trim() || String(fallback);
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new ConfigurationError(`${name} must be an integer from ${minimum} to ${maximum}.`);
+  }
+  return value;
+}
+
+function toolProfile(value: string | undefined): PandataskConfig['toolProfile'] {
+  const normalized = value?.trim().toLowerCase() || 'full';
+  if (normalized === 'core' || normalized === 'full' || normalized === 'admin') {
+    return normalized;
+  }
+  throw new ConfigurationError('PANDATASK_TOOL_PROFILE must be core, full, or admin.');
 }
 
 function absoluteHttpUrl(value: string, name: string): URL {
@@ -78,11 +98,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PandataskConfi
     throw new ConfigurationError('PANDATASK_API_BASE_URL must use HTTPS.');
   }
 
-  const timeoutRaw = env.PANDATASK_TIMEOUT_MS?.trim() || '30000';
-  const timeoutMs = Number.parseInt(timeoutRaw, 10);
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120000) {
-    throw new ConfigurationError('PANDATASK_TIMEOUT_MS must be an integer from 1000 to 120000.');
-  }
+  const timeoutMs = boundedInteger(env, 'PANDATASK_TIMEOUT_MS', 30000, 1000, 120000);
 
   const appPassword = required(env, 'PANDATASK_APP_PASSWORD').replace(/\s+/g, '');
   if (!appPassword) {
@@ -97,6 +113,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PandataskConfi
     defaultDryRun: booleanValue(env.PANDATASK_DRY_RUN, false),
     timeoutMs,
     allowInsecureHttp,
+    toolProfile: toolProfile(env.PANDATASK_TOOL_PROFILE),
+    maxConcurrency: boundedInteger(env, 'PANDATASK_MAX_CONCURRENCY', 5, 1, 20),
+    maxCollectionItems: boundedInteger(env, 'PANDATASK_MAX_COLLECTION_ITEMS', 1000, 50, 5000),
   };
 }
 
@@ -104,9 +123,11 @@ export function publicConfig(config: PandataskConfig): Record<string, unknown> {
   return {
     site_url: config.siteUrl,
     api_base_url: config.apiBaseUrl,
-    username: config.username,
     authentication: 'WordPress Application Password (HTTP Basic over HTTPS)',
     default_dry_run: config.defaultDryRun,
     timeout_ms: config.timeoutMs,
+    tool_profile: config.toolProfile,
+    max_concurrency: config.maxConcurrency,
+    max_collection_items: config.maxCollectionItems,
   };
 }

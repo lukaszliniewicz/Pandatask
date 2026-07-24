@@ -163,3 +163,23 @@ test('Pandatask protects task attachments without web-server-specific delivery',
 	assert.match(policy, /user_can\(\s*\$user_id,\s*'edit_posts'\s*\)/);
 	assert.doesNotMatch(policy, /current_user_can/);
 });
+
+test('Pandatask REST API exposes bounded pagination, site metadata, and mutation idempotency', () => {
+	const restApi = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/RestApi.php'), 'utf8');
+	const registrar = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/RouteRegistrar.php'), 'utf8');
+	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');
+	const middleware = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/IdempotencyMiddleware.php'), 'utf8');
+
+	assert.match(restApi, /IdempotencyMiddleware::register\(\)/);
+	assert.match(registrar, /'\/meta'/);
+	assert.match(registrar, /'limit'\s*=>\s*array/);
+	assert.match(registrar, /'offset'\s*=>\s*array/);
+	assert.match(handler, /'pagination'\s*=>\s*array/);
+	assert.match(middleware, /rest_request_before_callbacks/);
+	assert.match(middleware, /rest_request_after_callbacks/);
+	assert.match(middleware, /pandatask_idempotency_conflict/);
+	assert.match(middleware, /pandatask_idempotency_in_progress/);
+	assert.match(middleware, /add_option\(/);
+	assert.match(middleware, /DAY_IN_SECONDS/);
+	assert.match(middleware, /get_current_user_id\(\)/);
+});

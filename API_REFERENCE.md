@@ -4,7 +4,9 @@
 
 ## Authentication
 
-Endpoints require WordPress cookie authentication unless the administrator has explicitly enabled the constrained public bug-submission route for the requester's logged-in/logged-out state. Permission checks are performed for each board or resource. Administrative directory, AI, and batch endpoints require `manage_options`.
+Endpoints require WordPress cookie authentication or a WordPress Application Password over HTTPS unless the administrator has explicitly enabled the constrained public bug-submission route for the requester's logged-in/logged-out state. Permission checks are performed for each board or resource. Administrative directory, AI, and batch endpoints require `manage_options`.
+
+Authenticated mutations may include an `Idempotency-Key` header containing 8-128 letters, numbers, dots, underscores, colons, or hyphens. Successful responses are retained per user, HTTP method, and route for 24 hours. Replaying the same request/key returns the stored response; reusing the key with different parameters returns HTTP 409. A concurrent identical request also returns HTTP 409 with `pandatask_idempotency_in_progress` and may be retried shortly.
 
 ---
 
@@ -20,6 +22,8 @@ If you are an AI agent or building an automation script, follow these best pract
 3.  **Search:** Use the `search` parameter on `GET /boards/{board_name}/tasks` to find specific tasks before updating them.
 4.  **Dates:** Always use `YYYY-MM-DD` format for dates.
 5.  **IDs:** All references to other objects (Users, Projects, Categories) must be their integer IDs, not names.
+6.  **Pagination:** Agent task reads should supply `limit` and `offset`; the response includes `pagination.has_more` and `pagination.next_offset`.
+7.  **Retries:** Supply a stable `Idempotency-Key` for creates and batches, and reuse it unchanged after ambiguous network failures.
 
 ---
 
@@ -70,7 +74,30 @@ If you are an AI agent or building an automation script, follow these best pract
     }
     ```
 
-### 4. Generate AI Prompt
+### 4. Get Site Metadata
+
+-   **Endpoint:** `GET /meta`
+-   **Description:** Returns the canonical WordPress site date/timezone plus automation-relevant capabilities and limits. Use `today` for deadline and workload calculations rather than the agent host's UTC date.
+-   **Response Example:**
+    ```json
+    {
+        "plugin_version": "1.0.12",
+        "today": "2026-07-24",
+        "now": "2026-07-24T12:30:00+02:00",
+        "timezone": "Europe/Warsaw",
+        "is_administrator": false,
+        "capabilities": {
+            "idempotency": true,
+            "task_pagination": true
+        },
+        "limits": {
+            "task_page_size_max": 500,
+            "idempotency_ttl_seconds": 86400
+        }
+    }
+    ```
+
+### 5. Generate AI Prompt
 
 -   **Endpoint:** `POST /ai/generate-prompt`
 -   **Description:** Generates a structured LLM prompt containing board context (users, projects, categories, API schema) combined with a user-supplied instruction. The output is designed to be pasted into an LLM; the LLM's JSON response can then be executed via `POST /batch`.
@@ -215,10 +242,12 @@ Fields available when creating or updating tasks.
     -   `sort` (string, optional): Sort field and direction separated by an underscore, e.g. `deadline_asc` (default), `priority_desc`, `created_at_asc`, `name_asc`.
     -   `project_filter` (integer, optional): Only tasks belonging to the given project ID.
     -   `archived` (integer, optional): Set to `1` to return archived (soft-deleted) tasks instead of active ones. Default: `0`.
-    -   `private_only` (string, optional): `"true"` to return only tasks assigned to the current user.
+    -   `private_only` (string, optional): On a `user_{ID}` board, `"true"` restricts the cross-board personal view to tasks stored on that private board.
     -   `assigned_to_me` (string, optional): `"true"` to filter by tasks assigned to the current user.
     -   `include_templates` (string, optional): `"true"` to include recurring template tasks. Front end always sends `"true"`.
     -   `task_type_filter` (string, optional): Filter by `task_type` value (e.g. `"bug"`).
+    -   `limit` (integer, optional): Return at most 1-500 tasks. Omit it to preserve the unpaginated legacy front-end response.
+    -   `offset` (integer, optional): Zero-based offset used with `limit`.
 -   **Permissions:** User must have read access to the board. Alternatively, if the user is assigned to, supervises, or created any task, they can see that task even without board-level access.
 -   **Example Response (200 OK):**
     ```json
@@ -244,7 +273,14 @@ Fields available when creating or updating tasks.
                 "created_at": "2025-07-01 09:00:00",
                 "creator_id": 1
             }
-        ]
+        ],
+        "pagination": {
+            "limit": 100,
+            "offset": 0,
+            "returned": 1,
+            "has_more": false,
+            "next_offset": null
+        }
     }
     ```
 

@@ -38,6 +38,7 @@ final class RestApi {
     }
 
     public function registerRoutes() {
+        IdempotencyMiddleware::register();
         $this->route_registrar->register();
     }
 

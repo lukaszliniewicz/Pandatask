@@ -24,6 +24,10 @@ function enabled(value: unknown): boolean {
   return value === true || value === 1 || value === '1';
 }
 
+function actionableTasks(tasks: UnknownRecord[]): UnknownRecord[] {
+  return tasks.filter((task) => !enabled(task.is_recurring));
+}
+
 function dateValue(value: unknown): string | null {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null;
 }
@@ -53,8 +57,9 @@ export function todayIso(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function summarizeTasks(tasks: UnknownRecord[], today = todayIso()): UnknownRecord {
-  const open = tasks.filter((task) => task.status !== 'done');
+export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRecord {
+  const actionable = actionableTasks(tasks);
+  const open = actionable.filter((task) => task.status !== 'done');
   const overdue = open.filter((task) => {
     const deadline = dateValue(task.deadline);
     return deadline !== null && deadline < today;
@@ -70,11 +75,12 @@ export function summarizeTasks(tasks: UnknownRecord[], today = todayIso()): Unkn
   const blocked = open.filter((task) => enabled(task.is_blocked));
 
   return {
-    total: tasks.length,
+    total: actionable.length,
+    total_records: tasks.length,
     by_status: {
-      pending: tasks.filter((task) => task.status === 'pending').length,
-      in_progress: tasks.filter((task) => task.status === 'in-progress').length,
-      done: tasks.filter((task) => task.status === 'done').length,
+      pending: actionable.filter((task) => task.status === 'pending').length,
+      in_progress: actionable.filter((task) => task.status === 'in-progress').length,
+      done: actionable.filter((task) => task.status === 'done').length,
     },
     overdue: overdue.length,
     due_today: dueToday.length,
@@ -94,10 +100,9 @@ export function summarizeTasks(tasks: UnknownRecord[], today = todayIso()): Unkn
   };
 }
 
-export function workload(tasks: UnknownRecord[]): UnknownRecord[] {
+export function workload(tasks: UnknownRecord[], today: string): UnknownRecord[] {
   const users = new Map<number, { user_id: number; open: number; overdue: number; high_priority: number; task_ids: number[] }>();
-  const today = todayIso();
-  for (const task of tasks.filter((item) => item.status !== 'done')) {
+  for (const task of actionableTasks(tasks).filter((item) => item.status !== 'done')) {
     for (const userId of numberIds(task.assigned_user_ids)) {
       const current = users.get(userId) ?? { user_id: userId, open: 0, overdue: 0, high_priority: 0, task_ids: [] };
       current.open += 1;
@@ -110,9 +115,9 @@ export function workload(tasks: UnknownRecord[]): UnknownRecord[] {
   return [...users.values()].sort((left, right) => right.open - left.open || right.overdue - left.overdue);
 }
 
-export function deadlineReview(tasks: UnknownRecord[], days: number, today = todayIso()): UnknownRecord {
+export function deadlineReview(tasks: UnknownRecord[], days: number, today: string): UnknownRecord {
   const horizon = addDays(today, days);
-  const relevant = tasks
+  const relevant = actionableTasks(tasks)
     .filter((task) => task.status !== 'done')
     .filter((task) => {
       const deadline = dateValue(task.deadline);

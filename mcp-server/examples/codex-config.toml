@@ -1,10 +1,10 @@
 # Export these in the environment that starts Codex:
-# PANDATASK_URL, PANDATASK_USERNAME, PANDATASK_APP_PASSWORD, PANDATASK_DRY_RUN
+# PANDATASK_URL, PANDATASK_USERNAME, PANDATASK_APP_PASSWORD, PANDATASK_DRY_RUN, PANDATASK_TOOL_PROFILE
 
 [mcp_servers.pandatask]
 command = "node"
 args = ["C:/absolute/path/to/Pandatask/mcp-server/dist/src/index.js"]
-env_vars = ["PANDATASK_URL", "PANDATASK_USERNAME", "PANDATASK_APP_PASSWORD", "PANDATASK_DRY_RUN"]
+env_vars = ["PANDATASK_URL", "PANDATASK_USERNAME", "PANDATASK_APP_PASSWORD", "PANDATASK_DRY_RUN", "PANDATASK_TOOL_PROFILE"]
 required = true
 startup_timeout_sec = 10.0
-tool_timeout_sec = 60.0
+tool_timeout_sec = 300.0

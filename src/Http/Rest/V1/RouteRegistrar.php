@@ -46,6 +46,16 @@ final class RouteRegistrar {
     public function register() {
         register_rest_route(
             $this->namespace,
+            '/meta',
+            array(
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => array( $this->directory_route_handler, 'get_meta' ),
+                'permission_callback' => array( $this->permission_checker, 'check_user_logged_in_permission' ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
             '/boards',
             array(
                 'methods'             => WP_REST_Server::READABLE,
@@ -195,6 +205,20 @@ final class RouteRegistrar {
                         'board_name' => array(
                             'required' => true,
                             'type'     => 'string',
+                        ),
+                        'limit'      => array(
+                            'description'       => __( 'Maximum tasks returned in this page.', 'pandatask' ),
+                            'type'              => 'integer',
+                            'minimum'           => 1,
+                            'maximum'           => 500,
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'offset'     => array(
+                            'description'       => __( 'Zero-based task offset.', 'pandatask' ),
+                            'type'              => 'integer',
+                            'default'           => 0,
+                            'minimum'           => 0,
+                            'sanitize_callback' => 'absint',
                         ),
                     ),
                 ),

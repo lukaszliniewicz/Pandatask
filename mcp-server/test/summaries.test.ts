@@ -22,11 +22,22 @@ test('summarizeTasks calculates actionable status and attention buckets', () => 
 });
 
 test('workload and deadline review preserve useful task references', () => {
-  assert.deepEqual(workload(tasks), [
+  assert.deepEqual(workload(tasks, '2026-07-19'), [
     { user_id: 2, open: 2, overdue: 1, high_priority: 2, task_ids: [1, 3] },
     { user_id: 3, open: 1, overdue: 0, high_priority: 1, task_ids: [3] },
   ]);
   const review = deadlineReview(tasks, 3, '2026-07-19');
   assert.equal(review.count, 3);
   assert.deepEqual((review.tasks as Record<string, unknown>[]).map((task) => task.id), [1, 2, 3]);
+});
+
+test('recurring templates are reported but excluded from actionable totals', () => {
+  const summary = summarizeTasks(
+    [...tasks, { id: 5, name: 'Template', status: 'pending', priority: 10, deadline: '2026-07-18', is_recurring: true }],
+    '2026-07-19',
+  );
+  assert.equal(summary.total, 4);
+  assert.equal(summary.total_records, 5);
+  assert.equal(summary.recurring_templates, 1);
+  assert.equal(summary.overdue, 1);
 });

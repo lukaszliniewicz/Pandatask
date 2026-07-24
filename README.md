@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.11
+**Version:** 1.0.12
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -260,9 +260,9 @@ The action types supported: `create_task`, `update_task`, `delete_task`, `create
 
 ## MCP Server
 
-The repository includes a production-ready local MCP server in [`mcp-server/`](mcp-server/) for Codex, Antigravity, OpenCode, and other stdio MCP clients. It uses a dedicated WordPress Application Password over HTTPS and exposes 40 annotated tools spanning optimized board context, daily briefings, deadline/workload summaries, dependency-aware project plans, task/project/category/comment CRUD, assignments, schedules, archives, reports, bulk operations, and administrator batches.
+The repository includes a production-ready local MCP server in [`mcp-server/`](mcp-server/) for Codex, Antigravity, OpenCode, and other stdio MCP clients. It uses a dedicated WordPress Application Password over HTTPS and offers `core`, `full`, and `admin` profiles; the administrator profile exposes 40 annotated tools spanning optimized board context, daily briefings, deadline/workload summaries, dependency-aware project plans, task/project/category/comment CRUD, assignments, schedules, archives, reports, bulk operations, and administrator batches.
 
-Every mutation supports per-call `dry_run`; `PANDATASK_DRY_RUN=true` enforces preview-only behavior for the whole server process. See [`mcp-server/README.md`](mcp-server/README.md) for setup, client configuration, security boundaries, and the full tool catalog.
+Every mutation supports local preflight through per-call `dry_run`; `PANDATASK_DRY_RUN=true` enforces preview-only behavior for the whole server process. Creates and batches support 24-hour WordPress-backed idempotency, summaries use the WordPress site date/timezone, task reads are paginated, and long workflows use bounded concurrency and progress notifications. See [`mcp-server/README.md`](mcp-server/README.md) for setup, client configuration, security boundaries, profiles, and the full tool catalog.
 
 ---
 
@@ -281,8 +281,9 @@ Base: `/wp-json/pandatask/v1/`
 | GET | `/boards` | List available boards |
 | GET | `/users` | Search users (scoped to group board if `board_name` provided) |
 | GET | `/users/me/boards` | Boards the current user can write to |
+| GET | `/meta` | Canonical site date/timezone and MCP-relevant capabilities |
 | POST | `/batch` | Execute multiple actions in one request |
-| GET | `/boards/{board_name}/tasks` | List tasks with filters |
+| GET | `/boards/{board_name}/tasks` | List tasks with filters and optional `limit`/`offset` pagination |
 | POST | `/boards/{board_name}/tasks` | Create a task |
 | GET | `/tasks/{id}` | Get single task |
 | POST | `/tasks/{id}` | Update task |
