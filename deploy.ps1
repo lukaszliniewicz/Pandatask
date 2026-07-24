@@ -164,7 +164,9 @@ test -f $RemotePluginDirQ/build/main.css
 php -l $RemotePluginDirQ/pandatask.php >/dev/null
 if command -v wp >/dev/null 2>&1; then
     sudo -u iarf -- wp plugin is-active pandatask --path=/home/iarf/htdocs/iarf.net
-    sudo -u iarf -- wp cache flush --path=/home/iarf/htdocs/iarf.net >/dev/null
+    if ! sudo -u iarf -- wp cache flush --path=/home/iarf/htdocs/iarf.net >/dev/null; then
+        echo 'Warning: WordPress object cache could not be flushed; deployment files and plugin activation were verified.' >&2
+    fi
 fi
 "@
     $RemoteVerify = $RemoteVerify -replace "`r`n?", "`n"
