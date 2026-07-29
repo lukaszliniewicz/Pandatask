@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTasks } from '../hooks/useTasks';
+import Icon from './Icon';
 
 const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'multiple', overrideBoardName }) => {
     const [search, setSearch] = useState('');
@@ -69,13 +70,15 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
                 {selectedTasksDisplay.map(task => (
                     <span key={task.id} className="pandat69-selected-user">
                         {task.name} 
-                        <span 
+                        <button
+                            type="button"
                             className="pandat69-remove-user" 
                             onClick={() => mode === 'single' ? handleRemoveSingle() : toggleTask(task.id)}
+                            aria-label={`Remove ${task.name}`}
                             style={{ cursor: 'pointer', marginLeft: '5px' }}
                         >
-                            &times;
-                        </span>
+                            <Icon name="x" size={14} />
+                        </button>
                     </span>
                 ))}
             </div>

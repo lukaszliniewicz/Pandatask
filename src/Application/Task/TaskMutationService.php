@@ -29,6 +29,12 @@ final class TaskMutationService {
     }
 
     public function createTask( $data ) {
+        $data = $this->applyParentProjectInheritance( $data );
+
+        if ( is_wp_error( $data ) ) {
+            return $data;
+        }
+
         $is_recurring = ! empty( $data['is_recurring'] ) ? 1 : 0;
         $task_data    = array(
             'board_name'               => $data['board_name'],
@@ -227,10 +233,10 @@ final class TaskMutationService {
             }
         }
 
-        DatabaseContext::invalidateBoardCache( $task_data['board_name'], array( 'tasks', 'parent_tasks', 'reports' ) );
+        DatabaseContext::invalidateBoardCache( $task_data['board_name'], array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
         delete_transient( 'pandat69_all_board_names' );
 
-        $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons ) );
+        $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons, array( $creator_id ) ) );
 
         foreach ( $all_affected_users as $user_id ) {
             DatabaseContext::invalidateUserCache( (int) $user_id );
@@ -247,6 +253,34 @@ final class TaskMutationService {
         if ( ! $current_task ) {
             return false;
         }
+
+        $data = $this->applyParentProjectInheritance( $data, $current_task );
+
+        if ( is_wp_error( $data ) ) {
+            return $data;
+        }
+
+        $current_project_id = $current_task->project_id ? (int) $current_task->project_id : null;
+        $next_project_id = array_key_exists( 'project_id', $data ) && $data['project_id']
+            ? (int) $data['project_id']
+            : null;
+        $project_is_changing = array_key_exists( 'project_id', $data ) && $next_project_id !== $current_project_id;
+        $next_board_name = $data['board_name'] ?? $current_task->board_name;
+        $board_is_changing = $next_board_name !== $current_task->board_name;
+        $descendant_records = ( $project_is_changing || $board_is_changing )
+            ? $this->task_repository->findDescendantProjectRecords( $task_id, $current_task->board_name )
+            : array();
+
+        if ( $board_is_changing && ! empty( $descendant_records ) ) {
+            return new WP_Error(
+                'pandatask_task_has_children',
+                __( 'Move or detach this task\'s subtasks before changing its board.', 'pandatask' ),
+                array( 'status' => 409 )
+            );
+        }
+
+        $descendant_ids = array_values( array_map( 'intval', wp_list_pluck( $descendant_records, 'id' ) ) );
+        $descendant_user_ids = $this->repository->findParticipantUserIdsForTasks( $descendant_ids );
 
         if ( isset( $data['status'] ) && ( 'in-progress' === $data['status'] || 'done' === $data['status'] ) ) {
             if ( $this->task_repository->isBlocked( $task_id ) ) {
@@ -505,6 +539,33 @@ final class TaskMutationService {
             }
         }
 
+        if ( $project_is_changing && ! empty( $descendant_ids ) ) {
+            if ( ! $this->repository->updateProjectForTasks( $descendant_ids, $next_project_id ) ) {
+                throw new Exception( 'The descendant project update failed.' );
+            }
+
+            foreach ( $descendant_records as $descendant ) {
+                $old_project_id = $descendant->project_id ? (int) $descendant->project_id : null;
+
+                if ( $old_project_id === $next_project_id ) {
+                    continue;
+                }
+
+                if (
+                    ! $this->history_service->addEntry(
+                        $descendant->id,
+                        $actor_id,
+                        'project_id',
+                        $old_project_id ?: '',
+                        $next_project_id ?: '',
+                        __( 'Inherited from the parent task project.', 'pandatask' )
+                    )
+                ) {
+                    throw new Exception( 'The descendant project history update failed.' );
+                }
+            }
+        }
+
         if ( ! DatabaseContext::commit() ) {
             throw new Exception( 'The task database update could not be committed.' );
         }
@@ -515,10 +576,14 @@ final class TaskMutationService {
         }
 
         DatabaseContext::invalidateTaskCache( $task_id );
-        DatabaseContext::invalidateBoardCache( $current_task->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
+        DatabaseContext::invalidateBoardCache( $current_task->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
+
+        foreach ( $descendant_ids as $descendant_id ) {
+            DatabaseContext::invalidateTaskCache( $descendant_id );
+        }
 
         if ( isset( $update_data['board_name'] ) && $update_data['board_name'] !== $current_task->board_name ) {
-            DatabaseContext::invalidateBoardCache( $update_data['board_name'], array( 'tasks', 'parent_tasks', 'reports' ) );
+            DatabaseContext::invalidateBoardCache( $update_data['board_name'], array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
         }
 
         $attachment_result = ProtectedAttachmentService::syncTask( $task_id );
@@ -563,7 +628,14 @@ final class TaskMutationService {
             isset( $data['assigned_persons'] ) ? $data['assigned_persons'] : ( $current_task->assigned_user_ids ?? array() ),
             isset( $data['supervisor_persons'] ) ? $data['supervisor_persons'] : ( $current_task->supervisor_user_ids ?? array() )
         );
-        $all_affected_users = array_unique( array_merge( $old_users, $new_users ) );
+        $all_affected_users = array_unique(
+            array_merge(
+                $old_users,
+                $new_users,
+                $descendant_user_ids,
+                array( (int) ( $current_task->creator_id ?? 0 ) )
+            )
+        );
 
         foreach ( $all_affected_users as $user_id ) {
             DatabaseContext::invalidateUserCache( (int) $user_id );
@@ -687,7 +759,19 @@ final class TaskMutationService {
                 $this->history_service->addEntry( $task_id, get_current_user_id(), 'recurring_instance_skipped', 'Skipped instance for ' . $task_to_delete->start_date );
 
                 DatabaseContext::invalidateTaskCache( $task_id );
-                DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
+                DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
+
+                foreach (
+                    array_unique(
+                        array_merge(
+                            $task_to_delete->assigned_user_ids ?? array(),
+                            $task_to_delete->supervisor_user_ids ?? array(),
+                            array( (int) ( $task_to_delete->creator_id ?? 0 ) )
+                        )
+                    ) as $user_id
+                ) {
+                    DatabaseContext::invalidateUserCache( (int) $user_id );
+                }
 
                 return true;
             }
@@ -720,12 +804,13 @@ final class TaskMutationService {
 
         DatabaseContext::invalidateTaskCache( $task_id );
         ProtectedAttachmentService::deleteTaskFiles( $task_id );
-        DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
+        DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
 
         $all_affected_users = array_unique(
             array_merge(
                 ! empty( $task_to_delete->assigned_user_ids ) ? $task_to_delete->assigned_user_ids : array(),
-                ! empty( $task_to_delete->supervisor_user_ids ) ? $task_to_delete->supervisor_user_ids : array()
+                ! empty( $task_to_delete->supervisor_user_ids ) ? $task_to_delete->supervisor_user_ids : array(),
+                array( (int) ( $task_to_delete->creator_id ?? 0 ) )
             )
         );
 
@@ -870,6 +955,31 @@ final class TaskMutationService {
                 BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $actor_id, $role );
             }
         }
+    }
+
+    private function applyParentProjectInheritance( $data, $current_task = null ) {
+        $parent_task_id = array_key_exists( 'parent_task_id', $data )
+            ? (int) $data['parent_task_id']
+            : (int) ( $current_task->parent_task_id ?? 0 );
+
+        if ( $parent_task_id <= 0 ) {
+            return $data;
+        }
+
+        $parent = $this->task_repository->findHierarchyRecordById( $parent_task_id );
+        $target_board = $data['board_name'] ?? ( $current_task->board_name ?? '' );
+
+        if ( ! $parent || $parent->board_name !== $target_board ) {
+            return new WP_Error(
+                'pandatask_invalid_parent',
+                __( 'The selected parent task is invalid for this board.', 'pandatask' ),
+                array( 'status' => 422 )
+            );
+        }
+
+        $data['project_id'] = $parent->project_id ?: null;
+
+        return $data;
     }
 
     private function updateTaskRoleAssignments( $task_id, $user_ids, $role = 'assignee' ) {

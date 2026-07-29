@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { parseDate } from '../utils';
+import Icon from './Icon';
 
 const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
     const { days, taskRows, gridHeight } = useMemo(() => {
@@ -113,7 +114,7 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
                                 onClick={(e) => { e.stopPropagation(); onTaskClick(tInfo.task); }}
                             >
                                 <span className="pandat69-task-bar-text">
-                                    {tInfo.task.is_recurring == 1 && <span className="dashicons dashicons-update"></span>}
+                                    {tInfo.task.is_recurring == 1 && <Icon name="refresh" size={13} />}
                                     {tInfo.task.name}
                                 </span>
                             </div>

@@ -3,14 +3,18 @@ import { useProjects } from '../hooks/useProjects';
 import { useProjectMutations } from '../hooks/useProjectMutations';
 import { useTasks } from '../hooks/useTasks';
 import TaskList from './TaskList';
-import { escapeHtml } from '../utils';
+import Icon from './Icon';
 
-const ProjectsView = ({ onEditProject, onTaskAction }) => {
-    const { data: projects, isLoading: isLoadingProjects } = useProjects();
+const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
+    const { data: projects, isLoading: isLoadingProjects } = useProjects(undefined, { privateOnly });
     const { deleteProject } = useProjectMutations();
     
     // Fetch tasks that don't belong to any project
-    const { data: noProjectTasks, isLoading: isLoadingTasks } = useTasks({ project: 'none', archived: false });
+    const { data: noProjectTasks, isLoading: isLoadingTasks } = useTasks({
+        project: 'none',
+        archived: false,
+        onlyMyTasks: privateOnly,
+    });
 
     const handleDelete = async (id) => {
         if (confirm('Are you sure you want to delete this project? Tasks will be unassigned.')) {
@@ -28,10 +32,11 @@ const ProjectsView = ({ onEditProject, onTaskAction }) => {
         <div className="pandat69-projects-view">
             <div className="pandat69-header-actions">
                 <button 
+                    type="button"
                     className="pandat69-button pandat69-add-project-btn"
                     onClick={() => onEditProject(null)}
                 >
-                    <span className="dashicons dashicons-plus"></span> Add Project
+                    <Icon name="plus" /> Add Project
                 </button>
             </div>
 
@@ -41,25 +46,39 @@ const ProjectsView = ({ onEditProject, onTaskAction }) => {
                         <li key={project.id} className="pandat69-project-list-item">
                             <div className="pandat69-project-item-header">
                                 <div className="pandat69-project-item-header-main">
-                                    <h4>{project.name}</h4>
+                                    <div className="pandat69-project-title-row">
+                                        <h4>{project.name}</h4>
+                                        {project.board_scope === 'group' && (
+                                            <span className="pandat69-project-source-badge">
+                                                <Icon name="users" size={14} />
+                                                {project.board_display_name}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p>{project.description}</p>
                                 </div>
-                                <div className="pandat69-project-item-actions">
-                                    <button 
-                                        className="pandat69-icon-button pandat69-edit-project-btn" 
-                                        title="Edit Project"
-                                        onClick={() => onEditProject(project)}
-                                    >
-                                        <span className="dashicons dashicons-edit"></span>
-                                    </button>
-                                    <button 
-                                        className="pandat69-icon-button pandat69-delete-project-btn" 
-                                        title="Delete Project"
-                                        onClick={() => handleDelete(project.id)}
-                                    >
-                                        <span className="dashicons dashicons-trash"></span>
-                                    </button>
-                                </div>
+                                {project.can_manage !== false && (
+                                    <div className="pandat69-project-item-actions">
+                                        <button
+                                            type="button"
+                                            className="pandat69-icon-button pandat69-edit-project-btn"
+                                            title="Edit Project"
+                                            aria-label={`Edit project ${project.name}`}
+                                            onClick={() => onEditProject(project)}
+                                        >
+                                            <Icon name="pencil" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="pandat69-icon-button pandat69-delete-project-btn"
+                                            title="Delete Project"
+                                            aria-label={`Delete project ${project.name}`}
+                                            onClick={() => handleDelete(project.id)}
+                                        >
+                                            <Icon name="trash" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             <div className="pandat69-project-item-body">
                                 <div className="pandat69-detail-item">

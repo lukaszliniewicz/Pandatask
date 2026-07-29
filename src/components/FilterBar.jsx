@@ -2,9 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useProjects } from '../hooks/useProjects';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import Icon from './Icon';
 
 const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSubtaskToggle, onToggleSubtasks, allSubtasksExpanded }) => {
-    const { data: projects } = useProjects();
+    const { boardName } = useConfig();
+    const isUserBoard = boardName?.startsWith('user_');
+    const { data: projects } = useProjects(undefined, {
+        privateOnly: isUserBoard && filters.onlyMyTasks,
+    });
     const [search, setSearch] = useState(filters.search || '');
     const debouncedSearch = useDebouncedValue(search);
 
@@ -36,17 +41,22 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     className={`pandat69-icon-button ${value && value !== '' && value !== 'name_asc' ? 'active' : ''}`} 
                     onClick={() => setOpen(!open)}
                     title={title}
+                    aria-label={title}
+                    aria-expanded={open}
+                    aria-haspopup="menu"
                 >
-                    <span className={`dashicons ${icon}`}></span>
+                    <Icon name={icon} />
                 </button>
                 {open && (
-                    <div className="pandat69-filter-dropdown">
+                    <div className="pandat69-filter-dropdown" role="menu">
                         {options.map(opt => (
                             <button
                                 type="button"
                                 key={opt.value} 
                                 className={`pandat69-filter-item ${value === opt.value ? 'selected' : ''}`}
                                 onClick={() => { onChange(opt.value); setOpen(false); }}
+                                role="menuitemradio"
+                                aria-checked={value === opt.value}
                             >
                                 {opt.label}
                             </button>
@@ -64,6 +74,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     type="text" 
                     className="pandat69-input pandat69-search-input" 
                     placeholder="Search tasks..." 
+                    aria-label="Search tasks"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
@@ -72,7 +83,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
             <div className="pandat69-filter-group-right">
                 {/* Sorting Icon */}
                 <Dropdown 
-                    icon="dashicons-sort" 
+                    icon="arrow-down-up"
                     title="Sort Tasks"
                     value={filters.sort}
                     onChange={(val) => onFilterChange('sort', val)}
@@ -86,7 +97,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
 
                 {/* Status Filter Icon */}
                 <Dropdown 
-                    icon="dashicons-filter" 
+                    icon="list-filter"
                     title="Filter by Status"
                     value={filters.status}
                     onChange={(val) => onFilterChange('status', val)}
@@ -119,8 +130,10 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                             className={`pandat69-icon-button ${allSubtasksExpanded ? 'active' : ''}`}
                             onClick={onToggleSubtasks}
                             title={allSubtasksExpanded ? "Collapse Subtasks" : "Expand Subtasks"}
+                            aria-label={allSubtasksExpanded ? "Collapse subtasks" : "Expand subtasks"}
+                            aria-pressed={allSubtasksExpanded}
                         >
-                            <span className="dashicons dashicons-editor-indent"></span>
+                            <Icon name="list-tree" />
                         </button>
                     </div>
                 )}
@@ -131,10 +144,11 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                             type="checkbox" 
                             checked={filters.onlyMyTasks}
                             onChange={(e) => onFilterChange('onlyMyTasks', e.target.checked)}
+                            aria-label={isUserBoard ? 'Show private-board items only' : 'Show my assigned tasks only'}
                         />
                         <span className="pandat69-slider pandat69-round"></span>
                     </label>
-                    <span className="pandat69-toggle-label">Mine</span>
+                    <span className="pandat69-toggle-label">{isUserBoard ? 'Private only' : 'Mine'}</span>
                 </div>
             </div>
         </div>

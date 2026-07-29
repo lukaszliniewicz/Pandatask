@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import Modal from './Modal';
+import Icon from './Icon';
 
 const TaskForm = lazy(() => import('./TaskForm'));
 
@@ -110,11 +111,12 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
                 onMouseDown={handleMouseDown}
             >
                 <button 
+                    type="button"
                     className="pandat69-floating-btn"
                     onClick={handleClick}
                     title="Report a bug"
                 >
-                    <span className="dashicons dashicons-code-standards"></span>
+                    <Icon name="bug" />
                 </button>
             </div>
 

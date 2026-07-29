@@ -50,7 +50,7 @@ class TaskBoardShortcode {
         $this->enqueue_assets();
 
         $attributes = sprintf(
-            'id="pandat69-container-%1$s" data-board-name="%1$s" data-is-user-board="%2$s"',
+            'id="pandat69-container-%1$s" data-pandatask-board-root data-board-name="%1$s" data-is-user-board="%2$s"',
             esc_attr($board_name),
             $is_user_board ? 'true' : 'false'
         );
@@ -63,7 +63,7 @@ class TaskBoardShortcode {
         }
         
         // Output clean container for React to mount into
-        return '<div class="pandat69-container pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask" data-iarf-product="pandatask" data-iarf-app="pandatask" data-iarf-plugin="pandatask" data-iarf-product-kind="react-plugin" ' . $attributes . '></div>';
+        return '<div class="pandat69-mount pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask" data-iarf-product="pandatask" data-iarf-app="pandatask" data-iarf-plugin="pandatask" data-iarf-product-kind="react-plugin" ' . $attributes . '></div>';
     }
 
     private function enqueue_assets() {

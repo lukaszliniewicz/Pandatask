@@ -6,11 +6,14 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.11';
+    private const DB_VERSION = '1.0.13';
 
     public static function activate() {
         self::createTables();
-        update_option( 'pandat69_db_version', self::DB_VERSION );
+
+        if ( self::repairProjectInheritance() ) {
+            update_option( 'pandat69_db_version', self::DB_VERSION );
+        }
     }
 
     public static function createTables() {
@@ -196,6 +199,125 @@ final class DatabaseLifecycle {
             $wpdb->query( "ALTER TABLE $table_tasks ADD COLUMN notify_days_before INT UNSIGNED NOT NULL DEFAULT 3" );
         }
 
-        update_option( 'pandat69_db_version', self::DB_VERSION );
+        if ( self::repairProjectInheritance() ) {
+            update_option( 'pandat69_db_version', self::DB_VERSION );
+        }
+    }
+
+    public static function repairProjectInheritance() {
+        global $wpdb;
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $assignments_table = DatabaseContext::getDbPrefix() . 'assignments';
+        $history_table = DatabaseContext::getDbPrefix() . 'task_history';
+        $mismatches = $wpdb->get_results(
+            "SELECT child.id, child.board_name
+             FROM {$tasks_table} child
+             LEFT JOIN {$tasks_table} parent ON parent.id = child.parent_task_id
+             WHERE child.parent_task_id IS NOT NULL
+             AND (
+                 parent.id IS NULL
+                 OR child.board_name <> parent.board_name
+                 OR NOT (child.project_id <=> parent.project_id)
+             )"
+        );
+
+        if ( empty( $mismatches ) ) {
+            return true;
+        }
+
+        $board_names = array_values( array_unique( array_filter( wp_list_pluck( $mismatches, 'board_name' ) ) ) );
+        $board_placeholders = implode( ', ', array_fill( 0, count( $board_names ), '%s' ) );
+        $task_ids = array_values(
+            array_filter(
+                array_map(
+                    'absint',
+                    $wpdb->get_col(
+                        $wpdb->prepare(
+                            "SELECT id FROM {$tasks_table} WHERE board_name IN ({$board_placeholders})",
+                            ...$board_names
+                        )
+                    )
+                )
+            )
+        );
+        $task_ids_sql = implode( ',', $task_ids );
+        $user_ids = empty( $task_ids )
+            ? array()
+            : $wpdb->get_col(
+                "SELECT DISTINCT user_id
+                 FROM {$assignments_table}
+                 WHERE task_id IN ({$task_ids_sql})
+                 UNION
+                 SELECT DISTINCT user_id
+                 FROM {$history_table}
+                 WHERE task_id IN ({$task_ids_sql})
+                 AND field_changed = 'task_created'"
+            );
+
+        $detached = $wpdb->query(
+            "UPDATE {$tasks_table} child
+             LEFT JOIN {$tasks_table} parent ON parent.id = child.parent_task_id
+             SET child.parent_task_id = NULL,
+                 child.updated_at = UTC_TIMESTAMP()
+             WHERE child.parent_task_id IS NOT NULL
+             AND (
+                 parent.id IS NULL
+                 OR child.board_name <> parent.board_name
+             )"
+        );
+
+        if ( false === $detached ) {
+            return false;
+        }
+
+        for ( $pass = 0; $pass < 100; $pass++ ) {
+            $updated = $wpdb->query(
+                "UPDATE {$tasks_table} child
+                 INNER JOIN {$tasks_table} parent ON parent.id = child.parent_task_id
+                 SET child.project_id = parent.project_id,
+                     child.updated_at = UTC_TIMESTAMP()
+                 WHERE child.board_name = parent.board_name
+                 AND NOT (child.project_id <=> parent.project_id)"
+            );
+
+            if ( false === $updated ) {
+                return false;
+            }
+
+            if ( 0 === $updated ) {
+                break;
+            }
+        }
+
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$tasks_table} child
+             LEFT JOIN {$tasks_table} parent ON parent.id = child.parent_task_id
+             WHERE child.parent_task_id IS NOT NULL
+             AND (
+                 parent.id IS NULL
+                 OR child.board_name <> parent.board_name
+                 OR NOT (child.project_id <=> parent.project_id)
+             )"
+        );
+
+        if ( $remaining > 0 ) {
+            return false;
+        }
+
+        foreach ( $task_ids as $task_id ) {
+            DatabaseContext::invalidateTaskCache( $task_id );
+        }
+
+        foreach ( $board_names as $board_name ) {
+            DatabaseContext::invalidateBoardCache( $board_name, array( 'tasks', 'projects', 'reports' ) );
+        }
+
+        foreach ( array_unique( array_map( 'absint', (array) $user_ids ) ) as $user_id ) {
+            DatabaseContext::invalidateUserCache( $user_id );
+        }
+
+        return true;
     }
 }

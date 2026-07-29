@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useConfig } from '../context/ConfigContext';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { parseDate } from '../utils';
+import Icon from './Icon';
 
 const TaskItem = ({ task, onAction }) => {
-    const { isStandalone } = useConfig();
     const { updateTask } = useTaskMutations();
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [showDescription, setShowDescription] = useState(false);
@@ -62,7 +61,7 @@ const TaskItem = ({ task, onAction }) => {
             <div className="pandat69-task-item-details">
                 {isSubtask && (
                     <div className="pandat69-subtask-indicator">
-                        <span className="dashicons dashicons-subdirectory"></span>
+                        <Icon name="corner-down-right" />
                     </div>
                 )}
                 
@@ -70,7 +69,7 @@ const TaskItem = ({ task, onAction }) => {
                     <a href="#" className="pandat69-view-task-link" onClick={(e) => handleAction('view', e)}>
                         {isRecurring && (
                             <span className="pandat69-recurring-label">
-                                <span className="dashicons dashicons-update"></span> Recurring
+                                <Icon name="refresh" size={15} /> Recurring
                             </span>
                         )}
                         {task.name}
@@ -137,10 +136,10 @@ const TaskItem = ({ task, onAction }) => {
             <div className="pandat69-task-item-footer">
                 <div className="pandat69-footer-left">
                     <button type="button" className="pandat69-icon-button pandat69-edit-task-btn" title="Edit Task" onClick={(e) => handleAction('edit', e)}>
-                        <span className="dashicons dashicons-edit"></span>
+                        <Icon name="pencil" />
                     </button>
                     <button type="button" className="pandat69-icon-button pandat69-delete-task-btn" title="Delete Task" onClick={(e) => handleAction('delete', e)}>
-                        <span className="dashicons dashicons-trash"></span>
+                        <Icon name="trash" />
                     </button>
                     
                     {hasDescription && (
@@ -150,34 +149,34 @@ const TaskItem = ({ task, onAction }) => {
                             title={showDescription ? "Hide Description" : "Show Description"} 
                             onClick={(e) => { e.stopPropagation(); setShowDescription(!showDescription); }}
                         >
-                            <span className="dashicons dashicons-editor-alignleft"></span>
+                            <Icon name="align-left" />
                         </button>
                     )}
 
                     {isArchived ? (
                         <button type="button" className="pandat69-icon-button pandat69-unarchive-task-btn" title="Unarchive Task" onClick={(e) => handleAction('unarchive', e)}>
-                            <span className="dashicons dashicons-undo"></span>
+                            <Icon name="undo" />
                         </button>
                     ) : (
                         <button type="button" className="pandat69-icon-button pandat69-archive-task-btn" title="Archive Task" onClick={(e) => handleAction('archive', e)}>
-                            <span className="dashicons dashicons-archive"></span>
+                            <Icon name="archive" />
                         </button>
                     )}
                     
                     {!isSubtask && !isArchived && (
                         <button type="button" className="pandat69-icon-button pandat69-add-subtask-btn" title="Add Subtask" onClick={(e) => handleAction('add-subtask', e)}>
-                            <span className="dashicons dashicons-plus-alt2"></span>
+                            <Icon name="list-plus" />
                         </button>
                     )}
 
                     {!isArchived && task.deadline && (
                         <button type="button" className="pandat69-icon-button pandat69-gcal-export-btn" title="Export to Google Calendar" onClick={(e) => handleAction('gcal-export', e)}>
-                            <span className="dashicons dashicons-calendar-alt"></span>
+                            <Icon name="calendar-plus" />
                         </button>
                     )}
 
                     <button type="button" className="pandat69-icon-button pandat69-show-comments-btn" title="View Details" onClick={(e) => handleAction('view', e)}>
-                        <span className="dashicons dashicons-admin-comments"></span>
+                        <Icon name="message" />
                     </button>
                 </div>
             </div>

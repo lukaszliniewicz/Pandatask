@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 
 const TABS = [
     { id: 'tasks', label: 'All Tasks' },
@@ -9,10 +10,10 @@ const TABS = [
 ];
 
 const VIEWS = [
-    { id: 'compact', label: 'Compact', icon: 'dashicons-menu' },
-    { id: 'list', label: 'List', icon: 'dashicons-list-view' },
-    { id: 'kanban', label: 'Kanban', icon: 'dashicons-layout' },
-    { id: 'calendar', label: 'Calendar', icon: 'dashicons-calendar-alt' },
+    { id: 'compact', label: 'Compact', icon: 'list-todo' },
+    { id: 'list', label: 'List', icon: 'list' },
+    { id: 'kanban', label: 'Kanban', icon: 'columns' },
+    { id: 'calendar', label: 'Calendar', icon: 'calendar' },
 ];
 
 const ViewSwitcher = ({ currentTab, onTabChange, currentView, onViewChange }) => {
@@ -34,12 +35,14 @@ const ViewSwitcher = ({ currentTab, onTabChange, currentView, onViewChange }) =>
                 <div className="pandat69-view-switcher">
                     {VIEWS.map(view => (
                         <button 
+                            type="button"
                             key={view.id}
                             className={`pandat69-view-btn ${currentView === view.id ? 'active' : ''}`}
                             onClick={() => onViewChange(view.id)}
                             title={`${view.label} View`}
+                            aria-pressed={currentView === view.id}
                         >
-                            <span className={`dashicons ${view.icon}`}></span> {view.label}
+                            <Icon name={view.icon} /> {view.label}
                         </button>
                     ))}
                 </div>

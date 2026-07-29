@@ -1,17 +1,20 @@
 import React from 'react';
 import { useConfig } from '../context/ConfigContext';
+import Icon from './Icon';
 
 const VIEWS = [
-    { id: 'compact', label: 'Compact', icon: 'dashicons-menu' },
-    { id: 'list', label: 'List', icon: 'dashicons-list-view' },
-    { id: 'kanban', label: 'Kanban', icon: 'dashicons-layout' },
-    { id: 'calendar', label: 'Calendar', icon: 'dashicons-calendar-alt' },
+    { id: 'compact', label: 'Compact', icon: 'list-todo' },
+    { id: 'list', label: 'List', icon: 'list' },
+    { id: 'kanban', label: 'Kanban', icon: 'columns' },
+    { id: 'calendar', label: 'Calendar', icon: 'calendar' },
 ];
 
 const Header = ({ 
     onAddTask, 
     onManageCategories, 
     onFullscreen,
+    isFullscreen,
+    fullscreenToggleRef,
     currentView,
     onViewChange,
     toggleSidebar
@@ -32,15 +35,17 @@ const Header = ({
                    Controls the sidebar toggle via prop.
                 */}
                 <button 
+                    type="button"
                     className="pandat69-icon-button pandat69-sidebar-toggle"
                     onClick={toggleSidebar}
                     title="Toggle Sidebar"
+                    aria-label="Toggle project sidebar"
                 >
-                    <span className="dashicons dashicons-menu"></span>
+                    <Icon name="menu" />
                 </button>
 
                 <div className="pandat69-header-title">
-                    {showTitle ? <h2>{displayName}</h2> : <h2 style={{opacity: 0.5}}>Task Board</h2>}
+                    {showTitle ? <h2>{displayName}</h2> : <h2>Task Board</h2>}
                 </div>
             </div>
 
@@ -49,37 +54,49 @@ const Header = ({
                     <span className="pandat69-view-label">View:</span>
                     {VIEWS.map(view => (
                         <button 
+                            type="button"
                             key={view.id}
                             className={`pandat69-icon-button ${currentView === view.id ? 'active' : ''}`}
                             onClick={() => onViewChange(view.id)}
                             title={`${view.label} View`}
+                            aria-label={`${view.label} view`}
+                            aria-pressed={currentView === view.id}
                         >
-                            <span className={`dashicons ${view.icon}`}></span>
+                            <Icon name={view.icon} />
                         </button>
                     ))}
                 </div>
 
                 <div className="pandat69-header-buttons">
                     <button 
+                        type="button"
                         className="pandat69-icon-button pandat69-add-task-btn" 
                         title="Add New Task" 
                         onClick={onAddTask}
+                        aria-label="Add new task"
                     >
-                        <span className="dashicons dashicons-plus"></span>
+                        <Icon name="plus" />
                     </button>
                     <button 
+                        type="button"
                         className="pandat69-icon-button pandat69-manage-categories-btn" 
                         title="Manage Categories"
                         onClick={onManageCategories}
+                        aria-label="Manage categories"
                     >
-                        <span className="dashicons dashicons-tag"></span>
+                        <Icon name="tags" />
                     </button>
                     <button 
+                        type="button"
+                        ref={fullscreenToggleRef}
                         className="pandat69-icon-button pandat69-fullscreen-btn" 
-                        title="Fullscreen Mode" 
+                        title={isFullscreen ? 'Exit Full View' : 'Full View'}
                         onClick={onFullscreen}
+                        aria-label={isFullscreen ? 'Exit full view' : 'Open full view'}
+                        aria-pressed={isFullscreen}
+                        data-pandatask-viewport-toggle
                     >
-                        <span className="dashicons dashicons-fullscreen-alt"></span>
+                        <Icon name={isFullscreen ? 'minimize' : 'maximize'} />
                     </button>
                 </div>
             </div>

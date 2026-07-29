@@ -68,10 +68,9 @@
 	top: -4px;
 	color: $primary-color;
 
-	.dashicons {
-		font-size: 30px;
-		height: auto;
-		width: auto;
+	.pandat69-icon {
+		width: 24px;
+		height: 24px;
 	}
 }
 
@@ -155,10 +154,9 @@
 	font-weight: 600;
 	margin-right: 5px;
 
-	.dashicons {
-		font-size: 14px;
-		width: auto;
-		height: auto;
+	.pandat69-icon {
+		width: 14px;
+		height: 14px;
 	}
 }
 
@@ -265,8 +263,7 @@
 		position: relative;
 
 		&::after {
-			content: "\f147"; /* dashicons-yes */
-			font-family: dashicons, sans-serif;
+			content: "✓";
 			position: absolute;
 			right: 8px;
 			top: 50%;
@@ -284,13 +281,11 @@
 	align-items: center;
 	gap: 3px;
 
-	.dashicons {
-		font-size: 14px;
+	.pandat69-icon {
+		width: 14px;
+		height: 14px;
 		vertical-align: middle;
 		color: $success-color;
-		width: auto;
-		height: auto;
-		line-height: 1;
 	}
 }
 
@@ -433,8 +428,7 @@
 		align-items: center;
 		gap: 4px;
 
-		.dashicons {
-			font-size: 14px;
+		.pandat69-icon {
 			width: 14px;
 			height: 14px;
 			vertical-align: middle;
@@ -497,11 +491,9 @@
 		color: #333;
 	}
 
-	.dashicons {
-		font-size: 18px;
+	.pandat69-icon {
 		width: 18px;
 		height: 18px;
-		line-height: 1;
 	}
 }
 
@@ -538,23 +530,21 @@
 		box-shadow: none !important;
 		text-transform: none !important;
 
-		.dashicons {
+		.pandat69-icon {
 			margin-right: 12px !important;
 			margin-left: 0 !important;
-			font-size: 18px !important;
 			width: 18px !important;
 			height: 18px !important;
 			text-align: center !important;
 			color: #666 !important;
 			display: inline-block !important;
-			line-height: 1 !important;
 		}
 
 		&:hover {
 			background-color: #f5f5f5 !important;
 			color: #000 !important;
 
-			.dashicons {
+			.pandat69-icon {
 				color: #333 !important;
 			}
 		}
@@ -568,7 +558,7 @@
 				background: #fff0f0 !important;
 			}
 
-			.dashicons {
+			.pandat69-icon {
 				color: #d63638 !important;
 			}
 		}

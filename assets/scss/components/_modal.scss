@@ -12,7 +12,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	z-index: 150000;
+	z-index: var(--pandatask-modal-z, 2147483600);
 	opacity: 0;
 	visibility: hidden;
 	transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -33,7 +33,7 @@
 	width: 100%;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.75);
-	z-index: 1000000;
+	z-index: 0;
 }
 
 .pandat69-modal-container {
@@ -46,7 +46,7 @@
 	background-color: $white;
 	border-radius: $border-radius;
 	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-	z-index: 1000001;
+	z-index: 1;
 	display: flex;
 	flex-direction: column;
 
@@ -96,7 +96,7 @@
 	font-weight: 700;
 	color: $primary-color;
 	cursor: pointer;
-	z-index: 1000002;
+	z-index: 2;
 	width: 30px;
 	height: 30px;
 	display: flex;
@@ -195,7 +195,7 @@ body.pandat69-modal-open {
 	display: none;
 	align-items: center;
 	justify-content: center;
-	z-index: 150001;
+	z-index: calc(var(--pandatask-modal-z, 2147483600) + 1);
 
 	&.active {
 		display: flex;

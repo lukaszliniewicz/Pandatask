@@ -67,6 +67,52 @@ final class TaskCommandRepository {
         return $wpdb->update( $tasks_table, $update_data, array( 'id' => $task_id ), $format, array( '%d' ) );
     }
 
+    public function updateProjectForTasks( $task_ids, $project_id ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_filter( array_map( 'absint', (array) $task_ids ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return true;
+        }
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $task_ids_sql = implode( ',', $task_ids );
+        $project_sql = $project_id ? (string) absint( $project_id ) : 'NULL';
+
+        return false !== $wpdb->query(
+            "UPDATE {$tasks_table}
+             SET project_id = {$project_sql}, updated_at = UTC_TIMESTAMP()
+             WHERE id IN ({$task_ids_sql})"
+        );
+    }
+
+    public function findParticipantUserIdsForTasks( $task_ids ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_filter( array_map( 'absint', (array) $task_ids ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return array();
+        }
+
+        $assignments_table = DatabaseContext::getDbPrefix() . 'assignments';
+        $history_table = DatabaseContext::getDbPrefix() . 'task_history';
+        $task_ids_sql = implode( ',', $task_ids );
+        $user_ids = $wpdb->get_col(
+            "SELECT user_id
+             FROM {$assignments_table}
+             WHERE task_id IN ({$task_ids_sql})"
+            . " UNION
+                SELECT user_id
+                FROM {$history_table}
+                WHERE task_id IN ({$task_ids_sql})
+                AND field_changed = 'task_created'"
+        );
+
+        return array_values( array_filter( array_map( 'absint', (array) $user_ids ) ) );
+    }
+
     public function deleteTaskAssignments( $task_id ) {
         global $wpdb;
 

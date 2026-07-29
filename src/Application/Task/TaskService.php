@@ -88,6 +88,10 @@ final class TaskService {
         return $this->repository->findAccessRecordById( (int) $task_id );
     }
 
+    public function getTaskHierarchyRecord( $task_id ) {
+        return $this->repository->findHierarchyRecordById( (int) $task_id );
+    }
+
     public function isTaskOnBoard( $task_id, $board_name ) {
         return $this->repository->existsOnBoard( $task_id, $board_name );
     }

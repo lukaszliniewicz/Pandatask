@@ -122,8 +122,9 @@
 			color: $danger-color;
 		}
 
-		.dashicons {
-			font-size: 16px;
+		.pandat69-icon {
+			width: 16px;
+			height: 16px;
 		}
 	}
 }
@@ -236,8 +237,7 @@
 		color: #333;
 	}
 
-	.dashicons {
-		font-size: 16px;
+	.pandat69-icon {
 		width: 16px;
 		height: 16px;
 	}
@@ -260,13 +260,11 @@
 		align-items: center;
 
 		/* Apply indent fix here specifically if the icon is direct child */
-		.dashicons-subdirectory-arrow-right {
+		.pandat69-icon[data-pandatask-icon="corner-down-right"] {
 			margin-right: 4px;
-			font-size: 14px;
 			width: 14px;
 			height: 14px;
 			color: #aaa;
-			line-height: 1;
 		}
 	}
 }
@@ -294,8 +292,7 @@
 	width: 20px;
 	height: 20px;
 
-	.dashicons {
-		font-size: 18px;
+	.pandat69-icon {
 		width: 18px;
 		height: 18px;
 	}

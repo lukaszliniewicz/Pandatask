@@ -6,6 +6,7 @@
  */
 
 use Pandatask\Http\Rest\V1\Support\RequestHelper;
+use Pandatask\Application\Project\ProjectService;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
 
@@ -91,7 +92,8 @@ $admins = get_users(
 if ( empty( $admins ) ) {
     $failures[] = 'No administrator account was available for the repository performance probe.';
 } else {
-    wp_set_current_user( (int) $admins[0]->ID );
+    $admin_id = (int) $admins[0]->ID;
+    wp_set_current_user( $admin_id );
 
     $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
     $board_name  = $wpdb->get_var(
@@ -125,6 +127,48 @@ if ( empty( $admins ) ) {
             $failures[] = 'The largest board task REST request did not return a task collection.';
         }
     }
+
+    $project_query_start = $wpdb->num_queries;
+    $project_time_start  = microtime( true );
+    $workspace_projects  = ( new ProjectService() )->getProjects( 'user_' . $admin_id );
+    $workspace_ids       = array_map( 'intval', wp_list_pluck( $workspace_projects, 'id' ) );
+
+    $result['personal_workspace_projects'] = array(
+        'user_id'       => $admin_id,
+        'projects'      => count( $workspace_projects ),
+        'group_projects' => count(
+            array_filter(
+                $workspace_projects,
+                static function ( $project ) {
+                    return 'group' === ( $project->board_scope ?? '' );
+                }
+            )
+        ),
+        'queries'       => $wpdb->num_queries - $project_query_start,
+        'ms'            => round( ( microtime( true ) - $project_time_start ) * 1000, 1 ),
+        'duplicate_ids' => count( $workspace_ids ) - count( array_unique( $workspace_ids ) ),
+    );
+
+    if ( $result['personal_workspace_projects']['duplicate_ids'] > 0 ) {
+        $failures[] = 'The personal workspace returned a project more than once.';
+    }
+}
+
+$tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+$result['hierarchy_invalid_links'] = (int) $wpdb->get_var(
+    "SELECT COUNT(*)
+     FROM {$tasks_table} child
+     LEFT JOIN {$tasks_table} parent ON parent.id = child.parent_task_id
+     WHERE child.parent_task_id IS NOT NULL
+     AND (
+         parent.id IS NULL
+         OR child.board_name <> parent.board_name
+         OR NOT (child.project_id <=> parent.project_id)
+     )"
+);
+
+if ( $result['hierarchy_invalid_links'] > 0 ) {
+    $failures[] = 'An orphaned, cross-board, or project-mismatched subtask remains after the schema repair.';
 }
 
 $index_requirements = array(
@@ -180,8 +224,8 @@ if ( ! empty( $missing_assets ) ) {
     $failures[] = 'Missing packaged assets: ' . implode( ', ', $missing_assets );
 }
 
-if ( '1.0.12' !== $result['plugin_version'] || '1.0.11' !== $result['db_version'] ) {
-    $failures[] = 'Plugin version is not 1.0.12 or database version is not 1.0.11.';
+if ( '1.0.13' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
+    $failures[] = 'Plugin and database versions are not both 1.0.13.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

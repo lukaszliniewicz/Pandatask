@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import Icon from './Icon';
 
 const openModals = [];
 const focusableSelector = [
@@ -98,7 +99,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
                             onClick={onClose}
                             aria-label="Close modal"
                         >
-                            &times;
+                            <Icon name="x" />
                         </button>
                     </div>
                     <div className="pandat69-modal-body">

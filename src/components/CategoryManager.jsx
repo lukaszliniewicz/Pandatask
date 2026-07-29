@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCategories } from '../hooks/useCategories';
 import { useCategoryMutations } from '../hooks/useCategoryMutations';
+import Icon from './Icon';
 
 const CategoryManager = () => {
     const { data: categories, isLoading } = useCategories();
@@ -44,7 +45,7 @@ const CategoryManager = () => {
                                     onClick={() => handleDelete(cat.id)}
                                     title="Delete Category"
                                 >
-                                    &times;
+                                    <Icon name="trash" size={16} />
                                 </button>
                             </li>
                         ))

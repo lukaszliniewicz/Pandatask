@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.12
+**Version:** 1.0.13
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -56,6 +56,10 @@ There are also five tabs in the main navigation:
 | Archive | Archived tasks with unarchive/delete actions |
 | Report | Statistical report for a selected period |
 
+The header's full-view control expands the current board in place above the
+WordPress/theme shell. It retains the selected tab, view, filters, and query
+cache; press Escape or the Minimize control to return.
+
 ---
 
 ## Task Model
@@ -74,7 +78,7 @@ Each task has these fields:
 | `deadline` | date (YYYY-MM-DD) | Absolute deadline |
 | `deadline_days_after_start` | integer | Relative deadline: N days after start date. Mutually exclusive with fixed deadline. |
 | `category_id` | integer | Reference to a board category |
-| `project_id` | integer | Reference to a board project |
+| `project_id` | integer | Reference to a board project; subtasks always inherit the parent's project |
 | `parent_task_id` | integer | Makes this task a child (subtask) of another task |
 | `predecessors` | array of integers | Task IDs that must finish before this one can start |
 | `is_recurring` | boolean | Whether the task is a recurring template |
@@ -99,7 +103,7 @@ From the task list or detail modal:
 
 - **View details** – Opens a modal with full metadata, description, subtasks list, comment thread, and collapsible audit log.
 - **Edit** – Pre-filled modal form with three tabs (General, Schedule & Rules, People & Files).
-- **Add subtask** – Opens the task form with `parent_task_id` pre-set.
+- **Add subtask** – Opens the task form with `parent_task_id` pre-set. The server assigns the parent's project even if a client submits a conflicting project. A parent task with descendants cannot be moved to another board until those descendants are moved or detached.
 - **Delete** – Confirms then removes the task and its assignments, comments, and history.
 - **Archive / Unarchive** – Toggles the `archived` flag.
 - **Change status** – Click the status pill/badge to open an inline dropdown.
@@ -150,6 +154,12 @@ Projects group tasks within a board. Each project has a name, description, optio
 The project sidebar lists all projects; clicking one filters the task list to that project. The sidebar also shows task counts per project and has an "Unassigned" filter for tasks without a project.
 
 The Projects tab shows a full project list with inline tasks, plus a "Tasks without a project" section at the bottom.
+
+On a personal profile taskboard, projects from the user's enabled BuddyPress
+group boards appear alongside private projects and show their source group.
+The **Private only** filter removes group tasks and projects together. Project
+mutation controls are shown only when the viewer can manage the source board.
+Changing a parent task's project updates all descendants atomically.
 
 ---
 
@@ -266,9 +276,13 @@ Every mutation supports local preflight through per-call `dry_run`; `PANDATASK_D
 
 ---
 
-## Full-Screen Mode
+## Full View and Compatibility Route
 
-Adds a virtual page at `/pandatask-fullscreen/?board_name=...` via a WordPress rewrite rule. The template renders the board without any theme chrome. Permission checks are enforced for BuddyPress group boards.
+The board header provides a state-preserving in-page full view that portals above
+theme, admin-bar, and Network stacking contexts. The legacy
+`/pandatask-fullscreen/?board_name=...` route remains available for bookmarks.
+It applies the canonical board-access policy, sends no-cache headers, and is
+marked `noindex, nofollow, noarchive`.
 
 ---
 
@@ -353,6 +367,25 @@ Cache versioning uses WordPress transients suffixed with incrementing integers, 
 ## JavaScript API
 
 The plugin exposes `window.Pandatask.mountBoard(container, props)` for external React integration. Props: `boardName`, `apiSettings`, `currentUser`.
+
+The mount node is a stable host boundary; the rendered board owns its own
+container, design tokens, Lucide SVG icons, modal/sidebar portals, and scoped
+resets. IARF Network uses this API, but Pandatask has no runtime dependency on
+Network or BuddyPress and remains usable through its shortcode on an ordinary
+WordPress installation.
+
+---
+
+## Changelog
+
+### 1.0.13
+
+- Replace React and WordPress-admin Dashicons with a tree-shakeable Lucide icon boundary and accessible icon controls.
+- Isolate standalone shortcode styling, remove host-global compatibility rules, and add state-preserving full-viewport mode above host UI.
+- Enforce same-board parent-project inheritance on REST, batch, and direct mutations; cascade project changes to descendants, reject unsafe parent board moves, and repair legacy mismatches/orphan links on upgrade.
+- Show enabled group projects in personal workspaces with source labels, permission-aware controls, and a private-only filter.
+- Keep project summaries cache-correct after task mutations and replace truncation-prone task aggregation with bounded indexed queries.
+- Harden the legacy fullscreen route with canonical access checks, private caching headers, and search-engine exclusion.
 
 ---
 

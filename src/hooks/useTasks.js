@@ -27,7 +27,12 @@ export const useTasks = ( filters = {}, overrideBoardName ) => {
 				params.append( 'project_filter', filters.project );
 			}
 			if ( filters.onlyMyTasks ) {
-				params.append( 'assigned_to_me', 'true' );
+				params.append(
+					activeBoard.startsWith( 'user_' )
+						? 'private_only'
+						: 'assigned_to_me',
+					'true'
+				);
 			}
 			if ( filters.archived ) {
 				params.append( 'archived', '1' );

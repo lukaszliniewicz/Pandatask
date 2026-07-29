@@ -1,6 +1,6 @@
-import React, { lazy, Suspense, useEffect, useState, useMemo } from 'react';
+import React, { lazy, Suspense, useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Header from './Header';
-import ViewSwitcher from './ViewSwitcher';
 import FilterBar from './FilterBar';
 import TaskList from './TaskList';
 import CompactListView from './CompactListView';
@@ -35,6 +35,8 @@ const Layout = () => {
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isRecurringDeleteModalOpen, setIsRecurringDeleteModalOpen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const fullscreenToggleRef = useRef(null);
     
     // State for modal content
     const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -77,17 +79,39 @@ const Layout = () => {
     const { deleteTask, updateTask } = useTaskMutations();
 
     const { boardName } = useConfig();
+    const isUserBoard = boardName?.startsWith('user_');
 
-    // FIX: Implement Fullscreen Redirection
     const handleFullscreen = () => {
-        const params = new URLSearchParams();
-        params.append('board_name', boardName);
-
-        const siteUrl = window.pandatask_api_settings?.home_url || '/';
-        const baseUrl = siteUrl.replace(/\/$/, '');
-
-        window.location.href = `${baseUrl}/pandatask-fullscreen/?${params.toString()}`;
+        setIsFullscreen((isActive) => !isActive);
     };
+
+    useEffect(() => {
+        if (!isFullscreen) return undefined;
+
+        document.body.classList.add('pandat69-viewport-open');
+
+        const handleKeyDown = (event) => {
+            if (event.key !== 'Escape' || document.querySelector('.pandat69-react-modal.active')) {
+                return;
+            }
+
+            event.preventDefault();
+            setIsFullscreen(false);
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            window.requestAnimationFrame(() => {
+                if (!document.querySelector('.pandat69-viewport-shell')) {
+                    document.body.classList.remove('pandat69-viewport-open');
+                }
+
+                fullscreenToggleRef.current?.focus();
+            });
+        };
+    }, [isFullscreen]);
     
     // Filter State
     const [filters, setFilters] = useState({
@@ -112,7 +136,11 @@ const Layout = () => {
     const { data: tasks, isLoading, isError, error } = useTasks(activeFilters);
 
     const handleFilterChange = (key, value) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
+        setFilters(prev => ({
+            ...prev,
+            [key]: value,
+            ...(isUserBoard && key === 'onlyMyTasks' && value ? { project: 'all' } : {}),
+        }));
     };
 
     const handleAddTask = () => {
@@ -165,7 +193,10 @@ const Layout = () => {
             setEditingTask(task);
             setIsTaskModalOpen(true);
         } else if (action === 'add-subtask') {
-            setTaskFormDefaults({ parent_task_id: taskId });
+            setTaskFormDefaults({
+                parent_task_id: taskId,
+                project_id: task.project_id || '',
+            });
             setEditingTask(null);
             setIsTaskModalOpen(true);
         } else if (action === 'gcal-export') {
@@ -204,8 +235,11 @@ const Layout = () => {
         }
     };
 
-    const handleAddSubtask = (parentId) => {
-        setTaskFormDefaults({ parent_task_id: parentId });
+    const handleAddSubtask = (parentId, projectId = '') => {
+        setTaskFormDefaults({
+            parent_task_id: parentId,
+            project_id: projectId || '',
+        });
         setEditingTask(null);
         setIsDetailModalOpen(false);
         setIsTaskModalOpen(true);
@@ -223,12 +257,17 @@ const Layout = () => {
 
     const toggleSidebar = () => setIsSidebarOpen((isOpen) => !isOpen);
 
-    return (
-        <div className="pandat69-container">
+    const board = (
+        <div
+            className={`pandat69-container ${isFullscreen ? 'pandat69-viewport-shell' : ''}`}
+            data-pandatask-viewport={isFullscreen ? 'active' : 'inline'}
+        >
             <Header 
                 onAddTask={handleAddTask} 
                 onManageCategories={handleManageCategories}
                 onFullscreen={handleFullscreen}
+                isFullscreen={isFullscreen}
+                fullscreenToggleRef={fullscreenToggleRef}
                 currentView={currentView}
                 onViewChange={setCurrentView}
                 toggleSidebar={toggleSidebar}
@@ -247,6 +286,7 @@ const Layout = () => {
                     onTabChange={setCurrentTab}
                     currentView={currentView}
                     onViewChange={setCurrentView}
+                    privateOnly={isUserBoard && filters.onlyMyTasks}
                 />
 
                 <div className="pandat69-main-content">
@@ -315,7 +355,11 @@ const Layout = () => {
                             )}
 
                             {currentTab === 'projects' && (
-                                <ProjectsView onEditProject={handleEditProject} onTaskAction={handleTaskAction} />
+                                <ProjectsView
+                                    onEditProject={handleEditProject}
+                                    onTaskAction={handleTaskAction}
+                                    privateOnly={isUserBoard && filters.onlyMyTasks}
+                                />
                             )}
 
                             {currentTab === 'archive' && (
@@ -399,6 +443,8 @@ const Layout = () => {
             />
         </div>
     );
+
+    return isFullscreen ? createPortal(board, document.body) : board;
 };
 
 export default Layout;

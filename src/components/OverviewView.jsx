@@ -3,6 +3,7 @@ import TimelineCalendar from './TimelineCalendar';
 import MonthCalendar from './MonthCalendar';
 import { getMonday, formatDisplayDate, generateFutureOccurrences } from '../utils';
 import { useTasks } from '../hooks/useTasks';
+import Icon from './Icon';
 
 const OverviewView = ({ onTaskAction }) => {
     const [period, setPeriod] = useState('week'); // 'week' or 'month'
@@ -87,9 +88,9 @@ const OverviewView = ({ onTaskAction }) => {
             </div>
 
             <div className="pandat69-date-selector">
-                <button className="pandat69-button" onClick={handlePrev}>◀ Previous</button>
+                <button type="button" className="pandat69-button" onClick={handlePrev}><Icon name="chevron-left" /> Previous</button>
                 <span className="pandat69-current-week-display" style={{ fontWeight: 'bold' }}>{displayString}</span>
-                <button className="pandat69-button" onClick={handleNext}>Next ▶</button>
+                <button type="button" className="pandat69-button" onClick={handleNext}>Next <Icon name="chevron-right" /></button>
             </div>
 
             <div className="pandat69-overview-content" style={{ marginTop: '20px' }}>

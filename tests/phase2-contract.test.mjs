@@ -34,13 +34,16 @@ test('Pandatask exposes a plugin-owned token bridge', () => {
 	assert.match(variables, /--pandatask-font-family:\s*var\(--iarf-font-body/);
 });
 
-test('Pandatask shortcode keeps legacy mount selector and adds root alias', () => {
+test('Pandatask shortcode uses a dedicated mount boundary and IARF aliases', () => {
 	const shortcode = fs.readFileSync(path.join(repoRoot, 'src/Frontend/TaskBoardShortcode.php'), 'utf8');
 	const frontend = fs.readFileSync(path.join(repoRoot, 'src/Bootstrap/FrontendRegistrar.php'), 'utf8');
 	const entry = fs.readFileSync(path.join(repoRoot, 'src/index.jsx'), 'utf8');
 
-	assert.match(shortcode, /pandat69-container pandat69-root/);
+	assert.match(shortcode, /pandat69-mount pandat69-root/);
+	assert.match(shortcode, /data-pandatask-board-root/);
 	assert.match(shortcode, /pandat69-bug-tracker-container pandat69-root/);
+	assert.match(entry, /querySelectorAll\('\[data-pandatask-board-root\]'\)/);
+	assert.match(entry, /classList\.remove\('pandat69-container', 'pandat69-viewport-shell'\)/);
 	for (const source of [shortcode, frontend, entry]) {
 		assert.match(source, /iarf-app--pandatask/);
 		assert.match(source, /iarf-plugin--pandatask/);
@@ -63,11 +66,16 @@ test('Pandatask frontend CSS includes a scoped coexistence contract', () => {
 	assert.match(coexistence, /\.pandat69-root :where\(button, input, select, textarea\)/);
 	assert.match(coexistence, /\.pandat69-button,/);
 	assert.match(coexistence, /\.pandat69-icon-button,/);
-	assert.match(coexistence, /\.pandat69-root :where\(\.dashicons\)/);
+	assert.match(coexistence, /\.pandat69-icon/);
+	assert.match(coexistence, /UI lists/);
 	assert.match(base, /font-family:\s*var\(--pandatask-ui-font-family/);
 	assert.match(base, /color:\s*var\(--pandatask-primary/);
 	assert.doesNotMatch(coexistence, /--iarf-color-primary\s*:/);
 	assert.doesNotMatch(coexistence, /--iarf-font-body\s*:/);
+
+	const forms = fs.readFileSync(path.join(repoRoot, 'assets/scss/base/_forms.scss'), 'utf8');
+	assert.doesNotMatch(forms, /^\.nice-select/m);
+	assert.doesNotMatch(forms, /^\.mce-/m);
 });
 
 test('Pandatask registers assets globally but only enqueues on owned surfaces', () => {
@@ -123,16 +131,94 @@ test('Pandatask registers assets globally but only enqueues on owned surfaces', 
 	assert.match(profileTasks, /AssetRegistrar::enqueueFrontendAssetHandles\(\)/);
 });
 
-test('Pandatask does not depend on external icon packages', () => {
+test('Pandatask uses an explicit Lucide icon boundary without Dashicons', () => {
 	const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 	const shortcode = fs.readFileSync(path.join(repoRoot, 'src/Frontend/TaskBoardShortcode.php'), 'utf8');
 	const assets = fs.readFileSync(path.join(repoRoot, 'src/Bootstrap/AssetRegistrar.php'), 'utf8');
 	const assetManifest = fs.readFileSync(path.join(repoRoot, 'build/main.asset.php'), 'utf8');
+	const icon = fs.readFileSync(path.join(repoRoot, 'src/components/Icon.jsx'), 'utf8');
+	const componentSources = fs
+		.readdirSync(path.join(repoRoot, 'src/components'))
+		.filter((file) => file.endsWith('.jsx'))
+		.map((file) => fs.readFileSync(path.join(repoRoot, 'src/components', file), 'utf8'))
+		.join('\n');
+	const scssSources = fs
+		.readdirSync(path.join(repoRoot, 'assets/scss'), { recursive: true })
+		.filter((file) => file.endsWith('.scss'))
+		.map((file) => fs.readFileSync(path.join(repoRoot, 'assets/scss', file), 'utf8'))
+		.join('\n');
 
+	assert.equal(packageJson.dependencies['lucide-react'], '^1.27.0');
+	assert.match(icon, /from 'lucide-react'/);
+	assert.doesNotMatch(icon, /import\s+\*\s+as/);
+	assert.doesNotMatch(componentSources, /dashicons/i);
+	assert.doesNotMatch(scssSources, /dashicons/i);
 	assert.doesNotMatch(JSON.stringify(packageJson), /@fortawesome|font-awesome|fontawesome/i);
 	assert.doesNotMatch(shortcode, /font-awesome|fontawesome|fortawesome/i);
 	assert.doesNotMatch(assets, /font-awesome|fontawesome|fortawesome/i);
 	assert.doesNotMatch(assetManifest, /font-awesome|fontawesome|fortawesome/i);
+});
+
+test('Pandatask full view is state-preserving, host-covering, and modal-safe', () => {
+	const layout = fs.readFileSync(path.join(repoRoot, 'src/components/Layout.jsx'), 'utf8');
+	const base = fs.readFileSync(path.join(repoRoot, 'assets/scss/base/_base.scss'), 'utf8');
+	const modal = fs.readFileSync(path.join(repoRoot, 'assets/scss/components/_modal.scss'), 'utf8');
+	const sidebar = fs.readFileSync(path.join(repoRoot, 'assets/scss/components/_sidebar.scss'), 'utf8');
+
+	assert.match(layout, /createPortal\(board, document\.body\)/);
+	assert.match(layout, /pandat69-viewport-open/);
+	assert.match(layout, /pandat69-viewport-shell/);
+	assert.match(layout, /event\.key !== 'Escape'/);
+	assert.match(base, /z-index:\s*var\(--pandatask-viewport-z,\s*2147483000\)/);
+	assert.match(modal, /--pandatask-modal-z,\s*2147483600/);
+	assert.match(sidebar, /--pandatask-sidebar-z,\s*2147483400/);
+	assert.match(sidebar, /position:\s*fixed/);
+});
+
+test('Personal workspaces aggregate group projects with a private-only escape hatch', () => {
+	const service = fs.readFileSync(path.join(repoRoot, 'src/Application/Project/ProjectService.php'), 'utf8');
+	const repository = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Persistence/ProjectRepository.php'), 'utf8');
+	const route = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/ProjectRouteHandler.php'), 'utf8');
+	const hook = fs.readFileSync(path.join(repoRoot, 'src/hooks/useProjects.js'), 'utf8');
+
+	assert.match(service, /getUserWritableBoards\(\s*\$user_id\s*\)/);
+	assert.match(service, /findForUserWorkspace/);
+	assert.match(service, /board_scope/);
+	assert.match(repository, /findForUserWorkspace/);
+	assert.match(repository, /EXISTS \(\s*SELECT 1 FROM .*assignments/s);
+	assert.doesNotMatch(repository, /GROUP_CONCAT\(DISTINCT CONCAT\(t\./);
+	assert.match(route, /private_only/);
+	assert.match(hook, /private_only/);
+});
+
+test('Subtask projects are authoritative, cascaded, and repaired on upgrade', () => {
+	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');
+	const mutations = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskMutationService.php'), 'utf8');
+	const lifecycle = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Setup/DatabaseLifecycle.php'), 'utf8');
+
+	assert.match(handler, /applyParentProjectInheritance/);
+	assert.match(handler, /\$data\['project_id'\]\s*=\s*\$parent->project_id/);
+	assert.match(mutations, /findDescendantProjectRecords/);
+	assert.match(mutations, /updateProjectForTasks/);
+	assert.match(mutations, /Inherited from the parent task project/);
+	assert.match(mutations, /pandatask_task_has_children/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.13'/);
+	assert.match(lifecycle, /repairProjectInheritance/);
+	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
+	assert.match(lifecycle, /child\.board_name <> parent\.board_name/);
+	assert.match(lifecycle, /SET child\.parent_task_id = NULL/);
+});
+
+test('Legacy fullscreen compatibility route enforces policy and blocks indexing', () => {
+	const frontend = fs.readFileSync(path.join(repoRoot, 'src/Bootstrap/FrontendRegistrar.php'), 'utf8');
+	const template = fs.readFileSync(path.join(repoRoot, 'templates/fullscreen-template.php'), 'utf8');
+
+	assert.match(frontend, /BoardAccessPolicy/);
+	assert.match(frontend, /canReadBoard/);
+	assert.match(frontend, /X-Robots-Tag: noindex, nofollow, noarchive/);
+	assert.match(frontend, /nocache_headers/);
+	assert.match(template, /true === \$pandatask_fullscreen_access/);
+	assert.doesNotMatch(template, /any logged-in user can see non-group boards/);
 });
 
 test('Pandatask protects task attachments without web-server-specific delivery', () => {

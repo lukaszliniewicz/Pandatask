@@ -21,7 +21,15 @@ final class ProjectRouteHandler {
     }
 
     public function get_projects( $request ) {
-        return new WP_REST_Response( array( 'projects' => $this->project_service->getProjects( $request['board_name'] ) ), 200 );
+        $private_only = 'true' === (string) $request->get_param( 'private_only' )
+            || true === $request->get_param( 'private_only' );
+
+        return new WP_REST_Response(
+            array(
+                'projects' => $this->project_service->getProjects( $request['board_name'], $private_only ),
+            ),
+            200
+        );
     }
 
     public function get_project( $request ) {

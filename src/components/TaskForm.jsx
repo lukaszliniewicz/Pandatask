@@ -9,6 +9,7 @@ import { useUserBoards } from '../hooks/useUserBoards';
 import UserSelect from './UserSelect';
 import TaskSelect from './TaskSelect';
 import AttachmentControl from './AttachmentControl';
+import Icon from './Icon';
 import ReasonModal from './ReasonModal';
 
 const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValues = {} }) => {
@@ -43,7 +44,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
             start_date: task?.start_date || '',
             deadline: task?.deadline || '',
             deadline_days_after_start: task?.deadline_days_after_start || '',
-            project_id: task?.project_id || '',
+            project_id: task?.project_id || defaultValues.project_id || '',
             category_id: task?.category_id || '',
             assigned_persons: initialAssigned,
             supervisor_persons: task?.supervisor_user_ids?.map(id => parseInt(id, 10)) || [],
@@ -76,6 +77,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
     const notifyDeadline = watch('notify_deadline');
     const isRecurring = watch('is_recurring');
     const recurrenceFrequency = watch('recurrence_frequency');
+    const parentTaskId = watch('parent_task_id');
 
     // Context Cleanup: If board changes, clear context-specific data
     useEffect(() => {
@@ -245,10 +247,15 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                     <div className="pandat69-form-row">
                         <div className="pandat69-form-field pandat69-form-field-half">
                             <label>Project</label>
-                            <select className="pandat69-select" {...register('project_id')}>
+                            <select className="pandat69-select" {...register('project_id')} disabled={!!parentTaskId}>
                                 <option value="">-- No Project --</option>
                                 {projects?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
+                            {parentTaskId && (
+                                <p className="pandat69-field-hint">
+                                    This subtask inherits its parent task&apos;s project.
+                                </p>
+                            )}
                         </div>
                         <div className="pandat69-form-field pandat69-form-field-half">
                             <label>Category</label>
@@ -258,7 +265,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                                         <option value="">-- No Category --</option>
                                         {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
-                                    <button type="button" className="pandat69-button" onClick={() => setShowCategoryInput(true)} title="New Category" style={{ padding: '0 10px' }}>+</button>
+                                    <button type="button" className="pandat69-button" onClick={() => setShowCategoryInput(true)} title="New Category" aria-label="New category" style={{ padding: '0 10px' }}><Icon name="plus" /></button>
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', gap: '5px' }}>
@@ -271,8 +278,8 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                                             setNewCategoryName('');
                                             setValue('category_id', newCat.id);
                                         } catch(e) { alert('Error creating category'); }
-                                    }}>✓</button>
-                                    <button type="button" className="pandat69-button pandat69-button-danger" onClick={() => setShowCategoryInput(false)}>&times;</button>
+                                    }} aria-label="Create category"><Icon name="check" /></button>
+                                    <button type="button" className="pandat69-button pandat69-button-danger" onClick={() => setShowCategoryInput(false)} aria-label="Cancel category creation"><Icon name="x" /></button>
                                 </div>
                             )}
                         </div>
@@ -449,12 +456,12 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                     <div>
                         {activeTab !== 'general' && (
                             <button type="button" className="pandat69-button" onClick={() => setActiveTab(activeTab === 'people' ? 'schedule' : 'general')} style={{marginRight: '10px'}}>
-                                &laquo; Previous
+                                <Icon name="chevron-left" /> Previous
                             </button>
                         )}
                         {activeTab !== 'people' && (
                             <button type="button" className="pandat69-button" onClick={() => setActiveTab(activeTab === 'general' ? 'schedule' : 'people')}>
-                                Next &raquo;
+                                Next <Icon name="chevron-right" />
                             </button>
                         )}
                     </div>

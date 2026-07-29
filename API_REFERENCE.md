@@ -81,7 +81,7 @@ If you are an AI agent or building an automation script, follow these best pract
 -   **Response Example:**
     ```json
     {
-        "plugin_version": "1.0.12",
+        "plugin_version": "1.0.13",
         "today": "2026-07-24",
         "now": "2026-07-24T12:30:00+02:00",
         "timezone": "Europe/Warsaw",
@@ -216,8 +216,8 @@ Fields available when creating or updating tasks.
 | `supervisor_persons` | Array[Int] | IDs of supervisor users |
 | `predecessors` | Array[Int] | IDs of tasks this task depends on |
 | `category_id` | Integer | ID of category |
-| `project_id` | Integer | ID of project |
-| `parent_task_id` | Integer | ID of parent task (for subtask hierarchy) |
+| `project_id` | Integer | ID of project. For a subtask, the server always replaces this with the parent task's project. |
+| `parent_task_id` | Integer | ID of a same-board parent task. Changing a parent task's project cascades to all descendants; a task with descendants cannot change boards until they are moved or detached. |
 | `is_recurring` | Boolean | `true` if this is a recurring template |
 | `recurrence_frequency`| String | `weekly`, `monthly`, `custom_weekly` |
 | `recurrence_interval` | Integer | e.g., `1` for every week, `2` for bi-weekly |
@@ -451,14 +451,32 @@ Fields available when creating or updating tasks.
 ### 1. Get Projects for a Board
 
 -   **Endpoint:** `GET /boards/{board_name}/projects`
--   **Description:** Retrieves all projects associated with a board.
+-   **Description:** Retrieves all projects associated with a board. For a personal `user_{ID}` workspace, the default response also includes projects from enabled BuddyPress groups the user belongs to.
+-   **Query Parameters:**
+    -   `private_only` (boolean, optional): On a personal workspace, return only projects stored on the user's private board.
 -   **Permissions:** User must have read access to the board.
 -   **Response Example:**
     ```json
     {
         "projects": [
-            { "id": 1, "board_name": "project_alpha", "name": "Release 2.0", "description": "", "deadline": null, "assigned_user_ids": [], "supervisor_user_ids": [] },
-            { "id": 2, "board_name": "project_alpha", "name": "Internal Tools", "description": "Tooling for the team", "deadline": "2025-12-01", "assigned_user_ids": ["5"], "supervisor_user_ids": ["1"] }
+            {
+                "id": 1,
+                "board_name": "user_5",
+                "board_display_name": "My Tasks",
+                "board_scope": "private",
+                "can_manage": true,
+                "name": "Personal planning",
+                "tasks": []
+            },
+            {
+                "id": 2,
+                "board_name": "group_10",
+                "board_display_name": "Developers",
+                "board_scope": "group",
+                "can_manage": false,
+                "name": "Release 2.0",
+                "tasks": [{ "id": 42, "name": "Review release notes" }]
+            }
         ]
     }
     ```

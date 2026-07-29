@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { formatDate, parseDate } from '../utils';
+import Icon from './Icon';
 
 const MonthCalendar = ({ tasks, currentDate, onTaskClick }) => {
     const year = currentDate.getFullYear();
@@ -150,7 +151,7 @@ const MonthCalendar = ({ tasks, currentDate, onTaskClick }) => {
                                         >
                                             {isStart && (
                                                 <span className="pandat69-task-name">
-                                                    {span.task.is_recurring == 1 && <span className="dashicons dashicons-update"></span>}
+                                                    {span.task.is_recurring == 1 && <Icon name="refresh" size={13} />}
                                                     {span.task.name}
                                                 </span>
                                             )}

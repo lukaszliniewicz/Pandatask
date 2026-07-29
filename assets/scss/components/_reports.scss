@@ -102,22 +102,23 @@
 	color: $secondary-color;
 	margin-top: 4px;
 
-	.dashicons {
+	.pandat69-icon {
 		margin-right: 5px;
 		width: 14px;
+		height: 14px;
 		text-align: center;
 		vertical-align: middle;
 	}
 }
 
 /* Color coding for icons */
-.pandat69-report-section:nth-of-type(1) .pandat69-report-item-meta .dashicons {
+.pandat69-report-section:nth-of-type(1) .pandat69-report-item-meta .pandat69-icon {
 	color: $success-color;
 } /* Added */
-.pandat69-report-section:nth-of-type(2) .pandat69-report-item-meta .dashicons {
+.pandat69-report-section:nth-of-type(2) .pandat69-report-item-meta .pandat69-icon {
 	color: $info-color;
 } /* Completed */
-.pandat69-report-section:nth-of-type(3) .pandat69-report-item-meta .dashicons {
+.pandat69-report-section:nth-of-type(3) .pandat69-report-item-meta .pandat69-icon {
 	color: $danger-color;
 } /* Missed */
 
@@ -145,9 +146,11 @@
 	padding-top: 6px;
 	border-top: 1px dashed $border-color;
 
-	.dashicons {
+	.pandat69-icon {
 		vertical-align: middle;
 		margin-right: 5px;
 		color: #6c757d;
+		width: 14px;
+		height: 14px;
 	}
 }

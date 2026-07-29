@@ -272,6 +272,17 @@ final class RouteRegistrar {
                     'methods'             => WP_REST_Server::READABLE,
                     'callback'            => array( $this->project_route_handler, 'get_projects' ),
                     'permission_callback' => array( $this->permission_checker, 'check_board_read_permission' ),
+                    'args'                => array(
+                        'board_name'   => array(
+                            'required' => true,
+                            'type'     => 'string',
+                        ),
+                        'private_only' => array(
+                            'description' => __( 'For personal workspaces, restrict projects to the private board.', 'pandatask' ),
+                            'type'        => 'boolean',
+                            'default'     => false,
+                        ),
+                    ),
                 ),
                 array(
                     'methods'             => WP_REST_Server::CREATABLE,

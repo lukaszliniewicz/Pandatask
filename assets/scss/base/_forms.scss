@@ -36,12 +36,9 @@ button.pandat69-icon-button {
 	min-width: 30px;
 	min-height: 30px;
 
-	.dashicons {
-		font-size: 20px;
-		line-height: 1;
-		height: auto;
-		width: auto;
-		vertical-align: middle;
+	.pandat69-icon {
+		width: 20px;
+		height: 20px;
 	}
 }
 
@@ -147,30 +144,11 @@ textarea.pandat69-textarea {
 	}
 }
 
-/* TinyMCE Specific Styles */
-.mce-tinymce {
-	border: 1px solid #ccc !important;
-}
-
-.mce-panel {
-	background-color: #f7f7f7 !important;
-	border-color: #ccc !important;
-}
-
-.mce-btn {
-	background-color: transparent !important;
-	border-color: transparent !important;
-
-	&:hover,
-	&:focus {
-		background-color: #eee !important;
-		border-color: #ccc !important;
-	}
-}
-
-.mce-toolbar .mce-btn button {
-	padding: 4px !important;
-	color: $primary-color !important;
+.pandat69-field-hint {
+	margin: 6px 0 0;
+	color: $secondary-color;
+	font-size: 12px;
+	line-height: 1.4;
 }
 
 /* Fixed Select Styles to Prevent NiceSelect Conflicts */
@@ -216,9 +194,11 @@ select.pandat69-select,
 	}
 }
 
-/* Hide any NiceSelect elements completely */
-.nice-select,
-.nice-select.open {
+/* Hide only theme-generated NiceSelect clones inside Pandatask. */
+.pandat69-container .nice-select,
+.pandat69-container .nice-select.open,
+.pandat69-react-modal .nice-select,
+.pandat69-react-modal .nice-select.open {
 	display: none !important;
 	width: 0 !important;
 	height: 0 !important;
@@ -242,9 +222,14 @@ select.pandat69-select,
 	margin-right: 10px;
 
 	input {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
 		opacity: 0;
-		width: 0;
-		height: 0;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		cursor: pointer;
 	}
 }
 
@@ -274,8 +259,8 @@ select.pandat69-select,
 	background-color: $primary-color;
 }
 
-.pandat69-switch input:focus + .pandat69-slider {
-	box-shadow: 0 0 1px $primary-color;
+.pandat69-switch input:focus-visible + .pandat69-slider {
+	box-shadow: var(--pandatask-ui-focus-ring, 0 0 0 3px rgba(34, 113, 177, 0.25));
 }
 
 .pandat69-switch input:checked + .pandat69-slider::before {

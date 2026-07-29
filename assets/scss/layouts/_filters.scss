@@ -69,11 +69,9 @@
 		background-color: $light-bg;
 	}
 
-	.dashicons {
-		font-size: 20px;
+	.pandat69-icon {
 		width: 20px;
 		height: 20px;
-		line-height: 1;
 	}
 }
 
@@ -115,8 +113,7 @@
 			position: relative;
 
 			&::after {
-				content: "\f147"; /* dashicons-yes */
-				font-family: dashicons, sans-serif;
+				content: "✓";
 				position: absolute;
 				right: 10px;
 				top: 50%;

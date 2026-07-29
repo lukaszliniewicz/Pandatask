@@ -25,8 +25,7 @@
 			padding: 4px 10px;
 			border-radius: 4px;
 
-			.dashicons {
-				font-size: 16px;
+			.pandat69-icon {
 				width: 16px;
 				height: 16px;
 			}
@@ -129,7 +128,7 @@
 				font-weight: 600;
 			}
 
-			.dashicons {
+			.pandat69-icon {
 				color: #bbb;
 			}
 		}
@@ -289,12 +288,13 @@
 			color: $primary-color;
 		}
 
-		.dashicons {
-			font-size: 18px;
+		.pandat69-icon {
+			width: 18px;
+			height: 18px;
 			transition: transform 0.3s;
 		}
 
-		&.open .dashicons {
+		&.open > .pandat69-icon {
 			transform: rotate(180deg);
 		}
 	}
@@ -343,8 +343,7 @@
 		}
 
 		&::after {
-			content: "\f140";
-			font-family: dashicons, sans-serif;
+			content: "⌄";
 			position: absolute;
 			right: 8px;
 			top: 50%;

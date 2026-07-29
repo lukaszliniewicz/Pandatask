@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.12
+Stable tag: 1.0.13
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -21,18 +21,18 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 *   **Multiple boards** – Each shortcode instance with a unique `board_name` creates a separate board with its own tasks, categories, and projects.
 *   **Four view modes** – Compact list (with subtask tree and drag-and-drop reparenting), full list (with inline actions), Kanban (drag between columns), and monthly calendar.
 *   **Five tabs** – All Tasks, Projects (grouped task view), Overview (week/month timeline), Archive (soft-deleted tasks), Report (per-period statistics).
-*   **Task hierarchy** – Tasks can have parent-child relationships (subtasks). Drag a task onto another to make it a child.
+*   **Task hierarchy** – Tasks can have same-board parent-child relationships (subtasks). Subtasks inherit the parent's project, including descendant cascades when the project changes; parent board moves are blocked until children are moved or detached.
 *   **Task dependencies** – Tasks can list predecessors. A task is blocked until all predecessors are done. Completing a task auto-starts its successors.
 *   **Recurring tasks** – Weekly, bi-weekly, custom weekdays, or monthly. A daily cron rolls over completed instances to the next occurrence.
 *   **Deadline management** – Fixed dates or relative duration (days after start). Per-task deadline reminders with configurable lead time.
 *   **User roles** – Assignees (responsible) and supervisors (oversight). Both receive notifications.
 *   **Categories** – Named groupings scoped to each board, manageable from the board header or inline in the task form.
-*   **Projects** – Named groupings that cross-cut categories. The project sidebar filters the task list; the Projects tab shows a full overview with inline tasks.
+*   **Projects** – Named groupings that cross-cut categories. Personal workspaces include enabled group projects by default and offer a private-only filter.
 *   **Comments with @mentions** – Autocomplete user search, email and BuddyPress notifications for mentions.
 *   **Attachments** – Upload via the WordPress media library or attach an external URL.
 *   **Audit log** – Every field change is recorded. Multiple rapid changes are aggregated into a single history entry with a digest email.
 *   **Google Calendar export** – One-click export of task deadlines to Google Calendar.
-*   **Full-screen mode** – Visit `/pandatask-fullscreen/?board_name=...` for a distraction-free board view.
+*   **Full view** – Expand the current board above the WordPress/theme shell without losing state; the protected legacy fullscreen URL remains available for bookmarks.
 *   **Floating bug reporter** – A draggable button (configurable visibility: logged-in, logged-out, everyone, or off) that opens a bug submission form pre-filled with the current URL and system info.
 *   **Bug tracker shortcode** – `[pandatask_bug_tracker board_name="..."]` renders a standalone bug list and submission form.
 *   **Reports** – Tab showing tasks added, completed, and missed deadlines for configurable periods, plus workload distribution per user.
@@ -95,6 +95,14 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.13 =
+
+* Replace interface Dashicons with Lucide SVG icons and accessible controls.
+* Isolate shortcode styling from host themes and add a state-preserving full-viewport board above host UI.
+* Enforce same-board parent-project inheritance, cascade project changes to descendants, reject unsafe parent board moves, and repair legacy mismatch/orphan links on upgrade.
+* Include enabled group projects in personal workspaces with source labels, permission-aware controls, and a private-only filter.
+* Keep project summaries cache-correct and harden the legacy fullscreen route against unauthorized access, caching, and indexing.
 
 = 1.0.12 =
 

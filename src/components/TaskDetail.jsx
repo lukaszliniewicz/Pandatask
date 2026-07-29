@@ -5,6 +5,7 @@ import { useTaskHistory } from '../hooks/useTaskHistory';
 import { useCommentMutations } from '../hooks/useCommentMutations';
 import MentionTextarea from './MentionTextarea';
 import StatusBadge from './StatusBadge';
+import Icon from './Icon';
 import { formatDisplayDate, parseDate, parseUtcDateTime } from '../utils';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
@@ -149,7 +150,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                     </ul>
                     {entry.change_comment && (
                         <div className="history-comment">
-                            <span className="dashicons dashicons-format-quote"></span> {entry.change_comment}
+                            <Icon name="quote" size={15} /> {entry.change_comment}
                         </div>
                     )}
                 </div>
@@ -194,7 +195,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                 <div className="pandat69-breadcrumbs">
                     {task.parent_task_id && task.parent_task_name ? (
                         <>
-                            <span className="dashicons dashicons-arrow-up-alt2"></span>
+                            <Icon name="arrow-up" size={15} />
                             <span className="clickable" onClick={() => handleNavigate(task.parent_task_id)} style={{cursor:'pointer', textDecoration:'underline'}}>
                                 Parent: {task.parent_task_name}
                             </span>
@@ -204,7 +205,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                     
                     {task.project_name ? (
                         <>
-                            <span className="dashicons dashicons-portfolio"></span> 
+                            <Icon name="folder" size={15} />
                             <strong>{task.project_name}</strong> 
                         </>
                     ) : (
@@ -219,8 +220,8 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                 <div className="pandat69-title-wrapper" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '5px'}}>
                     <div style={{display:'flex', alignItems:'center', gap:'10px', width: '100%'}}>
                         <h2 style={{margin: 0}}>{task.name}</h2>
-                        <button className="pandat69-icon-button-clean" onClick={() => onEdit(task)} title="Edit Details">
-                            <span className="dashicons dashicons-edit"></span>
+                        <button type="button" className="pandat69-icon-button-clean" onClick={() => onEdit(task)} title="Edit Details">
+                            <Icon name="pencil" />
                         </button>
                     </div>
                     <div className="pandat69-status-wrapper" style={{marginTop: '5px'}}>
@@ -244,14 +245,14 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                 <div className="pandat69-meta-box">
                     <label>Priority</label>
                     <div className="val">
-                        <span className="dashicons dashicons-star-filled" style={{color: task.priority>7?'#e9b44c':'#ccc'}}></span>
+                        <Icon name="star" style={{color: task.priority > 7 ? '#e9b44c' : '#ccc'}} />
                         {task.priority}
                     </div>
                 </div>
                 <div className="pandat69-meta-box">
                     <label>Deadline</label>
                     <div className={`val ${task.deadline && parseDate(task.deadline) < new Date() && task.status !== 'done' ? 'overdue' : ''}`}>
-                        <span className="dashicons dashicons-calendar-alt"></span>
+                        <Icon name="calendar" />
                         {task.deadline || 'None'}
                     </div>
                 </div>
@@ -266,10 +267,10 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
             {/* Subtasks Section */}
             <div className="pandat69-detail-subtasks">
                 <div className="pandat69-section-header">
-                    <h4><span className="dashicons dashicons-list-view"></span> Subtasks ({subtasks.length})</h4>
+                    <h4><Icon name="list-tree" /> Subtasks ({subtasks.length})</h4>
                     {onAddSubtask && (
-                        <button className="pandat69-button" onClick={() => onAddSubtask(task.id)}>
-                            + Add Subtask
+                        <button type="button" className="pandat69-button" onClick={() => onAddSubtask(task.id, task.project_id)}>
+                            <Icon name="list-plus" /> Add Subtask
                         </button>
                     )}
                 </div>
@@ -339,8 +340,8 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                                             <div className="pandat69-comment-text">{renderCommentText(comment.comment_text)}</div>
                                             {comment.can_manage && (
                                                 <div className="pandat69-comment-actions">
-                                                    <button type="button" className="pandat69-icon-button" onClick={() => startEditComment(comment)}><span className="dashicons dashicons-edit"></span></button>
-                                                    <button type="button" className="pandat69-icon-button pandat69-button-danger" onClick={() => handleDeleteComment(comment.id)}><span className="dashicons dashicons-trash"></span></button>
+                                                    <button type="button" className="pandat69-icon-button" aria-label="Edit comment" onClick={() => startEditComment(comment)}><Icon name="pencil" /></button>
+                                                    <button type="button" className="pandat69-icon-button pandat69-button-danger" aria-label="Delete comment" onClick={() => handleDeleteComment(comment.id)}><Icon name="trash" /></button>
                                                 </div>
                                             )}
                                         </>
@@ -375,8 +376,8 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                     className={`pandat69-history-toggle ${showHistory ? 'open' : ''}`}
                     onClick={() => setShowHistory(!showHistory)}
                 >
-                    <span><span className="dashicons dashicons-backup" style={{verticalAlign:'text-bottom'}}></span> Audit Log & History</span>
-                    <span className="dashicons dashicons-arrow-down-alt2"></span>
+                    <span><Icon name="history" /> Audit Log & History</span>
+                    <Icon name="chevron-down" />
                 </button>
                 
                 {showHistory && (

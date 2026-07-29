@@ -29,7 +29,9 @@ $spacing-unit: 10px;
 .pandat69-root,
 .pandat69-container,
 .pandat69-bug-tracker-container,
-#pandat69-floating-bug-reporter-root {
+#pandat69-floating-bug-reporter-root,
+.pandat69-react-modal,
+.pandat69-project-sidebar.is-mobile {
 	--pandatask-primary: var(--iarf-color-primary, #{$primary-color});
 	--pandatask-secondary: var(--iarf-color-muted, #{$secondary-color});
 	--pandatask-surface: var(--iarf-color-surface, #{$white});
@@ -44,4 +46,8 @@ $spacing-unit: 10px;
 	--pandatask-font-family: var(--iarf-font-body, #{$font-family});
 	--pandatask-radius: var(--iarf-radius-sm, #{$border-radius});
 	--pandatask-spacing-unit: #{$spacing-unit};
+	--pandatask-viewport-z: 2147483000;
+	--pandatask-sidebar-overlay-z: 2147483300;
+	--pandatask-sidebar-z: 2147483400;
+	--pandatask-modal-z: 2147483600;
 }

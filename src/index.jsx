@@ -11,7 +11,12 @@ import '../assets/scss/main.scss';
 const applyPandataskBoundary = (root) => {
     if (!root) return;
 
+    // The mount node is deliberately separate from the application shell. Keeping
+    // `.pandat69-container` on both levels makes host-theme list/layout rules leak
+    // into the nested board and causes duplicated spacing on shortcode pages.
+    root.classList.remove('pandat69-container', 'pandat69-viewport-shell');
     root.classList.add(
+        'pandat69-mount',
         'pandat69-root',
         'iarf-app',
         'iarf-app--pandatask',
@@ -115,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 1. Task Board Shortcode
-    const boardRoots = document.querySelectorAll('.pandat69-container');
+    const boardRoots = document.querySelectorAll('[data-pandatask-board-root]');
     boardRoots.forEach(root => {
         if (!root.dataset.reactMounted) {
             const { boardName } = root.dataset;

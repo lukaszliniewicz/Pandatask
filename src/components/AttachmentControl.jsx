@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Icon from './Icon';
 
 const AttachmentControl = ({ value, onChange }) => {
     const [mode, setMode] = useState('none');
@@ -123,15 +124,16 @@ const AttachmentControl = ({ value, onChange }) => {
             {(value?.url || value?.filename) && mode !== 'none' && (
                 <div className="pandat69-attachment-display" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div className="pandat69-attachment-info" style={{ background: '#fff', padding: '5px 10px', border: '1px solid #ddd', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span className={`dashicons ${value.type === 'file' ? 'dashicons-media-default' : 'dashicons-admin-links'}`}></span>
+                        <Icon name={value.type === 'file' ? 'file' : 'link'} size={16} />
                         <a href={value.url} target="_blank" rel="noopener noreferrer">{value.filename || value.url}</a>
                         <button 
                             type="button" 
                             className="pandat69-remove-attachment-btn" 
                             onClick={handleRemove}
+                            aria-label="Remove attachment"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d63638', marginLeft: '5px' }}
                         >
-                            &times;
+                            <Icon name="x" size={16} />
                         </button>
                     </div>
                 </div>

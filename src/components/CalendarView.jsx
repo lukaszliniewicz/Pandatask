@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import MonthCalendar from './MonthCalendar';
 import { generateFutureOccurrences } from '../utils';
+import Icon from './Icon';
 
 const CalendarView = ({ tasks, onTaskAction }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -38,9 +39,9 @@ const CalendarView = ({ tasks, onTaskAction }) => {
     return (
         <div className="pandat69-view-container pandat69-calendar-view active">
             <div className="pandat69-date-selector">
-                <button className="pandat69-button" onClick={handlePrev}>◀ Previous Month</button>
+                <button type="button" className="pandat69-button" onClick={handlePrev}><Icon name="chevron-left" /> Previous Month</button>
                 <span className="pandat69-current-month-display-tasks">{displayDate}</span>
-                <button className="pandat69-button" onClick={handleNext}>Next Month ▶</button>
+                <button type="button" className="pandat69-button" onClick={handleNext}>Next Month <Icon name="chevron-right" /></button>
             </div>
             <div className="pandat69-month-task-container-tasks">
                 <MonthCalendar 

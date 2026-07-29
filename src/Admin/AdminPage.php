@@ -18,7 +18,7 @@ class AdminPage {
             'manage_options', // Capability required
             'pandatask-ai-assistant',
             array($this, 'render_ai_assistant_page'),
-            'dashicons-superhero', // Icon
+            $this->get_menu_icon(),
             26
         );
 
@@ -30,6 +30,17 @@ class AdminPage {
             'pandatask-settings',
             array($this, 'render_settings_page')
         );
+    }
+
+    /**
+     * Return a compact Lucide ListTodo icon for the WordPress admin menu.
+     *
+     * @return string
+     */
+    private function get_menu_icon() {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>';
+
+        return 'data:image/svg+xml;base64,' . base64_encode( $svg );
     }
 
     public function render_ai_assistant_page() {

@@ -168,8 +168,9 @@ ul.pandat69-bug-list {
 		}
 	}
 
-	.dashicons {
-		font-size: 20px;
+	.pandat69-icon {
+		width: 20px;
+		height: 20px;
 	}
 }
 
@@ -268,11 +269,9 @@ ul.pandat69-bug-list {
 		transform: scale(1.05);
 	}
 
-	.dashicons {
-		font-size: 20px;
-		line-height: 1;
-		width: auto;
-		height: auto;
+	.pandat69-icon {
+		width: 20px;
+		height: 20px;
 	}
 }
 

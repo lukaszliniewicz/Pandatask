@@ -132,6 +132,12 @@ final class TaskRouteHandler {
             return $data;
         }
 
+        $data = $this->applyParentProjectInheritance( $data['board_name'], $data );
+
+        if ( is_wp_error( $data ) ) {
+            return $data;
+        }
+
         $reference_validation = $this->validateTaskReferences( $data['board_name'], $data );
 
         if ( is_wp_error( $reference_validation ) ) {
@@ -174,7 +180,18 @@ final class TaskRouteHandler {
         }
 
         $current_task = $this->task_service->getTask( $id );
+
+        if ( ! $current_task ) {
+            return new WP_Error( 'rest_task_not_found', __( 'Task not found.', 'pandatask' ), array( 'status' => 404 ) );
+        }
+
         $target_board = $data['board_name'] ?? $current_task->board_name;
+        $data = $this->applyParentProjectInheritance( $target_board, $data, $current_task );
+
+        if ( is_wp_error( $data ) ) {
+            return $data;
+        }
+
         $reference_validation = $this->validateTaskReferences( $target_board, $data, $id, $current_task );
 
         if ( is_wp_error( $reference_validation ) ) {
@@ -225,6 +242,12 @@ final class TaskRouteHandler {
             return $task_data;
         }
 
+        $task_data = $this->applyParentProjectInheritance( $task_data['board_name'], $task_data );
+
+        if ( is_wp_error( $task_data ) ) {
+            return $task_data;
+        }
+
         $reference_validation = $this->validateTaskReferences( $task_data['board_name'], $task_data );
 
         if ( is_wp_error( $reference_validation ) ) {
@@ -267,6 +290,12 @@ final class TaskRouteHandler {
         }
 
         $target_board = $task_data['board_name'] ?? $current_task->board_name;
+        $task_data = $this->applyParentProjectInheritance( $target_board, $task_data, $current_task );
+
+        if ( is_wp_error( $task_data ) ) {
+            return $task_data;
+        }
+
         $reference_validation = $this->validateTaskReferences( $target_board, $task_data, $task_id, $current_task );
 
         if ( is_wp_error( $reference_validation ) ) {
@@ -309,6 +338,30 @@ final class TaskRouteHandler {
 
     private function parse_id_list( $input ) {
         return RequestHelper::parseIdList( $input );
+    }
+
+    private function applyParentProjectInheritance( $board_name, $data, $current_task = null ) {
+        $parent_task_id = array_key_exists( 'parent_task_id', $data )
+            ? (int) $data['parent_task_id']
+            : (int) ( $current_task->parent_task_id ?? 0 );
+
+        if ( $parent_task_id <= 0 ) {
+            return $data;
+        }
+
+        $parent = $this->task_service->getTaskHierarchyRecord( $parent_task_id );
+
+        if ( ! $parent || $parent->board_name !== $board_name ) {
+            return new WP_Error(
+                'rest_invalid_reference',
+                __( 'The selected parent task is invalid for this board.', 'pandatask' ),
+                array( 'status' => 422 )
+            );
+        }
+
+        $data['project_id'] = $parent->project_id ?: null;
+
+        return $data;
     }
 
     private function buildTaskCreateData( $board_name, $params ) {

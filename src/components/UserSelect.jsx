@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useUsers } from '../hooks/useUsers';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import Icon from './Icon';
 
 const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
     const [search, setSearch] = useState('');
@@ -40,7 +41,7 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
                             aria-label={`Remove ${user.name}`}
                             style={{ cursor: 'pointer', marginLeft: '5px' }}
                         >
-                            &times;
+                            <Icon name="x" size={14} />
                         </button>
                     </span>
                 ))}

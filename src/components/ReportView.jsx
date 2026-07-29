@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useReports } from '../hooks/useReports';
 import { parseUtcDateTime } from '../utils';
+import Icon from './Icon';
 
 const formatReportDate = (value) => {
     if (!value) return '';
@@ -17,12 +18,12 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
                     <li key={task.id}>
                         <span className="pandat69-report-item-title">{task.name}</span>
                         <div className="pandat69-report-item-meta">
-                            <span className={`dashicons dashicons-${icon}`}></span> {metaPrefix}: {formatReportDate(task.created_at || task.completed_at || task.deadline)}
+                            <Icon name={icon} size={15} /> {metaPrefix}: {formatReportDate(task.created_at || task.completed_at || task.deadline)}
                             {showOverdue && ` (${task.days_overdue} days overdue)`}
                         </div>
                         {task.assigned_user_names && (
                             <div className="pandat69-report-assigned">
-                                <span className="dashicons dashicons-admin-users"></span> Assigned to: {task.assigned_user_names}
+                                <Icon name="users" size={15} /> Assigned to: {task.assigned_user_names}
                             </div>
                         )}
                     </li>
@@ -111,9 +112,9 @@ const ReportView = () => {
                 
                 {!isLoading && data && (
                     <>
-                        <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="plus-alt" metaPrefix="Added" />
-                        <ReportSection title={`Tasks Completed (${data.tasks_completed.length})`} items={data.tasks_completed} icon="yes-alt" metaPrefix="Completed" />
-                        <ReportSection title={`Missed Deadlines (${data.missed_deadlines.length})`} items={data.missed_deadlines} icon="calendar-alt" metaPrefix="Deadline" showOverdue={true} />
+                        <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="circle-plus" metaPrefix="Added" />
+                        <ReportSection title={`Tasks Completed (${data.tasks_completed.length})`} items={data.tasks_completed} icon="circle-check" metaPrefix="Completed" />
+                        <ReportSection title={`Missed Deadlines (${data.missed_deadlines.length})`} items={data.missed_deadlines} icon="calendar" metaPrefix="Deadline" showOverdue={true} />
                         
                         <div className="pandat69-report-section">
                             <h4>Current Open Tasks Per Person</h4>

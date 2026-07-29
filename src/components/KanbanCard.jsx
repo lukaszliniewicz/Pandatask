@@ -1,12 +1,10 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useConfig } from '../context/ConfigContext';
 import { parseDate } from '../utils';
+import Icon from './Icon';
 
 const KanbanCard = ({ task, onAction }) => {
-    const { isStandalone } = useConfig();
-    
     const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
         id: task.id,
         data: { type: 'Task', task }
@@ -49,7 +47,7 @@ const KanbanCard = ({ task, onAction }) => {
     if (isSubtask) {
         subtaskInfo = (
             <div className="pandat69-kanban-subtask-label">
-                <span className="dashicons dashicons-subdirectory"></span> Subtask of: {task.parent_task_name || 'task'}
+                <Icon name="corner-down-right" size={15} /> Subtask of: {task.parent_task_name || 'task'}
             </div>
         );
     }
@@ -75,7 +73,7 @@ const KanbanCard = ({ task, onAction }) => {
             <div className="pandat69-kanban-card-title">
                 {isRecurring && (
                     <span className="pandat69-recurring-label">
-                        <span className="dashicons dashicons-update"></span>
+                        <Icon name="refresh" size={15} />
                     </span>
                 )}
                 {task.name}
@@ -83,21 +81,21 @@ const KanbanCard = ({ task, onAction }) => {
 
             <div className="pandat69-kanban-card-meta">
                 <span title="Priority">
-                    <span className="dashicons dashicons-star-filled"></span> {task.priority}
+                    <Icon name="star" size={15} /> {task.priority}
                 </span>
                 {task.deadline && (
                     <span title="Deadline">
-                        <span className="dashicons dashicons-calendar-alt"></span> {task.deadline}
+                        <Icon name="calendar" size={15} /> {task.deadline}
                     </span>
                 )}
                 {task.attachment_type && (
                     <span title="Attachment">
-                        <span className="dashicons dashicons-paperclip"></span>
+                        <Icon name="paperclip" size={15} />
                     </span>
                 )}
                 {task.board_display_name && (
                     <span className="pandat69-board-label" title={`Board: ${task.board_display_name}`}>
-                        <span className="dashicons dashicons-category"></span> {task.board_display_name}
+                        <Icon name="layers" size={15} /> {task.board_display_name}
                     </span>
                 )}
             </div>
@@ -127,7 +125,7 @@ const KanbanCard = ({ task, onAction }) => {
                     onPointerDown={(e) => e.stopPropagation()} 
                     onClick={(e) => handleButtonClick('edit', e)}
                 >
-                    <span className="dashicons dashicons-edit"></span>
+                    <Icon name="pencil" />
                 </button>
                 <button 
                     type="button" 
@@ -136,7 +134,7 @@ const KanbanCard = ({ task, onAction }) => {
                     onPointerDown={(e) => e.stopPropagation()} 
                     onClick={(e) => handleButtonClick('view', e)}
                 >
-                    <span className="dashicons dashicons-visibility"></span>
+                    <Icon name="eye" />
                 </button>
             </div>
         </div>

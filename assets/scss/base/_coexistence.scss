@@ -3,7 +3,9 @@
 .pandat69-container,
 .pandat69-bug-tracker-container,
 #pandat69-floating-bug-reporter-root,
-[data-iarf-plugin="pandatask"] {
+[data-iarf-plugin="pandatask"],
+.pandat69-react-modal,
+.pandat69-project-sidebar.is-mobile {
 	--pandatask-ui-font-family: var(--pandatask-font-family, var(--iarf-font-body, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
 	--pandatask-ui-control-height-sm: 32px;
 	--pandatask-ui-control-height-md: 38px;
@@ -30,7 +32,15 @@
 #pandat69-floating-bug-reporter-root,
 #pandat69-floating-bug-reporter-root *,
 #pandat69-floating-bug-reporter-root *::before,
-#pandat69-floating-bug-reporter-root *::after {
+#pandat69-floating-bug-reporter-root *::after,
+.pandat69-react-modal,
+.pandat69-react-modal *,
+.pandat69-react-modal *::before,
+.pandat69-react-modal *::after,
+.pandat69-project-sidebar.is-mobile,
+.pandat69-project-sidebar.is-mobile *,
+.pandat69-project-sidebar.is-mobile *::before,
+.pandat69-project-sidebar.is-mobile *::after {
 	box-sizing: border-box;
 }
 
@@ -43,11 +53,25 @@
 	letter-spacing: 0;
 }
 
+.pandat69-react-modal :where(button, input, select, textarea),
+.pandat69-project-sidebar.is-mobile :where(button, input, select, textarea) {
+	font: inherit;
+	letter-spacing: 0;
+}
+
 .pandat69-root :where(button, [type="button"], [type="submit"], [role="button"]),
 .pandat69-container :where(button, [type="button"], [type="submit"], [role="button"]),
 .pandat69-bug-tracker-container :where(button, [type="button"], [type="submit"], [role="button"]),
 #pandat69-floating-bug-reporter-root :where(button, [type="button"], [type="submit"], [role="button"]),
 [data-iarf-plugin="pandatask"] :where(button, [type="button"], [type="submit"], [role="button"]) {
+	appearance: none;
+	-webkit-appearance: none;
+	text-transform: none;
+	text-shadow: none;
+}
+
+.pandat69-react-modal :where(button, [type="button"], [type="submit"], [role="button"]),
+.pandat69-project-sidebar.is-mobile :where(button, [type="button"], [type="submit"], [role="button"]) {
 	appearance: none;
 	-webkit-appearance: none;
 	text-transform: none;
@@ -73,6 +97,40 @@
 	color: var(--pandatask-primary);
 	line-height: 1.2;
 	letter-spacing: 0;
+}
+
+.pandat69-react-modal :where(h1, h2, h3, h4, h5, h6),
+.pandat69-project-sidebar.is-mobile :where(h1, h2, h3, h4, h5, h6) {
+	font-family: var(--pandatask-ui-font-family);
+	color: var(--pandatask-primary);
+	line-height: 1.2;
+	letter-spacing: 0;
+}
+
+/*
+ * Host themes frequently add markers, indentation, and pseudo-bullets to every
+ * list. Reset only Pandatask UI lists; rich-text lists in task descriptions keep
+ * their author-defined presentation.
+ */
+.pandat69-container :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]),
+.pandat69-react-modal :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]),
+.pandat69-project-sidebar :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) {
+	list-style: none !important;
+	margin-left: 0;
+	padding-left: 0;
+}
+
+.pandat69-container :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li,
+.pandat69-react-modal :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li,
+.pandat69-project-sidebar :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li {
+	list-style: none !important;
+	margin-left: 0;
+}
+
+.pandat69-container :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li::marker,
+.pandat69-react-modal :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li::marker,
+.pandat69-project-sidebar :where(ul[class^="pandat69-"], ul[class*=" pandat69-"]) > li::marker {
+	content: "";
 }
 
 .pandat69-button,
@@ -103,15 +161,10 @@
 	box-shadow: var(--pandatask-ui-focus-ring);
 }
 
-.pandat69-root :where(.dashicons),
-.pandat69-container :where(.dashicons),
-.pandat69-bug-tracker-container :where(.dashicons),
-#pandat69-floating-bug-reporter-root :where(.dashicons),
-[data-iarf-plugin="pandatask"] :where(.dashicons) {
+.pandat69-icon {
 	width: 1em;
 	height: 1em;
-	font-size: 1.25em;
-	line-height: 1;
 	flex: 0 0 auto;
 	vertical-align: -0.12em;
+	stroke: currentcolor;
 }

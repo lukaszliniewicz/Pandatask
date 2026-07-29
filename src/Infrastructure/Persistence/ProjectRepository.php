@@ -5,86 +5,164 @@ namespace Pandatask\Infrastructure\Persistence;
 final class ProjectRepository {
 
     public function findForBoard( $board_name ) {
+        return $this->findForBoards( array( $board_name ) );
+    }
+
+    public function findForUserWorkspace( $user_id, $board_names ) {
+        return $this->findForBoards( $board_names, (int) $user_id, 'user_' . (int) $user_id );
+    }
+
+    private function findForBoards( $board_names, $workspace_user_id = 0, $private_board_name = '' ) {
         global $wpdb;
 
-        $prefix                    = DatabaseContext::getDbPrefix();
-        $projects_table            = $prefix . 'projects';
-        $project_assignments_table = $prefix . 'project_assignments';
-        $tasks_table               = $prefix . 'tasks';
-        $task_assignments_table    = $prefix . 'assignments';
-        $projects                  = array();
+        $board_names = array_values(
+            array_unique(
+                array_filter(
+                    array_map( 'sanitize_key', (array) $board_names )
+                )
+            )
+        );
 
-        if ( preg_match( '/^user_(\d+)$/', $board_name, $matches ) ) {
-            $user_id  = intval( $matches[1] );
-            $projects = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT p.*,
-                        GROUP_CONCAT(DISTINCT CASE WHEN pa.role = 'assignee' THEN pa.user_id END) as assigned_user_ids,
-                        GROUP_CONCAT(DISTINCT CASE WHEN pa.role = 'supervisor' THEN pa.user_id END) as supervisor_user_ids,
-                        (SELECT GROUP_CONCAT(DISTINCT CONCAT(t_user.id, '::', t_user.name) SEPARATOR ';;')
-                         FROM {$tasks_table} t_user
-                         INNER JOIN {$task_assignments_table} ta_user ON t_user.id = ta_user.task_id
-                         WHERE t_user.project_id = p.id AND ta_user.user_id = %d AND t_user.archived = 0
-                        ) as tasks_data
-                    FROM {$projects_table} p
-                    LEFT JOIN {$project_assignments_table} pa ON p.id = pa.project_id
-                    WHERE p.board_name = %s
-                    GROUP BY p.id
-                    ORDER BY p.name ASC",
-                    $user_id,
-                    $board_name
-                )
-            );
-        } else {
-            $projects = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT p.*,
-                     GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' THEN a.user_id END) as assigned_user_ids,
-                     GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN a.user_id END) as supervisor_user_ids,
-                     GROUP_CONCAT(DISTINCT CONCAT(t.id, '::', t.name) SEPARATOR ';;') as tasks_data
-                     FROM {$projects_table} p
-                     LEFT JOIN {$project_assignments_table} a ON p.id = a.project_id
-                     LEFT JOIN {$tasks_table} t ON p.id = t.project_id AND t.archived = 0
-                     WHERE p.board_name = %s
-                     GROUP BY p.id
-                     ORDER BY p.name ASC",
-                    $board_name
-                )
-            );
+        if ( empty( $board_names ) ) {
+            return array();
+        }
+
+        $prefix         = DatabaseContext::getDbPrefix();
+        $projects_table = $prefix . 'projects';
+        $placeholders   = implode( ', ', array_fill( 0, count( $board_names ), '%s' ) );
+        $projects       = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.*
+                 FROM {$projects_table} p
+                 WHERE p.board_name IN ({$placeholders})
+                 ORDER BY p.board_name ASC, p.name ASC",
+                ...$board_names
+            )
+        );
+
+        if ( empty( $projects ) ) {
+            return array();
+        }
+
+        $project_ids = array_values( array_filter( array_map( 'absint', wp_list_pluck( $projects, 'id' ) ) ) );
+        $assignment_map = $this->findProjectAssignments( $project_ids );
+        $task_map = $this->findProjectTasks( $project_ids, $workspace_user_id, $private_board_name );
+        $all_user_ids = array();
+
+        foreach ( $assignment_map as $roles ) {
+            $all_user_ids = array_merge( $all_user_ids, $roles['assignee'], $roles['supervisor'] );
+        }
+
+        $all_user_ids = array_values( array_unique( array_filter( array_map( 'absint', $all_user_ids ) ) ) );
+
+        if ( ! empty( $all_user_ids ) && function_exists( 'cache_users' ) ) {
+            cache_users( $all_user_ids );
         }
 
         foreach ( $projects as $project ) {
-            $assigned_user_ids           = ! empty( $project->assigned_user_ids ) ? array_map( 'absint', explode( ',', $project->assigned_user_ids ) ) : array();
-            $project->assigned_users     = $this->hydrateUsers( $assigned_user_ids, true );
-            $project->assigned_user_ids  = $assigned_user_ids;
+            $project_id = (int) $project->id;
+            $roles = $assignment_map[ $project_id ] ?? array(
+                'assignee'   => array(),
+                'supervisor' => array(),
+            );
 
-            $supervisor_user_ids         = ! empty( $project->supervisor_user_ids ) ? array_map( 'absint', explode( ',', $project->supervisor_user_ids ) ) : array();
-            $project->supervisor_users   = $this->hydrateUsers( $supervisor_user_ids, true );
-            $project->supervisor_user_ids = $supervisor_user_ids;
-
-            $project->tasks = array();
-
-            if ( ! empty( $project->tasks_data ) ) {
-                $task_items = explode( ';;', $project->tasks_data );
-
-                foreach ( $task_items as $task_item ) {
-                    if ( false !== strpos( $task_item, '::' ) ) {
-                        list( $id, $name ) = explode( '::', $task_item, 2 );
-
-                        if ( ! empty( $id ) && ! empty( $name ) ) {
-                            $project->tasks[] = (object) array(
-                                'id'   => (int) $id,
-                                'name' => $name,
-                            );
-                        }
-                    }
-                }
-            }
-
-            unset( $project->tasks_data );
+            $project->assigned_user_ids   = $roles['assignee'];
+            $project->assigned_users      = $this->hydrateUsers( $roles['assignee'], true );
+            $project->supervisor_user_ids = $roles['supervisor'];
+            $project->supervisor_users    = $this->hydrateUsers( $roles['supervisor'], true );
+            $project->tasks               = $task_map[ $project_id ] ?? array();
         }
 
         return $projects;
+    }
+
+    private function findProjectAssignments( $project_ids ) {
+        global $wpdb;
+
+        $assignment_map = array();
+
+        if ( empty( $project_ids ) ) {
+            return $assignment_map;
+        }
+
+        $assignments_table = DatabaseContext::getDbPrefix() . 'project_assignments';
+        $project_ids_sql = implode( ',', array_map( 'absint', $project_ids ) );
+        $rows = $wpdb->get_results(
+            "SELECT project_id, user_id, role
+             FROM {$assignments_table}
+             WHERE project_id IN ({$project_ids_sql})
+             ORDER BY project_id ASC, role ASC, user_id ASC"
+        );
+
+        foreach ( $rows as $row ) {
+            $project_id = (int) $row->project_id;
+            $role = 'supervisor' === $row->role ? 'supervisor' : 'assignee';
+
+            if ( ! isset( $assignment_map[ $project_id ] ) ) {
+                $assignment_map[ $project_id ] = array(
+                    'assignee'   => array(),
+                    'supervisor' => array(),
+                );
+            }
+
+            $assignment_map[ $project_id ][ $role ][] = (int) $row->user_id;
+        }
+
+        return $assignment_map;
+    }
+
+    private function findProjectTasks( $project_ids, $workspace_user_id = 0, $private_board_name = '' ) {
+        global $wpdb;
+
+        $task_map = array();
+
+        if ( empty( $project_ids ) ) {
+            return $task_map;
+        }
+
+        $prefix          = DatabaseContext::getDbPrefix();
+        $tasks_table     = $prefix . 'tasks';
+        $assignments     = $prefix . 'assignments';
+        $history         = $prefix . 'task_history';
+        $project_ids_sql = implode( ',', array_map( 'absint', $project_ids ) );
+        $sql             = "SELECT t.id, t.name, t.project_id
+                            FROM {$tasks_table} t
+                            WHERE t.project_id IN ({$project_ids_sql})
+                            AND t.archived = 0";
+
+        if ( $workspace_user_id > 0 ) {
+            $sql .= $wpdb->prepare(
+                " AND (
+                    t.board_name = %s
+                    OR EXISTS (
+                        SELECT 1 FROM {$assignments} ta
+                        WHERE ta.task_id = t.id AND ta.user_id = %d
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM {$history} th
+                        WHERE th.task_id = t.id
+                        AND th.field_changed = 'task_created'
+                        AND th.user_id = %d
+                    )
+                )",
+                $private_board_name,
+                $workspace_user_id,
+                $workspace_user_id
+            );
+        }
+
+        $sql .= ' ORDER BY t.name ASC, t.id ASC';
+        $tasks = $wpdb->get_results( $sql );
+
+        foreach ( $tasks as $task ) {
+            $project_id = (int) $task->project_id;
+            $task_map[ $project_id ][] = (object) array(
+                'id'   => (int) $task->id,
+                'name' => $task->name,
+            );
+        }
+
+        return $task_map;
     }
 
     public function findById( $project_id ) {

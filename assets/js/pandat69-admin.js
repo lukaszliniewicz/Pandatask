@@ -256,13 +256,7 @@ jQuery( document ).ready( function ( $ ) {
 			);
 			const actionLine = $( '<p>' );
 			const actionLabel = $( '<strong>' );
-			$( '<span>' )
-				.addClass(
-					`dashicons ${
-						result.success ? 'dashicons-yes-alt' : 'dashicons-no'
-					}`
-				)
-				.appendTo( actionLabel );
+			actionLabel.append( createStatusIcon( result.success ) );
 			actionLabel.append( document.createTextNode( ' Action:' ) );
 			actionLine.append(
 				actionLabel,
@@ -286,6 +280,42 @@ jQuery( document ).ready( function ( $ ) {
 			resultsDiv.append( resultItem );
 		} );
 		resultsContainer.slideDown();
+	}
+
+	function createStatusIcon( success ) {
+		const namespace = 'http://www.w3.org/2000/svg';
+		const icon = document.createElementNS( namespace, 'svg' );
+		const circle = document.createElementNS( namespace, 'circle' );
+		const firstPath = document.createElementNS( namespace, 'path' );
+
+		icon.setAttribute( 'viewBox', '0 0 24 24' );
+		icon.setAttribute( 'fill', 'none' );
+		icon.setAttribute( 'stroke', 'currentColor' );
+		icon.setAttribute( 'stroke-width', '2' );
+		icon.setAttribute( 'stroke-linecap', 'round' );
+		icon.setAttribute( 'stroke-linejoin', 'round' );
+		icon.setAttribute( 'aria-hidden', 'true' );
+		icon.setAttribute( 'focusable', 'false' );
+		icon.classList.add( 'pandat69-admin-result-icon' );
+
+		circle.setAttribute( 'cx', '12' );
+		circle.setAttribute( 'cy', '12' );
+		circle.setAttribute( 'r', '10' );
+		icon.appendChild( circle );
+
+		if ( success ) {
+			firstPath.setAttribute( 'd', 'm9 12 2 2 4-4' );
+			icon.appendChild( firstPath );
+		} else {
+			firstPath.setAttribute( 'd', 'm15 9-6 6' );
+			icon.appendChild( firstPath );
+
+			const secondPath = document.createElementNS( namespace, 'path' );
+			secondPath.setAttribute( 'd', 'm9 9 6 6' );
+			icon.appendChild( secondPath );
+		}
+
+		return icon;
 	}
 
 	// Initialize

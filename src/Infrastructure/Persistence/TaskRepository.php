@@ -175,6 +175,72 @@ final class TaskRepository {
         return $task;
     }
 
+    public function findHierarchyRecordById( $task_id ) {
+        global $wpdb;
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $record = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, board_name, project_id, parent_task_id
+                 FROM {$tasks_table}
+                 WHERE id = %d",
+                $task_id
+            )
+        );
+
+        if ( $record ) {
+            $record->id = (int) $record->id;
+            $record->project_id = $record->project_id ? (int) $record->project_id : null;
+            $record->parent_task_id = $record->parent_task_id ? (int) $record->parent_task_id : null;
+        }
+
+        return $record;
+    }
+
+    public function findDescendantProjectRecords( $task_id, $board_name ) {
+        global $wpdb;
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, parent_task_id, project_id
+                 FROM {$tasks_table}
+                 WHERE board_name = %s
+                 AND parent_task_id IS NOT NULL",
+                $board_name
+            )
+        );
+        $children_by_parent = array();
+
+        foreach ( $rows as $row ) {
+            $parent_id = (int) $row->parent_task_id;
+            $row->id = (int) $row->id;
+            $row->parent_task_id = $parent_id;
+            $row->project_id = $row->project_id ? (int) $row->project_id : null;
+            $children_by_parent[ $parent_id ][] = $row;
+        }
+
+        $descendants = array();
+        $queue = array( (int) $task_id );
+        $visited = array( (int) $task_id => true );
+
+        for ( $index = 0; $index < count( $queue ); $index++ ) {
+            $parent_id = $queue[ $index ];
+
+            foreach ( $children_by_parent[ $parent_id ] ?? array() as $child ) {
+                if ( isset( $visited[ $child->id ] ) ) {
+                    continue;
+                }
+
+                $visited[ $child->id ] = true;
+                $descendants[] = $child;
+                $queue[] = $child->id;
+            }
+        }
+
+        return $descendants;
+    }
+
     public function findAccessRecordById( $task_id ) {
         global $wpdb;
 

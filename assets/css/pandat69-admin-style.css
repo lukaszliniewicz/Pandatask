@@ -71,19 +71,17 @@
     margin-left: 10px;
 }
 
-.pandat69-admin-wrap .pandat69-result-item p strong .dashicons {
-    line-height: inherit;
-    height: auto;
-    width: auto;
-    font-size: inherit;
-    vertical-align: text-bottom;
-    font-family: dashicons;
+.pandat69-admin-wrap .pandat69-admin-result-icon {
+    width: 1em;
+    height: 1em;
+    margin-right: 0.25em;
+    vertical-align: -0.125em;
 }
 
-.pandat69-admin-wrap .pandat69-result-item.success p strong .dashicons {
+.pandat69-admin-wrap .pandat69-result-item.success .pandat69-admin-result-icon {
     color: #46b450;
 }
 
-.pandat69-admin-wrap .pandat69-result-item.error p strong .dashicons {
+.pandat69-admin-wrap .pandat69-result-item.error .pandat69-admin-result-icon {
     color: #dc3232;
 }

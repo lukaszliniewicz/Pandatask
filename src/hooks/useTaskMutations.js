@@ -20,9 +20,18 @@ export const useTaskMutations = () => {
 			queryClient.invalidateQueries( {
 				queryKey: [ 'tasks', targetBoard ],
 			} );
+			if ( targetBoard !== boardName ) {
+				queryClient.invalidateQueries( {
+					queryKey: [ 'tasks', boardName ],
+				} );
+				queryClient.invalidateQueries( {
+					queryKey: [ 'report', boardName ],
+				} );
+			}
 			queryClient.invalidateQueries( {
 				queryKey: [ 'report', targetBoard ],
 			} );
+			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
 		},
 	} );
 
@@ -64,7 +73,7 @@ export const useTaskMutations = () => {
 				} );
 			}
 		},
-		onSettled: ( _, __, { id, data } ) => {
+		onSettled: ( updatedTask, __, { id, data } ) => {
 			queryClient.invalidateQueries( {
 				queryKey: [ 'tasks', boardName ],
 			} );
@@ -75,13 +84,15 @@ export const useTaskMutations = () => {
 			queryClient.invalidateQueries( {
 				queryKey: [ 'task_history', id ],
 			} );
+			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
 
-			if ( data.board_name && data.board_name !== boardName ) {
+			const targetBoard = data.board_name || updatedTask?.board_name;
+			if ( targetBoard && targetBoard !== boardName ) {
 				queryClient.invalidateQueries( {
-					queryKey: [ 'tasks', data.board_name ],
+					queryKey: [ 'tasks', targetBoard ],
 				} );
 				queryClient.invalidateQueries( {
-					queryKey: [ 'report', data.board_name ],
+					queryKey: [ 'report', targetBoard ],
 				} );
 			}
 		},
@@ -133,6 +144,7 @@ export const useTaskMutations = () => {
 			} );
 			queryClient.removeQueries( { queryKey: [ 'task', id ] } );
 			queryClient.removeQueries( { queryKey: [ 'task_history', id ] } );
+			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
 		},
 	} );
 

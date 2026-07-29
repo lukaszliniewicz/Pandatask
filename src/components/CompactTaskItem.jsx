@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import StatusBadge from './StatusBadge';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { parseDate } from '../utils';
+import Icon from './Icon';
 
 const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand, onAction }) => {
     const { updateTask } = useTaskMutations();
@@ -58,7 +59,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
     return (
         <li ref={setNodeRef} style={style} className={itemClass}>
             <div className="pandat69-drag-handle" {...listeners} {...attributes}>
-                <span className="dashicons dashicons-menu" style={{fontSize:'14px'}}></span>
+                <Icon name="grip" size={15} />
             </div>
 
             <div className="pandat69-compact-status-col">
@@ -73,6 +74,8 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
                         <button 
                             className={`pandat69-expand-btn ${isExpanded ? 'expanded' : ''}`} 
                             onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
+                            aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                            aria-expanded={isExpanded}
                             style={{ 
                                 background: 'none', 
                                 border: 'none', 
@@ -82,7 +85,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
                                 alignItems: 'center' 
                             }}
                         >
-                            <span className={`dashicons ${isExpanded ? 'dashicons-arrow-down-alt2' : 'dashicons-arrow-right-alt2'}`} style={{ color: '#555' }}></span>
+                            <Icon name={isExpanded ? 'chevron-down' : 'chevron-right'} size={16} />
                         </button>
                     ) : (
                         <span className="pandat69-expand-spacer" style={{width:'20px', display:'inline-block'}}></span>
@@ -91,7 +94,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
 
                 <div className="pandat69-compact-title" onClick={() => onAction('view', task)}>
                     {isSubtask && (
-                        <span className="dashicons dashicons-arrow-right-alt2" style={{color: '#aaa', marginRight: '5px', fontSize: '14px', lineHeight: '1.5'}}></span>
+                        <Icon name="corner-down-right" size={15} />
                     )}
                     <span style={{ textDecoration: isArchived ? 'line-through' : 'none', color: isArchived ? '#999' : 'inherit' }}>
                         {task.name}
@@ -102,12 +105,12 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
             <div className="pandat69-compact-meta">
                 {task.deadline && (
                     <span title="Deadline" className={parseDate(task.deadline) < new Date() && task.status !== 'done' ? 'pandat69-meta-overdue' : ''}>
-                        <span className="dashicons dashicons-calendar-alt"></span> {task.deadline}
+                        <Icon name="calendar" size={15} /> {task.deadline}
                     </span>
                 )}
                 {task.priority > 7 && (
                     <span title="High Priority" className="pandat69-meta-high-priority">
-                        <span className="dashicons dashicons-star-filled"></span> {task.priority}
+                        <Icon name="star" size={15} /> {task.priority}
                     </span>
                 )}
             </div>
@@ -123,33 +126,33 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
             </div>
 
             <div className="pandat69-kebab-menu-container" ref={menuRef}>
-                <button className="pandat69-kebab-btn" onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}>
-                    <span className="dashicons dashicons-ellipsis"></span>
+                <button type="button" className="pandat69-kebab-btn" aria-expanded={showMenu} aria-label="Task actions" onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}>
+                    <Icon name="more" />
                 </button>
                 {showMenu && (
                     <div className="pandat69-kebab-dropdown">
-                        <button onClick={() => { onAction('edit', task); setShowMenu(false); }}><span className="dashicons dashicons-edit"></span> Edit</button>
-                        <button onClick={() => { onAction('view', task); setShowMenu(false); }}><span className="dashicons dashicons-visibility"></span> View Details</button>
+                        <button type="button" onClick={() => { onAction('edit', task); setShowMenu(false); }}><Icon name="pencil" /> Edit</button>
+                        <button type="button" onClick={() => { onAction('view', task); setShowMenu(false); }}><Icon name="eye" /> View Details</button>
                         
                         <div style={{borderTop:'1px solid #eee', margin:'5px 0'}}></div>
 
-                        <button onClick={() => { onAction('add-subtask', task); setShowMenu(false); }}>
-                            <span className="dashicons dashicons-plus-alt2"></span> Add Subtask
+                        <button type="button" onClick={() => { onAction('add-subtask', task); setShowMenu(false); }}>
+                            <Icon name="list-plus" /> Add Subtask
                         </button>
 
                         {task.deadline && (
-                            <button onClick={() => { onAction('gcal-export', task); setShowMenu(false); }}>
-                                <span className="dashicons dashicons-calendar-alt"></span> Add to Calendar
+                            <button type="button" onClick={() => { onAction('gcal-export', task); setShowMenu(false); }}>
+                                <Icon name="calendar-plus" /> Add to Calendar
                             </button>
                         )}
 
                         <div style={{borderTop:'1px solid #eee', margin:'5px 0'}}></div>
 
-                        <button onClick={handleArchiveToggle}>
-                            <span className="dashicons dashicons-archive"></span> {isArchived ? 'Unarchive' : 'Archive'}
+                        <button type="button" onClick={handleArchiveToggle}>
+                            <Icon name={isArchived ? 'undo' : 'archive'} /> {isArchived ? 'Unarchive' : 'Archive'}
                         </button>
                         
-                        <button className="danger" onClick={() => { onAction('delete', task); setShowMenu(false); }}><span className="dashicons dashicons-trash"></span> Delete</button>
+                        <button type="button" className="danger" onClick={() => { onAction('delete', task); setShowMenu(false); }}><Icon name="trash" /> Delete</button>
                     </div>
                 )}
             </div>

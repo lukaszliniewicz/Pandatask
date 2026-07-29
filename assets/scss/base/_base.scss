@@ -13,6 +13,7 @@ div.pandat69-container,
 	width: 100%;
 	max-width: 100%;
 	overflow-wrap: break-word;
+	isolation: isolate;
 
 	/* Strict Reset for Box Sizing inside the app */
 	*,
@@ -96,6 +97,58 @@ div.pandat69-container,
 		line-height: 1.3;
 		padding: 0;
 		border: none;
+	}
+}
+
+body.pandat69-viewport-open {
+	overflow: hidden !important;
+	overscroll-behavior: none;
+}
+
+.pandat69-container.pandat69-viewport-shell {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: var(--pandatask-viewport-z, 2147483000) !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	height: 100dvh !important;
+	max-width: none !important;
+	max-height: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	background: var(--pandatask-surface-muted, #f9f9f9);
+	overflow: auto;
+	overscroll-behavior: contain;
+	box-shadow: none !important;
+	isolation: isolate;
+
+	.pandat69-header {
+		position: sticky;
+		top: 0;
+		z-index: 20;
+		margin: 0;
+		padding: 14px 24px;
+		background: var(--pandatask-surface, #fff);
+		box-shadow: 0 1px 8px rgba(23, 43, 69, 0.09);
+	}
+
+	.pandat69-layout-body {
+		min-height: calc(100dvh - 66px);
+		padding: 20px 24px 28px;
+		overflow: visible;
+	}
+
+	@media (max-width: 600px) {
+
+		.pandat69-header {
+			padding: 12px;
+		}
+
+		.pandat69-layout-body {
+			padding: 14px 10px 20px;
+		}
 	}
 }
 

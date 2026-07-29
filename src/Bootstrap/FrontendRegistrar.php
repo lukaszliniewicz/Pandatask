@@ -2,6 +2,9 @@
 
 namespace Pandatask\Bootstrap;
 
+use Pandatask\Application\Security\BoardAccessPolicy;
+use WP_Error;
+
 final class FrontendRegistrar {
 
     public function register() {
@@ -36,9 +39,38 @@ final class FrontendRegistrar {
             return;
         }
 
-        status_header( 200 );
+        $board_name = isset( $_GET['board_name'] )
+            ? sanitize_key( wp_unslash( $_GET['board_name'] ) )
+            : '';
+        $access     = '' !== $board_name
+            ? ( new BoardAccessPolicy() )->canReadBoard( $board_name, get_current_user_id() )
+            : new WP_Error( 'pandatask_missing_board', __( 'No task board specified.', 'pandatask' ), array( 'status' => 400 ) );
+        $status     = true === $access ? 200 : (int) $access->get_error_data( 'status' );
+
+        if ( $status < 400 ) {
+            $status = true === $access ? 200 : 403;
+        }
+
+        // This compatibility endpoint contains private, user-specific application
+        // state and must never enter search indexes or shared caches.
+        status_header( $status );
+        nocache_headers();
+        header( 'X-Robots-Tag: noindex, nofollow, noarchive', true );
+        add_filter( 'wp_robots', array( $this, 'disableFullscreenIndexing' ) );
+
+        $pandatask_fullscreen_board_name = $board_name;
+        $pandatask_fullscreen_access     = $access;
+
         include $fullscreen_template;
         exit;
+    }
+
+    public function disableFullscreenIndexing( $robots ) {
+        $robots['noindex']   = true;
+        $robots['nofollow']  = true;
+        $robots['noarchive'] = true;
+
+        return $robots;
     }
 
     public function renderFloatingBugReporter() {
