@@ -237,7 +237,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                     <div className="val avatars">
                         {task.assigned_users && task.assigned_users.length > 0 ? (
                             task.assigned_users.map(u => (
-                                <img key={u.id} src={u.avatar} title={u.name} className="avatar-circle" alt={u.name}/>
+                                <img key={u.id} src={u.avatar} title={u.name} className="avatar-circle" alt={u.name} width="24" height="24" loading="lazy" decoding="async"/>
                             ))
                         ) : 'Unassigned'}
                     </div>
@@ -284,7 +284,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                                 <div className="subtask-meta">
                                     <StatusBadge task={sub} mode="dot" />
                                     {sub.assigned_users?.[0] && (
-                                        <img src={sub.assigned_users[0].avatar} style={{width: 16, height: 16, borderRadius: '50%'}} alt=""/>
+                                        <img src={sub.assigned_users[0].avatar} width="16" height="16" style={{width: 16, height: 16, borderRadius: '50%'}} alt="" loading="lazy" decoding="async"/>
                                     )}
                                 </div>
                             </li>
@@ -305,6 +305,12 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                         <a href={task.attachment_url} target="_blank" rel="noopener noreferrer">
                             {task.attachment_filename || 'View File'}
                         </a>
+                        {task.attachment_public_source_retained && (
+                            <p className="description pandat69-attachment-privacy-note">
+                                This download is protected, but its Media Library
+                                source may still be publicly reachable.
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
@@ -317,7 +323,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
                         task.comments.map(comment => (
                             <li key={comment.id} className="pandat69-comment-item">
                                 <div className="pandat69-comment-avatar">
-                                    <img src={comment.user_avatar_url} alt={comment.user_name} />
+                                    <img src={comment.user_avatar_url} alt={comment.user_name} width="40" height="40" loading="lazy" decoding="async" />
                                 </div>
                                 <div className="pandat69-comment-content">
                                     <div className="pandat69-comment-meta">

@@ -127,6 +127,10 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
                         src={task.assigned_users[0].avatar} 
                         alt={task.assigned_users[0].name} 
                         title={task.assigned_users[0].name}
+                        width="24"
+                        height="24"
+                        loading="lazy"
+                        decoding="async"
                     />
                 )}
             </div>

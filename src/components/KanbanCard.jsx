@@ -109,8 +109,11 @@ const KanbanCard = ({ task, onAction }) => {
                                 src={u.avatar} 
                                 title={u.name} 
                                 className="pandat69-meta-user-avatar" 
-                                loading="lazy" 
-                                alt={u.name} 
+                                loading="lazy"
+                                decoding="async"
+                                width="20"
+                                height="20"
+                                alt={u.name}
                             />
                         ))}
                     </div>

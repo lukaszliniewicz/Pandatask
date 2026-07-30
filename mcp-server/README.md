@@ -37,9 +37,9 @@ Optional variables:
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `PANDATASK_DRY_RUN` | `false` | When true, every mutation returns a preview and no mutation reaches WordPress |
+| `PANDATASK_DRY_RUN` | `true` | When true, every mutation returns a preview and no mutation reaches WordPress; set false explicitly only for a trusted write-enabled client |
 | `PANDATASK_TIMEOUT_MS` | `30000` | REST timeout from 1,000 to 120,000 milliseconds |
-| `PANDATASK_TOOL_PROFILE` | `full` | `core` for focused workflows, `full` for all non-admin tools, or `admin` for the complete surface |
+| `PANDATASK_TOOL_PROFILE` | `core` | `core` for focused workflows, `full` for all non-admin tools, or `admin` for the complete surface |
 | `PANDATASK_MAX_CONCURRENCY` | `5` | Maximum concurrent board reads or independent writes, from 1 to 20 |
 | `PANDATASK_MAX_COLLECTION_ITEMS` | `1000` | Safety cap for workflow collection scans, from 50 to 5,000 |
 | `PANDATASK_API_BASE_URL` | derived | Override for unusual reverse-proxy or WordPress REST paths |

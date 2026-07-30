@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useUserBoards = () => {
 	const { apiClient, currentUser } = useConfig();
 
 	return useQuery( {
-		queryKey: [ 'user_boards', currentUser?.id ],
-		queryFn: async () => {
-			const response = await apiClient.get( `users/me/boards` );
+		queryKey: queryKeys.userBoards( currentUser?.id ),
+		queryFn: async ( { signal } ) => {
+			const response = await apiClient.get( `users/me/boards`, {
+				signal,
+			} );
 			return response.boards;
 		},
 		enabled: !! currentUser?.id,

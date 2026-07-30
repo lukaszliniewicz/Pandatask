@@ -44,6 +44,8 @@ test('loadConfig rejects HTTP unless explicitly enabled', () => {
     PANDATASK_ALLOW_INSECURE_HTTP: 'true',
   });
   assert.equal(config.allowInsecureHttp, true);
+  assert.equal(config.defaultDryRun, true);
+  assert.equal(config.toolProfile, 'core');
 });
 
 test('loadConfig rejects credentials embedded in the URL', () => {

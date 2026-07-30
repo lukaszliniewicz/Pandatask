@@ -1,3 +1,19 @@
+/*
+ * Embedded boards size themselves from their mount slot, not the browser.
+ * Group pages can be desktop-width while still giving the board less than
+ * 1080px after the group shell/navigation is accounted for.
+ */
+.pandat69-container.is-container-narrow {
+
+	.pandat69-main-content {
+		padding-left: 0;
+	}
+
+	.pandat69-layout-body {
+		display: block;
+	}
+}
+
 @media (max-width: 768px) {
 
 	.pandat69-layout-body {

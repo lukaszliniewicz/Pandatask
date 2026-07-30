@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useUsers = (
 	search = '',
@@ -10,8 +11,8 @@ export const useUsers = (
 	const activeBoard = overrideBoardName || contextBoardName;
 
 	return useQuery( {
-		queryKey: [ 'users', activeBoard, search, includeUserIds ],
-		queryFn: async () => {
+		queryKey: queryKeys.users( activeBoard, search, includeUserIds ),
+		queryFn: async ( { signal } ) => {
 			if ( ! activeBoard ) {
 				return [];
 			}
@@ -24,7 +25,7 @@ export const useUsers = (
 				params.append( 'include[]', userId )
 			);
 
-			const response = await apiClient.get( `users`, { params } );
+			const response = await apiClient.get( `users`, { params, signal } );
 			return response.users;
 		},
 		enabled: !! activeBoard,

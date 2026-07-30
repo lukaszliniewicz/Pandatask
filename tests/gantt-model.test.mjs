@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+	buildGanttTimelineWindow,
 	buildGanttModel,
 	formatGanttDate,
 	getGanttTaskSet,
+	MAX_GANTT_TIMELINE_DAYS,
 	parseGanttDate,
 	pickGanttFocusDate,
 } from '../src/ganttModel.mjs';
@@ -215,4 +217,60 @@ test( 'initial focus prefers a useful nearby cluster over a lone nearer task', (
 	);
 
 	assert.equal( formatGanttDate( focusDate ), '2026-03-20' );
+} );
+
+test( 'century-spanning schedules produce a bounded render window', () => {
+	const model = buildGanttModel( [
+		{
+			id: 1,
+			name: 'Ancient task',
+			start_date: '1900-01-01',
+			deadline: '1900-01-02',
+		},
+		{
+			id: 2,
+			name: 'Current task',
+			start_date: '2026-07-20',
+			deadline: '2026-08-10',
+		},
+		{
+			id: 3,
+			name: 'Far future task',
+			start_date: '2200-01-01',
+			deadline: '2200-01-02',
+		},
+	] );
+	const window = buildGanttTimelineWindow(
+		model.scheduledRows,
+		parseGanttDate( '2026-07-30' ),
+		14
+	);
+
+	assert.equal( window.wasBounded, true );
+	assert.equal( window.dayCount, MAX_GANTT_TIMELINE_DAYS );
+	assert.equal( window.todayIsVisible, true );
+	assert.deepEqual(
+		window.visibleRows.map( ( row ) => row.id ),
+		[ '2' ]
+	);
+	assert.equal( window.excludedRowCount, 2 );
+} );
+
+test( 'a task spanning the whole supported range remains visible in the bounded window', () => {
+	const model = buildGanttModel( [
+		{
+			id: 1,
+			name: 'Long programme',
+			start_date: '1900-01-01',
+			deadline: '2200-12-31',
+		},
+	] );
+	const window = buildGanttTimelineWindow(
+		model.scheduledRows,
+		parseGanttDate( '2026-07-30' ),
+		7
+	);
+
+	assert.equal( window.dayCount, MAX_GANTT_TIMELINE_DAYS );
+	assert.equal( window.visibleRows.length, 1 );
 } );

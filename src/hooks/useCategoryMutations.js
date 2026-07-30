@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useCategoryMutations = () => {
 	const { apiClient, boardName } = useConfig();
@@ -25,7 +26,7 @@ export const useCategoryMutations = () => {
 					? boardName
 					: variables.boardName || boardName;
 			queryClient.invalidateQueries( {
-				queryKey: [ 'categories', targetBoard ],
+				queryKey: queryKeys.categories( targetBoard ),
 			} );
 		},
 	} );
@@ -38,10 +39,10 @@ export const useCategoryMutations = () => {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries( {
-				queryKey: [ 'categories', boardName ],
+				queryKey: queryKeys.categories( boardName ),
 			} );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 		},
 	} );

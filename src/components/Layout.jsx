@@ -1,38 +1,38 @@
-import React, { lazy, Suspense, useEffect, useState, useMemo, useRef } from 'react';
+import React, { Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Header from './Header';
-import FilterBar from './FilterBar';
-import TaskList from './TaskList';
-import CompactListView from './CompactListView';
-import KanbanView from './KanbanView';
-import CalendarView from './CalendarView';
 import OverviewView from './OverviewView';
 import ArchiveView from './ArchiveView';
 import ProjectsView from './ProjectsView';
-import CategoryManager from './CategoryManager';
-import Modal from './Modal';
 import ProjectSidebar from './ProjectSidebar';
-import RecurringDeleteModal from './RecurringDeleteModal';
+import TaskWorkspace from './TaskWorkspace';
+import BoardModals from './BoardModals';
 import { useTasks } from '../hooks/useTasks';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { generateGCalUrl } from '../utils';
 import { useConfig } from '../context/ConfigContext';
+import { useBoardNavigation } from '../hooks/useBoardNavigation';
+import { useContainerMode } from '../hooks/useContainerMode';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 
-const ProjectForm = lazy(() => import('./ProjectForm'));
-const ReportView = lazy(() => import('./ReportView'));
-const TaskDetail = lazy(() => import('./TaskDetail'));
-const TaskForm = lazy(() => import('./TaskForm'));
-const GanttView = lazy(() => import('./GanttView'));
+const ReportView = lazyWithRetry(() => import('./ReportView'));
 const LoadingChunk = () => <div className="pandat69-loading">Loading...</div>;
 
 const Layout = () => {
-    const [currentTab, setCurrentTab] = useState('tasks');
-    const [currentView, setCurrentView] = useState('compact');
+    const {
+        currentTab,
+        currentView,
+        selectedTaskId,
+        isDetailModalOpen,
+        setCurrentTab,
+        setCurrentView,
+        openTask,
+        closeTask,
+    } = useBoardNavigation();
+    const { containerRef, isContainerNarrow } = useContainerMode();
     const [allSubtasksExpanded, setAllSubtasksExpanded] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 768);
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1080);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isRecurringDeleteModalOpen, setIsRecurringDeleteModalOpen] = useState(false);
@@ -40,7 +40,6 @@ const Layout = () => {
     const fullscreenToggleRef = useRef(null);
     
     // State for modal content
-    const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [taskToDelete, setTaskToDelete] = useState(null);
     const [editingTask, setEditingTask] = useState(null);
     const [editingProject, setEditingProject] = useState(null);
@@ -48,33 +47,11 @@ const Layout = () => {
 
     const { text } = useConfig(); // Get localized text
 
-    // Resize handler to switch modes automatically
     useEffect(() => {
-        const handleResize = () => {
-            const mobile = window.innerWidth <= 768;
-            setIsMobile(mobile);
-            if (mobile) setIsSidebarOpen(false);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Deep Linking: Check for open_task param on mount
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const taskParam = params.get('open_task');
-        if (taskParam) {
-            const taskId = parseInt(taskParam, 10);
-            if (!isNaN(taskId)) {
-                setSelectedTaskId(taskId);
-                setIsDetailModalOpen(true);
-            }
-            params.delete('open_task');
-            const remainingQuery = params.toString();
-            const newUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`;
-            window.history.replaceState({}, document.title, newUrl);
+        if (isContainerNarrow) {
+            setIsSidebarOpen(false);
         }
-    }, []);
+    }, [isContainerNarrow]);
 
     // Mutations
     const { deleteTask, updateTask } = useTaskMutations();
@@ -90,6 +67,7 @@ const Layout = () => {
         if (!isFullscreen) return undefined;
 
         document.body.classList.add('pandat69-viewport-open');
+        const toggleElement = fullscreenToggleRef.current;
 
         const handleKeyDown = (event) => {
             if (event.key !== 'Escape' || document.querySelector('.pandat69-react-modal.active')) {
@@ -109,7 +87,7 @@ const Layout = () => {
                     document.body.classList.remove('pandat69-viewport-open');
                 }
 
-                fullscreenToggleRef.current?.focus();
+                toggleElement?.focus();
             });
         };
     }, [isFullscreen]);
@@ -156,13 +134,14 @@ const Layout = () => {
 
     const handleCloseModal = () => {
         setIsTaskModalOpen(false);
-        setIsDetailModalOpen(false);
+        if (isDetailModalOpen) {
+            closeTask();
+        }
         setIsProjectModalOpen(false);
         setIsCategoryModalOpen(false);
         setIsRecurringDeleteModalOpen(false);
         setEditingTask(null);
         setEditingProject(null);
-        setSelectedTaskId(null);
         setTaskToDelete(null);
         setTaskFormDefaults({});
     };
@@ -189,8 +168,7 @@ const Layout = () => {
         }
 
         if (action === 'view') {
-            setSelectedTaskId(taskId);
-            setIsDetailModalOpen(true);
+            openTask(taskId);
         } else if (action === 'edit') {
             setEditingTask(task);
             setIsTaskModalOpen(true);
@@ -243,13 +221,12 @@ const Layout = () => {
             project_id: projectId || '',
         });
         setEditingTask(null);
-        setIsDetailModalOpen(false);
+        closeTask({ replace: true });
         setIsTaskModalOpen(true);
     };
 
     const handleNavigateTask = (taskId) => {
-        setSelectedTaskId(taskId);
-        setIsDetailModalOpen(true);
+        openTask(taskId, { replace: true });
     };
 
     const handleEditProject = (project) => {
@@ -261,8 +238,10 @@ const Layout = () => {
 
     const board = (
         <div
-            className={`pandat69-container ${isFullscreen ? 'pandat69-viewport-shell' : ''}`}
+            ref={containerRef}
+            className={`pandat69-container ${isFullscreen ? 'pandat69-viewport-shell' : ''} ${isContainerNarrow ? 'is-container-narrow' : 'is-container-wide'}`}
             data-pandatask-viewport={isFullscreen ? 'active' : 'inline'}
+            data-pandatask-container-mode={isContainerNarrow ? 'compact' : 'wide'}
         >
             <Header 
                 onAddTask={handleAddTask} 
@@ -280,7 +259,7 @@ const Layout = () => {
                 <ProjectSidebar 
                     isOpen={isSidebarOpen}
                     toggleSidebar={toggleSidebar}
-                    isMobile={isMobile}
+                    isMobile={isContainerNarrow}
                     selectedProjectId={filters.project}
                     onSelectProject={(pid) => handleFilterChange('project', pid)}
                     onClose={() => setIsSidebarOpen(false)}
@@ -320,47 +299,18 @@ const Layout = () => {
                     <div className="pandat69-tabs">
                         <div className={`pandat69-tab-content pandat69-tab-${currentTab} active`}>
                             {currentTab === 'tasks' && (
-                                <>
-                                    <FilterBar 
-                                        filters={filters} 
-                                        onFilterChange={handleFilterChange} 
-                                        hideProjectSelect={true}
-                                        showSubtaskToggle={currentView === 'compact'}
-                                        allSubtasksExpanded={allSubtasksExpanded}
-                                        onToggleSubtasks={() => setAllSubtasksExpanded((isExpanded) => !isExpanded)}
-                                    />
-                                    
-                                    {isLoading && <div className="pandat69-loading">Loading...</div>}
-                                    {isError && <div className="pandat69-error">Error: {error.message}</div>}
-                                    
-                                    {!isLoading && !isError && currentView === 'compact' && (
-                                        <CompactListView 
-                                            tasks={tasks} 
-                                            onTaskAction={handleTaskAction}
-                                            allSubtasksExpanded={allSubtasksExpanded}
-                                        />
-                                    )}
-
-                                    {!isLoading && !isError && currentView === 'list' && (
-                                        <TaskList tasks={tasks} onTaskAction={handleTaskAction} />
-                                    )}
-
-                                    {!isLoading && !isError && currentView === 'kanban' && (
-                                        <div className="pandat69-view-container pandat69-kanban-view active">
-                                            <KanbanView tasks={tasks} onTaskAction={handleTaskAction} />
-                                        </div>
-                                    )}
-                                    
-                                    {!isLoading && !isError && currentView === 'calendar' && (
-                                        <CalendarView tasks={tasks} onTaskAction={handleTaskAction} />
-                                    )}
-
-                                    {!isLoading && !isError && currentView === 'gantt' && (
-                                        <Suspense fallback={<LoadingChunk />}>
-                                            <GanttView tasks={tasks} onTaskAction={handleTaskAction} />
-                                        </Suspense>
-                                    )}
-                                </>
+                                <TaskWorkspace
+                                    filters={filters}
+                                    onFilterChange={handleFilterChange}
+                                    currentView={currentView}
+                                    allSubtasksExpanded={allSubtasksExpanded}
+                                    onToggleSubtasks={() => setAllSubtasksExpanded((isExpanded) => !isExpanded)}
+                                    tasks={tasks}
+                                    isLoading={isLoading}
+                                    isError={isError}
+                                    error={error}
+                                    onTaskAction={handleTaskAction}
+                                />
                             )}
 
                             {currentTab === 'projects' && (
@@ -389,66 +339,21 @@ const Layout = () => {
                 </div>
             </div>
 
-            {/* Task Form Modal */}
-            <Modal 
-                isOpen={isTaskModalOpen} 
-                onClose={handleCloseModal} 
-                title={editingTask ? 'Edit Task' : (taskFormDefaults.parent_task_id ? 'Add Subtask' : 'Add New Task')}
-            >
-                <Suspense fallback={<LoadingChunk />}>
-                    <TaskForm
-                        task={editingTask}
-                        defaultValues={taskFormDefaults}
-                        onClose={handleCloseModal}
-                    />
-                </Suspense>
-            </Modal>
-
-            {/* Task Detail Modal */}
-            <Modal 
-                isOpen={isDetailModalOpen} 
-                onClose={handleCloseModal} 
-                title="Task Details"
-            >
-                {selectedTaskId && (
-                    <Suspense fallback={<LoadingChunk />}>
-                        <TaskDetail
-                            taskId={selectedTaskId}
-                            onEdit={(task) => {
-                                handleCloseModal();
-                                handleTaskAction('edit', task);
-                            }}
-                            onAddSubtask={handleAddSubtask}
-                            onNavigate={handleNavigateTask}
-                        />
-                    </Suspense>
-                )}
-            </Modal>
-
-            {/* Project Form Modal */}
-            <Modal
-                isOpen={isProjectModalOpen}
+            <BoardModals
+                isTaskModalOpen={isTaskModalOpen}
+                isDetailModalOpen={isDetailModalOpen}
+                isProjectModalOpen={isProjectModalOpen}
+                isCategoryModalOpen={isCategoryModalOpen}
+                isRecurringDeleteModalOpen={isRecurringDeleteModalOpen}
                 onClose={handleCloseModal}
-                title={editingProject ? 'Edit Project' : 'Add Project'}
-            >
-                <Suspense fallback={<LoadingChunk />}>
-                    <ProjectForm project={editingProject} onClose={handleCloseModal} />
-                </Suspense>
-            </Modal>
-
-            {/* Category Manager Modal */}
-            <Modal
-                isOpen={isCategoryModalOpen}
-                onClose={handleCloseModal}
-                title="Manage Categories"
-            >
-                <CategoryManager />
-            </Modal>
-
-            <RecurringDeleteModal 
-                isOpen={isRecurringDeleteModalOpen}
-                onClose={handleCloseModal}
-                onConfirm={handleRecurringDeleteConfirm}
+                editingTask={editingTask}
+                taskFormDefaults={taskFormDefaults}
+                selectedTaskId={selectedTaskId}
+                onTaskAction={handleTaskAction}
+                onAddSubtask={handleAddSubtask}
+                onNavigateTask={handleNavigateTask}
+                editingProject={editingProject}
+                onRecurringDeleteConfirm={handleRecurringDeleteConfirm}
             />
         </div>
     );

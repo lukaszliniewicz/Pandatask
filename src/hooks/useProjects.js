@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useProjects = ( overrideBoardName, options = {} ) => {
 	const { apiClient, boardName: contextBoardName } = useConfig();
@@ -7,8 +8,8 @@ export const useProjects = ( overrideBoardName, options = {} ) => {
 	const privateOnly = !! options.privateOnly;
 
 	return useQuery( {
-		queryKey: [ 'projects', activeBoard, { privateOnly } ],
-		queryFn: async () => {
+		queryKey: queryKeys.projects.list( activeBoard, privateOnly ),
+		queryFn: async ( { signal } ) => {
 			if ( ! activeBoard ) {
 				return [];
 			}
@@ -16,6 +17,7 @@ export const useProjects = ( overrideBoardName, options = {} ) => {
 				`boards/${ activeBoard }/projects`,
 				{
 					params: privateOnly ? { private_only: 'true' } : {},
+					signal,
 				}
 			);
 			return response.projects;

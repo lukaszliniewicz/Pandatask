@@ -116,7 +116,7 @@ const TaskItem = ({ task, onAction }) => {
                             <span className="pandat69-meta-user-list">
                                 {task.assigned_users.map(user => (
                                     <span key={user.id} className="pandat69-meta-user" title={user.name}>
-                                        <img src={user.avatar} className="pandat69-meta-user-avatar" alt={user.name} loading="lazy" />
+                                        <img src={user.avatar} className="pandat69-meta-user-avatar" alt={user.name} width="20" height="20" loading="lazy" decoding="async" />
                                         {user.name}
                                     </span>
                                 ))}

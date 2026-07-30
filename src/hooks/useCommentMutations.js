@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useCommentMutations = ( taskId ) => {
 	const { apiClient } = useConfig();
@@ -14,7 +15,9 @@ export const useCommentMutations = ( taskId ) => {
 			return response.comment;
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'task', taskId ] } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.task( taskId ),
+			} );
 		},
 	} );
 
@@ -23,7 +26,9 @@ export const useCommentMutations = ( taskId ) => {
 			await apiClient.delete( `comments/${ commentId }` );
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'task', taskId ] } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.task( taskId ),
+			} );
 		},
 	} );
 
@@ -35,7 +40,9 @@ export const useCommentMutations = ( taskId ) => {
 			return response.comment;
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'task', taskId ] } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.task( taskId ),
+			} );
 		},
 	} );
 

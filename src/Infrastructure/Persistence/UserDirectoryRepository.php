@@ -4,7 +4,7 @@ namespace Pandatask\Infrastructure\Persistence;
 
 final class UserDirectoryRepository {
 
-    public function findBuddyPressUsers( $search = '', $group_id = 0, $include = array() ) {
+    public function findBuddyPressUsers( $search = '', $group_id = 0, $include = array(), $allow_email_search = false ) {
         if ( $group_id <= 0 || ! function_exists( 'bp_has_members' ) || ! function_exists( 'groups_get_group_members' ) ) {
             return array();
         }
@@ -31,7 +31,9 @@ final class UserDirectoryRepository {
             array(
                 'role'           => 'administrator',
                 'search'         => $search ? '*' . esc_attr( $search ) . '*' : '',
-                'search_columns' => array( 'user_login', 'user_email', 'user_nicename', 'display_name' ),
+                'search_columns' => $allow_email_search
+                    ? array( 'user_login', 'user_email', 'user_nicename', 'display_name' )
+                    : array( 'user_login', 'user_nicename', 'display_name' ),
                 'fields'         => array( 'ID', 'display_name' ),
                 'number'         => 50,
             )
@@ -78,7 +80,7 @@ final class UserDirectoryRepository {
         return array_values( $members );
     }
 
-    public function findWordPressUsers( $search = '', $include = array() ) {
+    public function findWordPressUsers( $search = '', $include = array(), $allow_email_search = false ) {
         $args = array(
             'orderby' => 'display_name',
             'order'   => 'ASC',
@@ -88,7 +90,9 @@ final class UserDirectoryRepository {
 
         if ( ! empty( $search ) ) {
             $args['search']         = '*' . esc_attr( $search ) . '*';
-            $args['search_columns'] = array( 'user_login', 'user_nicename', 'user_email', 'display_name' );
+            $args['search_columns'] = $allow_email_search
+                ? array( 'user_login', 'user_nicename', 'user_email', 'display_name' )
+                : array( 'user_login', 'user_nicename', 'display_name' );
         }
 
         $users           = get_users( $args );

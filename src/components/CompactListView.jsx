@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import CompactTaskItem from './CompactTaskItem';
 import { useTaskMutations } from '../hooks/useTaskMutations';
@@ -15,16 +15,24 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
     // Set for Expanded IDs
     const [expandedIds, setExpandedIds] = useState(new Set());
 
-    const parentIdsRef = useRef([]);
-    parentIdsRef.current = Array.from(new Set(safeTasks.map((task) => Number(task.parent_task_id)).filter(Boolean)));
+    const parentIds = useMemo(
+        () => Array.from(
+            new Set(
+                safeTasks
+                    .map((task) => Number(task.parent_task_id))
+                    .filter(Boolean)
+            )
+        ),
+        [safeTasks]
+    );
 
     useEffect(() => {
         if (allSubtasksExpanded) {
-            setExpandedIds(new Set(parentIdsRef.current));
+            setExpandedIds(new Set(parentIds));
         } else {
             setExpandedIds(new Set());
         }
-    }, [allSubtasksExpanded]);
+    }, [allSubtasksExpanded, parentIds]);
 
     const toggleExpand = (taskId) => {
         const newSet = new Set(expandedIds);
@@ -89,7 +97,9 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
             hierarchyRoots.forEach(root => {
                 let groupName;
                 const currentUserId = currentUser ? parseInt(currentUser.id, 10) : 0;
-                const isAssigned = root.assigned_user_ids && root.assigned_user_ids.includes(String(currentUserId));
+                const isAssigned = root.assigned_user_ids?.some(
+                    (userId) => Number(userId) === currentUserId
+                );
                 const isCreator = root.creator_id === currentUserId;
 
                 if (isAssigned) {

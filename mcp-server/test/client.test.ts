@@ -87,6 +87,45 @@ test('request converts WordPress errors into a safe typed error', async () => {
   );
 });
 
+test('request redacts reflected application-password credentials from success and error payloads', async () => {
+  const encoded = Buffer.from(`${config.username}:${config.appPassword}`).toString('base64');
+  const successClient = new PandataskClient(config, async () =>
+    new Response(
+      JSON.stringify({
+        echoed: `Authorization: Basic ${encoded}`,
+        nested: { password: config.appPassword },
+      }),
+      { status: 200 },
+    ),
+  );
+
+  const success = await successClient.request({ path: '/meta' });
+  const serializedSuccess = JSON.stringify(success);
+  assert.equal(serializedSuccess.includes(config.appPassword), false);
+  assert.equal(serializedSuccess.includes(encoded), false);
+
+  const errorClient = new PandataskClient(config, async () =>
+    new Response(
+      JSON.stringify({
+        code: 'upstream_error',
+        message: `Upstream reflected ${config.username}:${config.appPassword}`,
+        data: { authorization: `Basic ${encoded}` },
+      }),
+      { status: 502 },
+    ),
+  );
+
+  await assert.rejects(
+    () => errorClient.request({ path: '/meta' }),
+    (error: unknown) => {
+      assert.ok(error instanceof PandataskApiError);
+      assert.equal(JSON.stringify(error.details).includes(config.appPassword), false);
+      assert.equal(JSON.stringify(error.details).includes(encoded), false);
+      return true;
+    },
+  );
+});
+
 test('request reports MCP cancellation with a stable error code', async () => {
   const controller = new AbortController();
   controller.abort();

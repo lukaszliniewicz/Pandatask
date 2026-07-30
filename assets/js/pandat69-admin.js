@@ -26,12 +26,16 @@ jQuery( document ).ready( function ( $ ) {
 	const resultsDiv = $( '#pandat69-results' );
 
 	const spinner = $( '#pandat69-spinner' );
+	const executeDefaultText = executeActionsBtn.text();
+	let pendingActionsFingerprint = '';
+	let pendingActions = null;
 
 	function showSpinner( show ) {
 		spinner.css( 'visibility', show ? 'visible' : 'hidden' );
 	}
 
 	function showError( message ) {
+		clearActionPreview();
 		resultsDiv
 			.empty()
 			.append(
@@ -41,6 +45,56 @@ jQuery( document ).ready( function ( $ ) {
 			);
 		resultsContainer.slideDown();
 	}
+
+	function clearActionPreview() {
+		pendingActionsFingerprint = '';
+		pendingActions = null;
+		executeActionsBtn.text( executeDefaultText );
+	}
+
+	function actionFingerprint( boardName, response ) {
+		return JSON.stringify( [ boardName, response ] );
+	}
+
+	function renderActionPreview( actions ) {
+		resultsDiv.empty();
+		resultsDiv.append(
+			$( '<div>' )
+				.addClass( 'pandat69-result-item' )
+				.append(
+					$( '<strong>' ).text(
+						`Review ${ actions.length } action${
+							actions.length === 1 ? '' : 's'
+						} before execution:`
+					)
+				)
+		);
+
+		actions.forEach( function ( action, index ) {
+			const summary = action?.action || 'Unknown action';
+			const identifier =
+				action?.data?.name || action?.data?.id || action?.id || '';
+			resultsDiv.append(
+				$( '<div>' )
+					.addClass( 'pandat69-result-item' )
+					.text(
+						`${ index + 1 }. ${ summary }${
+							identifier ? ` — ${ identifier }` : ''
+						}`
+					)
+			);
+		} );
+
+		resultsContainer.slideDown();
+	}
+
+	boardSelect.add( llmResponseTextarea ).on( 'change input', function () {
+		if ( pendingActions ) {
+			clearActionPreview();
+			resultsContainer.slideUp();
+			resultsDiv.empty();
+		}
+	} );
 
 	// 1. Fetch boards on page load
 	function loadBoards() {
@@ -124,6 +178,7 @@ jQuery( document ).ready( function ( $ ) {
 				user_prompt: userPrompt,
 			} ),
 			success( response ) {
+				clearActionPreview();
 				generatedPromptPre.text( response.prompt );
 				generatedPromptContainer.slideDown();
 				llmResponseContainer.slideDown();
@@ -204,6 +259,26 @@ jQuery( document ).ready( function ( $ ) {
 				}
 			}
 		} );
+
+		const fingerprint = actionFingerprint( boardName, llmResponse );
+
+		if (
+			fingerprint !== pendingActionsFingerprint ||
+			! Array.isArray( pendingActions )
+		) {
+			pendingActionsFingerprint = fingerprint;
+			pendingActions = actions;
+			renderActionPreview( actions );
+			executeActionsBtn.text(
+				`Confirm & execute ${ actions.length } action${
+					actions.length === 1 ? '' : 's'
+				}`
+			);
+			return;
+		}
+
+		actions = pendingActions;
+		clearActionPreview();
 
 		showSpinner( true );
 		$( this ).prop( 'disabled', true );

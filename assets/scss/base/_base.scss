@@ -164,3 +164,16 @@ body.pandat69-viewport-open {
 	font-size: 14px;
 	color: #666;
 }
+
+.pandat69-fatal-error {
+	max-width: 680px;
+	margin: 24px auto;
+	padding: 20px;
+	border: 1px solid #d63638;
+	border-radius: var(--pandatask-ui-radius-sm);
+	background: #fff;
+
+	p {
+		margin: 8px 0 16px;
+	}
+}

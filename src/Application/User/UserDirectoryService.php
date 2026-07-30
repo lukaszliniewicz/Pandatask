@@ -17,12 +17,29 @@ final class UserDirectoryService {
             return $this->getBuddyPressUsers( $search, intval( $matches[1] ), $include );
         }
 
+        if ( $board_name && preg_match( '/^user_(\d+)$/', $board_name, $matches ) && ! current_user_can( 'manage_options' ) ) {
+            $owner_id = (int) $matches[1];
+            $owner = get_userdata( $owner_id );
+
+            if ( ! $owner ) {
+                return array();
+            }
+
+            return array(
+                array(
+                    'id'   => $owner_id,
+                    'name' => $owner->display_name,
+                ),
+            );
+        }
+
         return $this->getWordPressUsers( $search, $include );
     }
 
     public function getBuddyPressUsers( $search = '', $group_id = 0, $include = array() ) {
         $cache_version = defined( 'PANDAT69_VERSION' ) ? PANDAT69_VERSION : '1.0';
-        $search_key    = md5( $search . '_' . $group_id . '_' . implode( ',', $include ) );
+        $allow_email_search = current_user_can( 'manage_options' );
+        $search_key    = md5( $search . '_' . $group_id . '_' . implode( ',', $include ) . '_' . (int) $allow_email_search );
         $transient_key = 'pandat69_bp_users_v2_' . $cache_version . '_' . $search_key;
         $cached        = get_transient( $transient_key );
 
@@ -30,7 +47,7 @@ final class UserDirectoryService {
             return $cached;
         }
 
-        $users = $this->repository->findBuddyPressUsers( $search, $group_id, $include );
+        $users = $this->repository->findBuddyPressUsers( $search, $group_id, $include, $allow_email_search );
         set_transient( $transient_key, $users, 5 * MINUTE_IN_SECONDS );
 
         return $users;
@@ -38,7 +55,8 @@ final class UserDirectoryService {
 
     public function getWordPressUsers( $search = '', $include = array() ) {
         $cache_version = defined( 'PANDAT69_VERSION' ) ? PANDAT69_VERSION : '1.0';
-        $search_key    = md5( $search . '_' . implode( ',', $include ) );
+        $allow_email_search = current_user_can( 'manage_options' );
+        $search_key    = md5( $search . '_' . implode( ',', $include ) . '_' . (int) $allow_email_search );
         $transient_key = 'pandat69_wp_users_v2_' . $cache_version . '_' . $search_key;
         $cached        = get_transient( $transient_key );
 
@@ -46,7 +64,7 @@ final class UserDirectoryService {
             return $cached;
         }
 
-        $users = $this->repository->findWordPressUsers( $search, $include );
+        $users = $this->repository->findWordPressUsers( $search, $include, $allow_email_search );
         set_transient( $transient_key, $users, 5 * MINUTE_IN_SECONDS );
 
         return $users;

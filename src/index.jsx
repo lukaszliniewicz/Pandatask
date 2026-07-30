@@ -1,174 +1,219 @@
 import React, { useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClientProvider } from '@tanstack/react-query';
 import TaskBoard from './components/TaskBoard';
 import BugTracker from './components/BugTracker';
 import FloatingBugReporter from './components/FloatingBugReporter';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import { ConfigProvider } from './context/ConfigContext';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createApiClient } from './api/client';
+import { createPandataskQueryClient } from './query/createQueryClient';
 import '../assets/scss/main.scss';
 
-const applyPandataskBoundary = (root) => {
-    if (!root) return;
+const mountedRoots = new WeakMap();
 
-    // The mount node is deliberately separate from the application shell. Keeping
-    // `.pandat69-container` on both levels makes host-theme list/layout rules leak
-    // into the nested board and causes duplicated spacing on shortcode pages.
-    root.classList.remove('pandat69-container', 'pandat69-viewport-shell');
-    root.classList.add(
-        'pandat69-mount',
-        'pandat69-root',
-        'iarf-app',
-        'iarf-app--pandatask',
-        'iarf-plugin',
-        'iarf-plugin--pandatask'
-    );
-    root.setAttribute('data-iarf-product', 'pandatask');
-    root.setAttribute('data-iarf-app', 'pandatask');
-    root.setAttribute('data-iarf-plugin', 'pandatask');
-    root.setAttribute('data-iarf-product-kind', 'react-plugin');
+const applyPandataskBoundary = ( root ) => {
+	if ( ! root ) {
+		return;
+	}
+
+	// The mount node is deliberately separate from the application shell. Keeping
+	// `.pandat69-container` on both levels makes host-theme list/layout rules leak
+	// into the nested board and causes duplicated spacing on shortcode pages.
+	root.classList.remove( 'pandat69-container', 'pandat69-viewport-shell' );
+	root.classList.add(
+		'pandat69-mount',
+		'pandat69-root',
+		'iarf-app',
+		'iarf-app--pandatask',
+		'iarf-plugin',
+		'iarf-plugin--pandatask'
+	);
+	root.setAttribute( 'data-iarf-product', 'pandatask' );
+	root.setAttribute( 'data-iarf-app', 'pandatask' );
+	root.setAttribute( 'data-iarf-plugin', 'pandatask' );
+	root.setAttribute( 'data-iarf-product-kind', 'react-plugin' );
 };
 
-// Wrapper for simple components that need API context but not full TaskBoard
-const AppWrapper = ({ apiSettings, currentUser, children, boardName }) => {
-    const queryClient = useMemo(() => new QueryClient(), []);
-    const apiClient = useMemo(() => createApiClient(apiSettings), [apiSettings]);
-    
-    const config = useMemo(() => ({
-        boardName,
-        apiClient,
-        currentUser,
-        isStandalone: true,
-        text: apiSettings.text || {}
-    }), [apiClient, apiSettings.text, boardName, currentUser]);
+const renderInto = ( container, element ) => {
+	if ( ! container ) {
+		throw new Error( 'A valid PandaTask mount container is required.' );
+	}
 
-    return (
-        <ConfigProvider config={config}>
-            <QueryClientProvider client={queryClient}>
-                {children}
-            </QueryClientProvider>
-        </ConfigProvider>
-    );
+	applyPandataskBoundary( container );
+	let record = mountedRoots.get( container );
+
+	if ( ! record ) {
+		container.replaceChildren();
+		record = { root: createRoot( container ), token: null };
+		mountedRoots.set( container, record );
+	}
+
+	const token = Symbol( 'pandatask-mount' );
+	record.token = token;
+	record.root.render( element );
+	container.dataset.reactMounted = 'true';
+
+	return () => {
+		const current = mountedRoots.get( container );
+		if ( ! current || current.token !== token ) {
+			return;
+		}
+		current.root.unmount();
+		mountedRoots.delete( container );
+		delete container.dataset.reactMounted;
+	};
 };
 
-// Expose Global API for React Integration
+// Wrapper for simple components that need API context but not the full board.
+const AppWrapper = ( { apiSettings, currentUser, children, boardName } ) => {
+	const queryClient = useMemo( () => createPandataskQueryClient(), [] );
+	const apiClient = useMemo(
+		() =>
+			apiSettings.apiClient ||
+			createApiClient( {
+				root: apiSettings.root,
+				nonce: apiSettings.nonce,
+			} ),
+		[ apiSettings.apiClient, apiSettings.nonce, apiSettings.root ]
+	);
+	const config = useMemo(
+		() => ( {
+			boardName,
+			apiClient,
+			currentUser,
+			isStandalone: true,
+			text: apiSettings.text || {},
+		} ),
+		[ apiClient, apiSettings.text, boardName, currentUser ]
+	);
+
+	return (
+		<ConfigProvider config={ config }>
+			<QueryClientProvider client={ queryClient }>
+				<AppErrorBoundary>{ children }</AppErrorBoundary>
+			</QueryClientProvider>
+		</ConfigProvider>
+	);
+};
+
+const resolveSettings = ( apiSettings ) =>
+	apiSettings || window.pandatask_api_settings || {};
+
+const resolveCurrentUser = ( settings, currentUser ) =>
+	currentUser || {
+		id: settings.current_user_id,
+		name: settings.current_user_display_name,
+	};
+
+const mountBoard = ( container, props = {} ) => {
+	const settings = resolveSettings( props.apiSettings );
+	return renderInto(
+		container,
+		<AppErrorBoundary>
+			<TaskBoard
+				boardName={ props.boardName || container?.dataset?.boardName }
+				apiSettings={ settings }
+				currentUser={ resolveCurrentUser( settings, props.currentUser ) }
+				isStandalone={ props.isStandalone ?? true }
+			/>
+		</AppErrorBoundary>
+	);
+};
+
+const mountFloatingBugReporter = ( container, props = {} ) => {
+	const settings = resolveSettings( props.apiSettings );
+	const boardName = props.boardName || container?.dataset?.boardName;
+	return renderInto(
+		container,
+		<AppErrorBoundary>
+			<AppWrapper
+				apiSettings={ settings }
+				currentUser={ resolveCurrentUser( settings, props.currentUser ) }
+				boardName={ boardName }
+			>
+				<FloatingBugReporter
+					boardName={ boardName }
+					defaultAssigneeId={
+						props.defaultAssigneeId ||
+						container?.dataset?.defaultAssigneeId
+					}
+					initialOpen={ props.initialOpen || false }
+				/>
+			</AppWrapper>
+		</AppErrorBoundary>
+	);
+};
+
+// Merge with integrations registered by the host instead of replacing the
+// shared namespace.
 window.Pandatask = {
-    mountBoard: (container, props) => {
-        const { boardName, apiSettings, currentUser } = props;
-        // Merge passed settings with global defaults if needed
-        const settings = apiSettings || window.pandatask_api_settings || {};
-
-        applyPandataskBoundary(container);
-
-        container.replaceChildren();
-        const root = createRoot(container);
-        root.render(
-            <TaskBoard
-                boardName={boardName}
-                apiSettings={settings}
-                currentUser={currentUser || {
-                    id: settings.current_user_id,
-                    name: settings.current_user_display_name
-                }}
-                isStandalone={true}
-            />
-        );
-        return () => root.unmount(); // Return cleanup function
-    },
-    mountFloatingBugReporter: (container, props = {}) => {
-        const {
-            boardName,
-            defaultAssigneeId,
-            apiSettings,
-            currentUser,
-            initialOpen = false
-        } = props;
-        const settings = apiSettings || window.pandatask_api_settings || {};
-        const resolvedBoardName = boardName || container?.dataset?.boardName;
-
-        applyPandataskBoundary(container);
-
-        container.replaceChildren();
-        const root = createRoot(container);
-        root.render(
-            <AppWrapper
-                apiSettings={settings}
-                currentUser={currentUser || {
-                    id: settings.current_user_id,
-                    name: settings.current_user_display_name
-                }}
-                boardName={resolvedBoardName}
-            >
-                <FloatingBugReporter
-                    boardName={resolvedBoardName}
-                    defaultAssigneeId={defaultAssigneeId || container?.dataset?.defaultAssigneeId}
-                    initialOpen={initialOpen}
-                />
-            </AppWrapper>
-        );
-        container.dataset.reactMounted = "true";
-        return () => root.unmount();
-    }
+	...( window.Pandatask || {} ),
+	mountBoard,
+	mountFloatingBugReporter,
 };
 
-// Mode A: Standalone WordPress Mount
-document.addEventListener('DOMContentLoaded', () => {
-    const apiSettings = window.pandatask_api_settings || {};
-    const currentUser = {
-        id: apiSettings.current_user_id,
-        name: apiSettings.current_user_display_name
-    };
+const bootstrapStandaloneMounts = () => {
+	const apiSettings = resolveSettings();
+	const currentUser = resolveCurrentUser( apiSettings );
 
-    // 1. Task Board Shortcode
-    const boardRoots = document.querySelectorAll('[data-pandatask-board-root]');
-    boardRoots.forEach(root => {
-        if (!root.dataset.reactMounted) {
-            const { boardName } = root.dataset;
-            applyPandataskBoundary(root);
-            root.replaceChildren();
-            const reactRoot = createRoot(root);
-            reactRoot.render(
-                <TaskBoard 
-                    boardName={boardName} 
-                    apiSettings={apiSettings}
-                    currentUser={currentUser}
-                    isStandalone={true}
-                />
-            );
-            root.dataset.reactMounted = "true";
-        }
-    });
+	document
+		.querySelectorAll( '[data-pandatask-board-root]' )
+		.forEach( ( container ) => {
+			if ( container.dataset.reactMounted !== 'true' ) {
+				mountBoard( container, {
+					boardName: container.dataset.boardName,
+					apiSettings,
+					currentUser,
+					isStandalone: true,
+				} );
+			}
+		} );
 
-    // 2. Bug Tracker Shortcode
-    const bugRoots = document.querySelectorAll('.pandat69-bug-tracker-container');
-    bugRoots.forEach(root => {
-        if (!root.dataset.reactMounted) {
-            const { boardName, defaultAssigneeId } = root.dataset;
-            applyPandataskBoundary(root);
-            root.replaceChildren();
-            const reactRoot = createRoot(root);
-            reactRoot.render(
-                <AppWrapper apiSettings={apiSettings} currentUser={currentUser} boardName={boardName}>
-                    <BugTracker boardName={boardName} defaultAssigneeId={defaultAssigneeId} />
-                </AppWrapper>
-            );
-            root.dataset.reactMounted = "true";
-        }
-    });
+	document
+		.querySelectorAll( '.pandat69-bug-tracker-container' )
+		.forEach( ( container ) => {
+			if ( container.dataset.reactMounted === 'true' ) {
+				return;
+			}
+			const { boardName, defaultAssigneeId } = container.dataset;
+			renderInto(
+				container,
+				<AppErrorBoundary>
+					<AppWrapper
+						apiSettings={ apiSettings }
+						currentUser={ currentUser }
+						boardName={ boardName }
+					>
+						<BugTracker
+							boardName={ boardName }
+							defaultAssigneeId={ defaultAssigneeId }
+						/>
+					</AppWrapper>
+				</AppErrorBoundary>
+			);
+		} );
 
-    // 3. Floating Bug Reporter
-    const floatRoot = document.getElementById('pandat69-floating-bug-reporter-root');
-    if (floatRoot && !floatRoot.dataset.reactMounted) {
-        const { boardName, defaultAssigneeId } = floatRoot.dataset;
-        applyPandataskBoundary(floatRoot);
-        floatRoot.replaceChildren();
-        const reactRoot = createRoot(floatRoot);
-        // Do not clear innerHTML here as it's likely empty or hidden
-        reactRoot.render(
-            <AppWrapper apiSettings={apiSettings} currentUser={currentUser} boardName={boardName}>
-                <FloatingBugReporter boardName={boardName} defaultAssigneeId={defaultAssigneeId} />
-            </AppWrapper>
-        );
-        floatRoot.dataset.reactMounted = "true";
-    }
-});
+	const floatingContainer = document.getElementById(
+		'pandat69-floating-bug-reporter-root'
+	);
+	if (
+		floatingContainer &&
+		floatingContainer.dataset.reactMounted !== 'true'
+	) {
+		mountFloatingBugReporter( floatingContainer, {
+			boardName: floatingContainer.dataset.boardName,
+			defaultAssigneeId: floatingContainer.dataset.defaultAssigneeId,
+			apiSettings,
+			currentUser,
+		} );
+	}
+};
+
+if ( document.readyState === 'loading' ) {
+	document.addEventListener( 'DOMContentLoaded', bootstrapStandaloneMounts, {
+		once: true,
+	} );
+} else {
+	queueMicrotask( bootstrapStandaloneMounts );
+}

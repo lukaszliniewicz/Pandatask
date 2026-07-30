@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useTaskMutations = () => {
 	const { apiClient, boardName } = useConfig();
@@ -18,20 +19,22 @@ export const useTaskMutations = () => {
 		onSuccess: ( _, variables ) => {
 			const targetBoard = variables.board_name || boardName;
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', targetBoard ],
+				queryKey: queryKeys.tasks.board( targetBoard ),
 			} );
 			if ( targetBoard !== boardName ) {
 				queryClient.invalidateQueries( {
-					queryKey: [ 'tasks', boardName ],
+					queryKey: queryKeys.tasks.board( boardName ),
 				} );
 				queryClient.invalidateQueries( {
-					queryKey: [ 'report', boardName ],
+					queryKey: queryKeys.reports.board( boardName ),
 				} );
 			}
 			queryClient.invalidateQueries( {
-				queryKey: [ 'report', targetBoard ],
+				queryKey: queryKeys.reports.board( targetBoard ),
 			} );
-			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.all(),
+			} );
 		},
 	} );
 
@@ -46,14 +49,14 @@ export const useTaskMutations = () => {
 			}
 
 			await queryClient.cancelQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			const previousTasks = queryClient.getQueriesData( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 
 			queryClient.setQueriesData(
-				{ queryKey: [ 'tasks', boardName ] },
+				{ queryKey: queryKeys.tasks.board( boardName ) },
 				( old ) => {
 					if ( ! Array.isArray( old ) ) {
 						return old;
@@ -75,24 +78,26 @@ export const useTaskMutations = () => {
 		},
 		onSettled: ( updatedTask, __, { id, data } ) => {
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'report', boardName ],
+				queryKey: queryKeys.reports.board( boardName ),
 			} );
-			queryClient.invalidateQueries( { queryKey: [ 'task', id ] } );
+			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'task_history', id ],
+				queryKey: queryKeys.taskHistory( id ),
 			} );
-			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.all(),
+			} );
 
 			const targetBoard = data.board_name || updatedTask?.board_name;
 			if ( targetBoard && targetBoard !== boardName ) {
 				queryClient.invalidateQueries( {
-					queryKey: [ 'tasks', targetBoard ],
+					queryKey: queryKeys.tasks.board( targetBoard ),
 				} );
 				queryClient.invalidateQueries( {
-					queryKey: [ 'report', targetBoard ],
+					queryKey: queryKeys.reports.board( targetBoard ),
 				} );
 			}
 		},
@@ -110,14 +115,14 @@ export const useTaskMutations = () => {
 			}
 
 			await queryClient.cancelQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			const previousTasks = queryClient.getQueriesData( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 
 			queryClient.setQueriesData(
-				{ queryKey: [ 'tasks', boardName ] },
+				{ queryKey: queryKeys.tasks.board( boardName ) },
 				( old ) => {
 					if ( ! Array.isArray( old ) ) {
 						return old;
@@ -137,14 +142,18 @@ export const useTaskMutations = () => {
 		},
 		onSettled: ( _, __, { id } ) => {
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'report', boardName ],
+				queryKey: queryKeys.reports.board( boardName ),
 			} );
-			queryClient.removeQueries( { queryKey: [ 'task', id ] } );
-			queryClient.removeQueries( { queryKey: [ 'task_history', id ] } );
-			queryClient.invalidateQueries( { queryKey: [ 'projects' ] } );
+			queryClient.removeQueries( { queryKey: queryKeys.task( id ) } );
+			queryClient.removeQueries( {
+				queryKey: queryKeys.taskHistory( id ),
+			} );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.all(),
+			} );
 		},
 	} );
 

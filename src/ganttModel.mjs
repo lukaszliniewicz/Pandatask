@@ -1,5 +1,7 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+export const MAX_GANTT_TIMELINE_DAYS = 1096;
+
 const toId = ( value ) => {
 	if ( value === null || value === undefined || value === '' ) {
 		return '';
@@ -135,6 +137,67 @@ export const pickGanttFocusDate = ( rows, targetDate ) => {
 	} );
 
 	return bestDate;
+};
+
+/**
+ * Bound the rendered timeline while retaining tasks that overlap the window.
+ *
+ * A corrupt or accidental century-spanning date must never create millions of
+ * day headers or a multi-megabyte SVG/canvas.
+ *
+ * @param {Array}  rows        Scheduled Gantt model rows.
+ * @param {Date}   targetDate  Preferred focus date.
+ * @param {number} padding     Extra days around the natural range.
+ * @param {number} maximumDays Maximum number of rendered days.
+ * @return {Object} Bounded dates, visible rows, and truncation metadata.
+ */
+export const buildGanttTimelineWindow = (
+	rows,
+	targetDate,
+	padding = 0,
+	maximumDays = MAX_GANTT_TIMELINE_DAYS
+) => {
+	const scheduledRows = rows.filter(
+		( row ) => row.effectiveStart && row.effectiveEnd
+	);
+	const safeMaximumDays = Math.max( 31, Math.floor( maximumDays ) );
+	const focusDate = pickGanttFocusDate( scheduledRows, targetDate );
+	const earliest = minDate( [
+		targetDate,
+		...scheduledRows.map( ( row ) => row.effectiveStart ),
+	] );
+	const latest = maxDate( [
+		targetDate,
+		...scheduledRows.map( ( row ) => row.effectiveEnd ),
+	] );
+	const naturalStart = addGanttDays( earliest || targetDate, -padding );
+	const naturalEnd = addGanttDays( latest || targetDate, padding );
+	const naturalDayCount = ganttDayDifference( naturalStart, naturalEnd ) + 1;
+	let start = naturalStart;
+	let end = naturalEnd;
+	let wasBounded = false;
+
+	if ( naturalDayCount > safeMaximumDays ) {
+		wasBounded = true;
+		const daysBeforeFocus = Math.floor( ( safeMaximumDays - 1 ) / 2 );
+		start = addGanttDays( focusDate, -daysBeforeFocus );
+		end = addGanttDays( start, safeMaximumDays - 1 );
+	}
+
+	const visibleRows = scheduledRows.filter(
+		( row ) => row.effectiveStart <= end && row.effectiveEnd >= start
+	);
+
+	return {
+		start,
+		end,
+		focusDate,
+		dayCount: ganttDayDifference( start, end ) + 1,
+		visibleRows,
+		excludedRowCount: scheduledRows.length - visibleRows.length,
+		wasBounded,
+		todayIsVisible: targetDate >= start && targetDate <= end,
+	};
 };
 
 const compareNodes = ( first, second ) => {

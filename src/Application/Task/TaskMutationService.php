@@ -876,23 +876,13 @@ final class TaskMutationService {
         $tasks_to_roll_over = $this->repository->findRecurringTasksToRollOver( $today );
 
         foreach ( $tasks_to_roll_over as $task ) {
-            $current_start_date = $task->start_date;
-
-            while ( $current_start_date < $today ) {
-                $next_date_str = $this->calculateNextRecurrenceDate(
-                    $current_start_date,
-                    $task->recurrence_frequency,
-                    $task->recurrence_interval,
-                    $task->recurrence_days
-                );
-
-                if ( ! $next_date_str ) {
-                    $current_start_date = null;
-                    break;
-                }
-
-                $current_start_date = $next_date_str;
-            }
+            $current_start_date = $this->calculateRecurrenceDateOnOrAfter(
+                $task->start_date,
+                $today,
+                $task->recurrence_frequency,
+                $task->recurrence_interval,
+                $task->recurrence_days
+            );
 
             if ( ! $current_start_date ) {
                 $this->repository->setTaskRecurringState( $task->id, 0 );
@@ -1060,6 +1050,79 @@ final class TaskMutationService {
             }
 
             return $next_date->format( 'Y-m-d' );
+        } catch ( Exception $exception ) {
+            return null;
+        }
+    }
+
+    /**
+     * Find the first occurrence on or after a target without an unbounded catch-up loop.
+     */
+    private function calculateRecurrenceDateOnOrAfter( $from_date_str, $target_date_str, $frequency, $interval, $days_of_week_str ) {
+        if ( empty( $from_date_str ) || empty( $target_date_str ) || empty( $frequency ) ) {
+            return null;
+        }
+
+        try {
+            $from_date = new \DateTimeImmutable( $from_date_str );
+            $target_date = new \DateTimeImmutable( $target_date_str );
+            $interval = absint( $interval ) ?: 1;
+
+            if ( $from_date >= $target_date ) {
+                return $from_date->format( 'Y-m-d' );
+            }
+
+            if ( 'weekly' === $frequency || 'bi-weekly' === $frequency ) {
+                $period_days = 7 * $interval;
+                $elapsed_days = (int) $from_date->diff( $target_date )->format( '%a' );
+                $periods = max( 1, (int) ceil( $elapsed_days / $period_days ) );
+
+                return $from_date->modify( '+' . ( $periods * $period_days ) . ' days' )->format( 'Y-m-d' );
+            }
+
+            if ( 'custom_weekly' === $frequency ) {
+                $days_of_week = array_values(
+                    array_unique(
+                        array_filter(
+                            array_map( 'intval', explode( ',', (string) $days_of_week_str ) ),
+                            static function ( $day ) {
+                                return $day >= 1 && $day <= 7;
+                            }
+                        )
+                    )
+                );
+
+                if ( empty( $days_of_week ) ) {
+                    return null;
+                }
+
+                $candidate = $target_date;
+
+                // Seven checks are sufficient because every valid weekday recurs weekly.
+                for ( $offset = 0; $offset < 7; $offset++ ) {
+                    if ( in_array( (int) $candidate->format( 'N' ), $days_of_week, true ) ) {
+                        return $candidate->format( 'Y-m-d' );
+                    }
+
+                    $candidate = $candidate->modify( '+1 day' );
+                }
+
+                return null;
+            }
+
+            if ( 'monthly' !== $frequency ) {
+                return null;
+            }
+
+            $candidate = $from_date;
+
+            // 2,400 iterations covers the supported 1900–2200 date range while
+            // guaranteeing that corrupted legacy data cannot monopolize cron.
+            for ( $iteration = 0; $iteration < 2400 && $candidate < $target_date; $iteration++ ) {
+                $candidate = $candidate->modify( '+' . $interval . ' month' );
+            }
+
+            return $candidate >= $target_date ? $candidate->format( 'Y-m-d' ) : null;
         } catch ( Exception $exception ) {
             return null;
         }

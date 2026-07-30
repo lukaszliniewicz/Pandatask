@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.14
+Stable tag: 1.0.15
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -71,7 +71,7 @@ Add `[task_board board_name="project_alpha"]` to any page or post. Replace `"pro
 
 = How do permissions work? =
 
-Standard boards are accessible to logged-in users with `edit_posts`. BuddyPress group boards require group membership, and private user boards (`user_{ID}`) are accessible only to the owner. Task updates and deletions additionally require task participation, creation/ownership, board-management capability, or administrator privileges. The batch endpoint is administrator-only.
+Standard boards are accessible to logged-in users with `edit_posts`. BuddyPress group boards require group membership, and private user boards (`user_{ID}`) are accessible only to the owner. Participants may update ordinary task fields; only creators, supervisors, board managers, or administrators may change task roles, and board moves require board-manager authority. The batch endpoint is administrator-only.
 
 = Can I have multiple boards? =
 
@@ -95,6 +95,15 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.15 =
+
+* Make embedded boards container-responsive so group pages use an overlay project navigator when their real content slot is narrow, while standalone and profile mounts retain the wide layout.
+* Add URL-backed tab, view, and task-detail navigation with browser back/forward support; make the public mount API idempotent and preserve other IARF namespace integrations.
+* Centralize React Query keys and retry policy, propagate cancellation, add typed TypeScript API/query boundaries, recover lazy-load failures, and decompose the board workspace and modal layer.
+* Bound Gantt rendering and recurring-task catch-up, cap list and protected-file workloads, lazy-load dimensioned avatars, and enforce production bundle budgets.
+* Harden task role changes, cross-board moves, comment access, signed downloads, anonymous bug reports, directory search, AI reference data, and MCP credential handling/defaults.
+* Pin CI actions, refresh safe package versions, validate release assets and PHP before deployment, and keep the dev rollback until WordPress verification succeeds.
 
 = 1.0.14 =
 

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useProjectMutations = () => {
 	const { apiClient, boardName } = useConfig();
@@ -19,7 +20,7 @@ export const useProjectMutations = () => {
 		onSuccess: ( _, variables ) => {
 			const targetBoard = variables.board_name || boardName;
 			queryClient.invalidateQueries( {
-				queryKey: [ 'projects', targetBoard ],
+				queryKey: queryKeys.projects.board( targetBoard ),
 			} );
 		},
 	} );
@@ -31,12 +32,14 @@ export const useProjectMutations = () => {
 		},
 		onSuccess: ( _, { id } ) => {
 			queryClient.invalidateQueries( {
-				queryKey: [ 'projects', boardName ],
+				queryKey: queryKeys.projects.board( boardName ),
 			} );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
-			queryClient.removeQueries( { queryKey: [ 'project', id ] } );
+			queryClient.removeQueries( {
+				queryKey: [ ...queryKeys.projects.all(), 'detail', id ],
+			} );
 		},
 	} );
 
@@ -46,10 +49,10 @@ export const useProjectMutations = () => {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries( {
-				queryKey: [ 'projects', boardName ],
+				queryKey: queryKeys.projects.board( boardName ),
 			} );
 			queryClient.invalidateQueries( {
-				queryKey: [ 'tasks', boardName ],
+				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 		},
 	} );

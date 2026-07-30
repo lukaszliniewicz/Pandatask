@@ -51,7 +51,7 @@ function boundedInteger(env: NodeJS.ProcessEnv, name: string, fallback: number, 
 }
 
 function toolProfile(value: string | undefined): PandataskConfig['toolProfile'] {
-  const normalized = value?.trim().toLowerCase() || 'full';
+  const normalized = value?.trim().toLowerCase() || 'core';
   if (normalized === 'core' || normalized === 'full' || normalized === 'admin') {
     return normalized;
   }
@@ -110,7 +110,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PandataskConfi
     apiBaseUrl: withoutTrailingSlash(apiBase.toString()),
     username: required(env, 'PANDATASK_USERNAME'),
     appPassword,
-    defaultDryRun: booleanValue(env.PANDATASK_DRY_RUN, false),
+    defaultDryRun: booleanValue(env.PANDATASK_DRY_RUN, true),
     timeoutMs,
     allowInsecureHttp,
     toolProfile: toolProfile(env.PANDATASK_TOOL_PROFILE),

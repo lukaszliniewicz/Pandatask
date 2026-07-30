@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.14
+**Version:** 1.0.15
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -377,6 +377,14 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.15
+
+- Make group/profile/standalone mounts responsive to their actual container width, with an overlay project navigator for constrained embedded slots.
+- Add durable URL routing for tabs, views, and task details, browser history support, idempotent React roots, lazy-load recovery, and decomposed workspace/modal components.
+- Add strict TypeScript API/query boundaries, centralized query keys and retry/cancellation policy, bounded Gantt/recurrence/list/media workloads, and bundle-size budgets.
+- Harden task-role and board-move authorization, comment access, protected downloads, anonymous bug intake, directory lookup, AI reference data, and MCP credentials and safe defaults.
+- Refresh compatible dependencies, pin CI actions, and make dev deployment validation and rollback cover the WordPress activation check.
 
 ### 1.0.14
 

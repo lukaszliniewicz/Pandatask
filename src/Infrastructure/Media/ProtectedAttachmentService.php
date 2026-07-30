@@ -10,6 +10,8 @@ use WP_REST_Request;
 final class ProtectedAttachmentService {
     const OPTION_PREFIX = 'pandatask_protected_attachment_';
 
+    const DEFAULT_MAX_BYTES = 26214400;
+
     public static function registerHooks() {
         add_action( 'rest_api_init', array( __CLASS__, 'registerRoutes' ) );
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -49,6 +51,30 @@ final class ProtectedAttachmentService {
             if ( ! $source ) {
                 return new WP_Error( 'pandatask_attachment_source_missing', 'The task attachment source file is missing.' );
             }
+
+            $source_size = @filesize( $source );
+            $maximum_bytes = max(
+                1,
+                (int) apply_filters(
+                    'pandatask_max_protected_attachment_bytes',
+                    defined( 'PANDATASK_MAX_PROTECTED_ATTACHMENT_BYTES' )
+                        ? PANDATASK_MAX_PROTECTED_ATTACHMENT_BYTES
+                        : self::DEFAULT_MAX_BYTES
+                )
+            );
+
+            if ( false === $source_size || $source_size > $maximum_bytes ) {
+                return new WP_Error(
+                    'pandatask_attachment_too_large',
+                    sprintf(
+                        /* translators: %s: maximum attachment size. */
+                        __( 'The task attachment exceeds the protected-storage limit of %s.', 'pandatask' ),
+                        size_format( $maximum_bytes )
+                    ),
+                    array( 'status' => 413, 'maximum_bytes' => $maximum_bytes )
+                );
+            }
+
             $extension = strtolower( pathinfo( $source, PATHINFO_EXTENSION ) ) ?: 'bin';
             $key = $task_id . '/original.' . sanitize_key( $extension );
             $target = self::pathForKey( $key, false );
@@ -87,6 +113,8 @@ final class ProtectedAttachmentService {
         $task->attachment_url = self::viewerCanAccess( $task, $viewer_id )
             ? self::signedUrl( (int) $task->id, $viewer_id, $registry )
             : '';
+        $task->attachment_protected = true;
+        $task->attachment_public_source_retained = empty( $registry['public_removed'] );
         return $task;
     }
 
@@ -101,7 +129,8 @@ final class ProtectedAttachmentService {
         $registry = self::registry( $task_id );
         if ( ! $task || empty( $registry['key'] ) ) return self::notFound();
         $viewer_id = self::resolveSignedViewer( $request, $task_id, $registry );
-        if ( $viewer_id <= 0 || ! self::viewerCanAccess( $task, $viewer_id ) ) return self::notFound();
+        $current_user_id = get_current_user_id();
+        if ( $viewer_id <= 0 || $current_user_id <= 0 || $viewer_id !== $current_user_id || ! self::viewerCanAccess( $task, $viewer_id ) ) return self::notFound();
         $path = self::pathForKey( $registry['key'], true );
         if ( ! $path || ! is_readable( $path ) ) return self::notFound();
         return self::streamFile( $request, $path, (string) ( $registry['mime_type'] ?? '' ), (string) ( $registry['filename'] ?? 'attachment' ) );
@@ -191,8 +220,8 @@ final class ProtectedAttachmentService {
     private static function viewerCanAccess( $task, $viewer_id ) {
         if ( $viewer_id <= 0 || ! $task ) return false;
         if ( user_can( $viewer_id, 'manage_options' ) ) return true;
-        if ( ! empty( $task->assigned_user_ids ) && in_array( (string) $viewer_id, $task->assigned_user_ids, true ) ) return true;
-        if ( ! empty( $task->supervisor_user_ids ) && in_array( (string) $viewer_id, $task->supervisor_user_ids, true ) ) return true;
+        if ( ! empty( $task->assigned_user_ids ) && in_array( $viewer_id, array_map( 'intval', $task->assigned_user_ids ), true ) ) return true;
+        if ( ! empty( $task->supervisor_user_ids ) && in_array( $viewer_id, array_map( 'intval', $task->supervisor_user_ids ), true ) ) return true;
         if ( (int) ( $task->creator_id ?? 0 ) === $viewer_id ) return true;
         return true === ( new BoardAccessPolicy() )->canReadBoard( (string) $task->board_name, $viewer_id );
     }
@@ -200,7 +229,16 @@ final class ProtectedAttachmentService {
     private static function signedUrl( $task_id, $viewer_id, $registry ) {
         $expires = time() + 900; $generation = (int) ( $registry['generation'] ?? 1 );
         $payload = implode( '|', array( $task_id, $viewer_id, $expires, $generation ) );
-        return add_query_arg( array( 'viewer' => $viewer_id, 'expires' => $expires, 'generation' => $generation, 'signature' => hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) ) ), rest_url( 'pandatask/v1/protected-attachments/' . $task_id ) );
+        return add_query_arg(
+            array(
+                'viewer'     => $viewer_id,
+                'expires'    => $expires,
+                'generation' => $generation,
+                'signature'  => hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) ),
+                '_wpnonce'   => wp_create_nonce( 'wp_rest' ),
+            ),
+            rest_url( 'pandatask/v1/protected-attachments/' . $task_id )
+        );
     }
 
     private static function resolveSignedViewer( $request, $task_id, $registry ) {

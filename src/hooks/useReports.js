@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useReports = ( filters ) => {
 	const { apiClient, boardName } = useConfig();
 
 	return useQuery( {
-		queryKey: [ 'report', boardName, filters ],
-		queryFn: async () => {
+		queryKey: queryKeys.reports.detail( boardName, filters ),
+		queryFn: async ( { signal } ) => {
 			const params = new URLSearchParams();
 			if ( filters.period ) {
 				params.append( 'period', filters.period );
@@ -20,7 +21,7 @@ export const useReports = ( filters ) => {
 
 			const response = await apiClient.get(
 				`boards/${ boardName }/report`,
-				{ params }
+				{ params, signal }
 			);
 			return response;
 		},

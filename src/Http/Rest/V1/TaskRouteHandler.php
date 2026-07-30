@@ -7,6 +7,7 @@ use Pandatask\Application\Category\CategoryService;
 use Pandatask\Application\Project\ProjectService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\PublicBugSubmissionPolicy;
+use Pandatask\Application\Security\TaskAccessPolicy;
 use Pandatask\Application\Task\HistoryService;
 use Pandatask\Application\Task\TaskService;
 use Pandatask\Http\Rest\V1\Support\RequestHelper;
@@ -27,13 +28,16 @@ final class TaskRouteHandler {
 
     private $public_bug_submission_policy;
 
-    public function __construct( $task_service = null, $history_service = null, $category_service = null, $project_service = null, $board_access_policy = null, $public_bug_submission_policy = null ) {
+    private $task_access_policy;
+
+    public function __construct( $task_service = null, $history_service = null, $category_service = null, $project_service = null, $board_access_policy = null, $public_bug_submission_policy = null, $task_access_policy = null ) {
         $this->task_service    = $task_service ?: new TaskService();
         $this->history_service = $history_service ?: new HistoryService();
         $this->category_service = $category_service ?: new CategoryService();
         $this->project_service = $project_service ?: new ProjectService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
         $this->public_bug_submission_policy = $public_bug_submission_policy ?: new PublicBugSubmissionPolicy();
+        $this->task_access_policy = $task_access_policy ?: new TaskAccessPolicy( $this->task_service, $this->board_access_policy );
     }
 
     public function get_potential_parent_tasks( $request ) {
@@ -62,7 +66,7 @@ final class TaskRouteHandler {
         $private_only      = isset( $params['private_only'] ) && 'true' === $params['private_only'];
         $include_templates = isset( $params['include_templates'] ) && 'true' === $params['include_templates'];
         $task_type_filter  = $params['task_type_filter'] ?? '';
-        $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 0;
+        $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 500;
         $offset            = max( 0, (int) ( $params['offset'] ?? 0 ) );
 
         $last_underscore_pos = strrpos( $sort, '_' );
@@ -185,6 +189,12 @@ final class TaskRouteHandler {
             return new WP_Error( 'rest_task_not_found', __( 'Task not found.', 'pandatask' ), array( 'status' => 404 ) );
         }
 
+        $field_permission = $this->validateSensitiveTaskUpdate( $id, $data, $current_task );
+
+        if ( is_wp_error( $field_permission ) ) {
+            return $field_permission;
+        }
+
         $target_board = $data['board_name'] ?? $current_task->board_name;
         $data = $this->applyParentProjectInheritance( $target_board, $data, $current_task );
 
@@ -287,6 +297,12 @@ final class TaskRouteHandler {
 
         if ( ! $current_task ) {
             return new WP_Error( 'rest_task_not_found', __( 'Task not found.', 'pandatask' ), array( 'status' => 404 ) );
+        }
+
+        $field_permission = $this->validateSensitiveTaskUpdate( $task_id, $task_data, $current_task );
+
+        if ( is_wp_error( $field_permission ) ) {
+            return $field_permission;
         }
 
         $target_board = $task_data['board_name'] ?? $current_task->board_name;
@@ -405,8 +421,10 @@ final class TaskRouteHandler {
             'predecessors'              => isset( $params['predecessors'] ) ? $this->parse_id_list( $params['predecessors'] ) : array(),
         );
 
-        if ( is_wp_error( $data['deadline'] ) || is_wp_error( $data['start_date'] ) || is_wp_error( $data['recurrence_ends_on'] ) ) {
-            return new WP_Error( 'rest_invalid_param', __( 'Dates must use the YYYY-MM-DD format.', 'pandatask' ), array( 'status' => 422 ) );
+        foreach ( array( 'deadline', 'start_date', 'recurrence_ends_on' ) as $date_field ) {
+            if ( is_wp_error( $data[ $date_field ] ) ) {
+                return $data[ $date_field ];
+            }
         }
 
         $attachment_validation = $this->validateAttachmentInput( $data );
@@ -544,6 +562,12 @@ final class TaskRouteHandler {
             return new WP_Error( 'rest_forbidden', __( 'Public bug submission is not enabled for this board.', 'pandatask' ), array( 'status' => 403 ) );
         }
 
+        $rate_limit = $this->public_bug_submission_policy->consumeAnonymousSubmissionBudget();
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $assignee_id = $this->public_bug_submission_policy->getConfiguredAssigneeId();
         $public_params = array(
             'name'        => $params['name'] ?? '',
@@ -568,12 +592,23 @@ final class TaskRouteHandler {
             return new WP_Error( 'rest_invalid_param', __( 'A valid board is required.', 'pandatask' ), array( 'status' => 422 ) );
         }
 
-        if ( $current_task && $board_name !== $current_task->board_name ) {
+        $board_is_changing = $current_task && $board_name !== $current_task->board_name;
+
+        if ( $board_is_changing ) {
             $destination_permission = $this->board_access_policy->canWriteBoard( $board_name, get_current_user_id() );
 
             if ( true !== $destination_permission ) {
                 return $destination_permission;
             }
+
+            // A board move crosses a security boundary. Validate every retained
+            // board-scoped relationship, not only the fields present in the patch.
+            $data['category_id'] = array_key_exists( 'category_id', $data ) ? $data['category_id'] : ( $current_task->category_id ?? null );
+            $data['project_id'] = array_key_exists( 'project_id', $data ) ? $data['project_id'] : ( $current_task->project_id ?? null );
+            $data['parent_task_id'] = array_key_exists( 'parent_task_id', $data ) ? $data['parent_task_id'] : ( $current_task->parent_task_id ?? null );
+            $data['predecessors'] = array_key_exists( 'predecessors', $data ) ? $data['predecessors'] : ( $current_task->predecessor_ids ?? array() );
+            $data['assigned_persons'] = array_key_exists( 'assigned_persons', $data ) ? $data['assigned_persons'] : ( $current_task->assigned_user_ids ?? array() );
+            $data['supervisor_persons'] = array_key_exists( 'supervisor_persons', $data ) ? $data['supervisor_persons'] : ( $current_task->supervisor_user_ids ?? array() );
         }
 
         if ( ! empty( $data['category_id'] ) && ! $this->category_service->isCategoryOnBoard( $data['category_id'], $board_name ) ) {
@@ -679,7 +714,51 @@ final class TaskRouteHandler {
             return new WP_Error( 'rest_invalid_date', __( 'Dates must use the YYYY-MM-DD format.', 'pandatask' ), array( 'status' => 422 ) );
         }
 
+        $minimum = (string) apply_filters( 'pandatask_minimum_task_date', '1900-01-01' );
+        $maximum = (string) apply_filters( 'pandatask_maximum_task_date', '2200-12-31' );
+
+        if ( $value < $minimum || $value > $maximum ) {
+            return new WP_Error(
+                'rest_invalid_date_range',
+                sprintf(
+                    /* translators: 1: earliest supported date, 2: latest supported date. */
+                    __( 'Dates must be between %1$s and %2$s.', 'pandatask' ),
+                    $minimum,
+                    $maximum
+                ),
+                array( 'status' => 422 )
+            );
+        }
+
         return $value;
+    }
+
+    private function validateSensitiveTaskUpdate( $task_id, $data, $current_task ) {
+        if ( array_key_exists( 'assigned_persons', $data ) || array_key_exists( 'supervisor_persons', $data ) ) {
+            $role_permission = $this->task_access_policy->canManageTaskRoles( $task_id, get_current_user_id() );
+
+            if ( true !== $role_permission ) {
+                return new WP_Error(
+                    'rest_forbidden_task_roles',
+                    __( 'Only the task creator, a supervisor, or a board manager may change task roles.', 'pandatask' ),
+                    array( 'status' => 403 )
+                );
+            }
+        }
+
+        if ( isset( $data['board_name'] ) && $data['board_name'] !== $current_task->board_name ) {
+            $move_permission = $this->task_access_policy->canMoveTask( $task_id, get_current_user_id() );
+
+            if ( true !== $move_permission ) {
+                return new WP_Error(
+                    'rest_forbidden_task_move',
+                    __( 'Only a board manager may move a task to another board.', 'pandatask' ),
+                    array( 'status' => 403 )
+                );
+            }
+        }
+
+        return true;
     }
 
     private function sanitizeRecurrenceDays( $value ) {

@@ -1,6 +1,6 @@
 {
   "name": "pandatask",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Adds a shortcode [task_board board_name=\"unique_board_id\"] to display a task management board.",
   "main": "build/main.js",
   "scripts": {
@@ -16,31 +16,38 @@
     "lint": "npm run lint:js && npm run lint:style",
     "lint:js": "wp-scripts lint-js src assets/js",
     "lint:style": "wp-scripts lint-style \"assets/scss/**/*.scss\"",
+    "typecheck": "tsc -p tsconfig.frontend.json",
+    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "check:build-size": "node scripts/check-build-size.mjs",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run check:build-size && npm run audit:production",
     "zip": "npm run build && shx rm -rf release && shx mkdir -p release/pandatask/assets && shx cp pandatask.php README.txt release/pandatask/ && shx cp -r templates build src release/pandatask/ && shx cp -r assets/css assets/js release/pandatask/assets/ && cd release && bestzip ../pandatask.zip pandatask/ && cd .. && shx rm -rf release"
   },
   "author": "Lukasz Liniewicz",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@wordpress/scripts": "^32.2.0",
-    "bestzip": "^2.2.1",
+    "bestzip": "^2.2.5",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "shx": "^0.4.0"
+    "sass": "^1.102.0",
+    "shx": "^0.4.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/utilities": "^3.2.2",
-    "@tanstack/react-query": "^5.90.20",
-    "axios": "^1.18.1",
-    "lucide-react": "^1.27.0",
-    "react-hook-form": "^7.0.0",
+    "@tanstack/react-query": "^5.101.4",
+    "axios": "^1.19.0",
+    "lucide-react": "^1.28.0",
+    "react-hook-form": "^7.83.0",
     "react-mentions": "^4.4.10"
   },
   "overrides": {
     "adm-zip": "0.6.0",
     "linkify-it": "6.0.0",
     "markdown-it": "14.3.0",
-    "minimatch": "3.1.5",
     "react-mentions": {
       "@babel/runtime": "^7.29.0"
     },

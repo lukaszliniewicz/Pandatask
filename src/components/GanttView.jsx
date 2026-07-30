@@ -1,12 +1,12 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
 	addGanttDays,
+	buildGanttTimelineWindow,
 	buildGanttModel,
 	formatGanttDate,
 	ganttDayDifference,
 	getGanttTaskSet,
 	parseGanttDate,
-	pickGanttFocusDate,
 } from '../ganttModel.mjs';
 import Icon from './Icon';
 
@@ -140,12 +140,20 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 		[ model.rows, collapsedIds ]
 	);
 
-	const scheduledRows = visibleRows.filter(
+	const allScheduledRows = visibleRows.filter(
 		( row ) => row.effectiveStart && row.effectiveEnd
 	);
 	const unscheduledRows = visibleRows.filter(
 		( row ) => ! row.effectiveStart || ! row.effectiveEnd
 	);
+	const zoomConfig = ZOOM_LEVELS[ zoom ];
+	const today = getLocalToday();
+	const timelineWindow = buildGanttTimelineWindow(
+		allScheduledRows,
+		today,
+		zoomConfig.padding
+	);
+	const scheduledRows = timelineWindow.visibleRows;
 	const rowIndexes = new Map(
 		scheduledRows.map( ( row, index ) => [ row.id, index ] )
 	);
@@ -158,15 +166,8 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 		0
 	);
 
-	const zoomConfig = ZOOM_LEVELS[ zoom ];
-	const today = getLocalToday();
-	const firstDate =
-		model.rangeStart && model.rangeStart < today ? model.rangeStart : today;
-	const lastDate =
-		model.rangeEnd && model.rangeEnd > today ? model.rangeEnd : today;
-	const timelineStart = addGanttDays( firstDate, -zoomConfig.padding );
-	const timelineEnd = addGanttDays( lastDate, zoomConfig.padding );
-	const dayCount = ganttDayDifference( timelineStart, timelineEnd ) + 1;
+	const timelineStart = timelineWindow.start;
+	const dayCount = timelineWindow.dayCount;
 	const timelineWidth = Math.max(
 		720,
 		dayCount * zoomConfig.dayWidth
@@ -178,7 +179,7 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 	const todayOffset =
 		ganttDayDifference( timelineStart, today ) * zoomConfig.dayWidth +
 		zoomConfig.dayWidth / 2;
-	const initialFocusDate = pickGanttFocusDate( scheduledRows, today );
+	const initialFocusDate = timelineWindow.focusDate;
 	const initialFocusOffset =
 		ganttDayDifference( timelineStart, initialFocusDate ) *
 			zoomConfig.dayWidth +
@@ -243,7 +244,7 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 	};
 
 	const scrollToToday = () => {
-		if ( ! scrollRef.current ) {
+		if ( ! scrollRef.current || ! timelineWindow.todayIsVisible ) {
 			return;
 		}
 
@@ -286,6 +287,12 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 						type="button"
 						className="pandat69-gantt-toolbar-button is-text"
 						onClick={ scrollToToday }
+						disabled={ ! timelineWindow.todayIsVisible }
+						title={
+							timelineWindow.todayIsVisible
+								? 'Scroll to today'
+								: 'Today is outside the bounded timeline window'
+						}
 					>
 						Today
 					</button>
@@ -345,7 +352,7 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 
 			<div className="pandat69-gantt-summary" aria-live="polite">
 				<span>
-					<strong>{ scheduledRows.length }</strong> scheduled
+					<strong>{ allScheduledRows.length }</strong> scheduled
 				</span>
 				<span>
 					<strong>{ unscheduledRows.length }</strong> unscheduled
@@ -355,6 +362,19 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 						<Icon name="circle-alert" size={ 15 } />
 						<strong>{ conflictCount }</strong>{ ' ' }
 						schedule { conflictCount === 1 ? 'warning' : 'warnings' }
+					</span>
+				) }
+				{ timelineWindow.wasBounded && (
+					<span className="has-warning">
+						<Icon name="circle-alert" size={ 15 } />
+						Timeline limited to { dayCount } days
+						{ timelineWindow.excludedRowCount > 0
+							? `; ${ timelineWindow.excludedRowCount } scheduled ${
+									timelineWindow.excludedRowCount === 1
+										? 'task is'
+										: 'tasks are'
+							  } outside this window`
+							: ''}
 					</span>
 				) }
 				<span className="pandat69-gantt-semantics">
@@ -416,33 +436,56 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 							</div>
 
 							{ scheduledRows.map( ( row ) => {
+								const visibleStart =
+									row.effectiveStart < timelineWindow.start
+										? timelineWindow.start
+										: row.effectiveStart;
+								const visibleEnd =
+									row.effectiveEnd > timelineWindow.end
+										? timelineWindow.end
+										: row.effectiveEnd;
 								const left =
 									ganttDayDifference(
 										timelineStart,
-										row.effectiveStart
+										visibleStart
 									) * zoomConfig.dayWidth;
 								const width = Math.max(
 									zoomConfig.dayWidth,
 									( ganttDayDifference(
-										row.effectiveStart,
-										row.effectiveEnd
+										visibleStart,
+										visibleEnd
 									) +
 										1 ) *
 										zoomConfig.dayWidth
 								);
-								const ownLeft = row.ownStart
+								const hasVisibleOwnRange =
+									row.ownStart &&
+									row.ownEnd &&
+									row.ownStart <= timelineWindow.end &&
+									row.ownEnd >= timelineWindow.start;
+								const visibleOwnStart = hasVisibleOwnRange
+									? row.ownStart < timelineWindow.start
+										? timelineWindow.start
+										: row.ownStart
+									: null;
+								const visibleOwnEnd = hasVisibleOwnRange
+									? row.ownEnd > timelineWindow.end
+										? timelineWindow.end
+										: row.ownEnd
+									: null;
+								const ownLeft = visibleOwnStart
 									? ganttDayDifference(
-											row.effectiveStart,
-											row.ownStart
+											visibleStart,
+											visibleOwnStart
 									  ) * zoomConfig.dayWidth
 									: 0;
 								const ownWidth =
-									row.ownStart && row.ownEnd
+									visibleOwnStart && visibleOwnEnd
 										? Math.max(
 												zoomConfig.dayWidth,
 												( ganttDayDifference(
-													row.ownStart,
-													row.ownEnd
+													visibleOwnStart,
+													visibleOwnEnd
 												) +
 													1 ) *
 													zoomConfig.dayWidth
@@ -565,13 +608,15 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 											role="cell"
 											aria-label={ dateLabel }
 										>
-											<div
-												className="pandat69-gantt-today-line"
-												style={ {
-													left: `${ todayOffset }px`,
-												} }
-												aria-hidden="true"
-											/>
+											{ timelineWindow.todayIsVisible && (
+												<div
+													className="pandat69-gantt-today-line"
+													style={ {
+														left: `${ todayOffset }px`,
+													} }
+													aria-hidden="true"
+												/>
+											) }
 											<div
 												className={ `pandat69-gantt-bar status-${ row.task.status } kind-${ row.scheduleKind } ${
 													row.warnings.length
@@ -585,8 +630,7 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 												title={ `${ row.task.name }: ${ dateLabel }` }
 											>
 												{ row.children.length > 0 &&
-													row.ownStart &&
-													row.ownEnd && (
+													hasVisibleOwnRange && (
 														<span
 															className="pandat69-gantt-own-range"
 															style={ {
@@ -627,19 +671,27 @@ const GanttView = ( { tasks, onTaskAction } ) => {
 								{ visibleEdges.map( ( edge ) => {
 									const from = rowsById.get( edge.from );
 									const to = rowsById.get( edge.to );
-									const fromX =
+									const rawFromX =
 										( ganttDayDifference(
 											timelineStart,
 											from.effectiveEnd
 										) +
 											1 ) *
 										zoomConfig.dayWidth;
-									const toX =
+									const rawToX =
 										ganttDayDifference(
 											timelineStart,
 											to.effectiveStart
 										) *
 										zoomConfig.dayWidth;
+									const fromX = Math.min(
+										timelineWidth,
+										Math.max( 0, rawFromX )
+									);
+									const toX = Math.min(
+										timelineWidth,
+										Math.max( 0, rawToX )
+									);
 									const fromY =
 										rowIndexes.get( edge.from ) *
 											ROW_HEIGHT +

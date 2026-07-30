@@ -62,6 +62,49 @@ function transportError(error: unknown, timeoutSignal: AbortSignal, requestSigna
   return new PandataskApiError(`Unable to reach Pandatask: ${message}`, 0, 'pandatask_network_error');
 }
 
+function replaceAllLiteral(value: string, needle: string, replacement: string): string {
+  return needle ? value.split(needle).join(replacement) : value;
+}
+
+/**
+ * WordPress or an intermediary may reflect request metadata in an error body.
+ * Never pass configured credentials through MCP structured or text output.
+ */
+export function redactCredentialMaterial(value: unknown, config: PandataskConfig): unknown {
+  const rawCredential = `${config.username}:${config.appPassword}`;
+  const encodedCredential = Buffer.from(rawCredential, 'utf8').toString('base64');
+
+  const visit = (entry: unknown, key = ''): unknown => {
+    if (entry === null || entry === undefined) return entry;
+    if (typeof entry === 'string') {
+      if (/authorization|password|credential|secret/i.test(key)) {
+        return '[REDACTED]';
+      }
+
+      let redacted = entry;
+      redacted = replaceAllLiteral(redacted, `Basic ${encodedCredential}`, 'Basic [REDACTED]');
+      redacted = replaceAllLiteral(redacted, encodedCredential, '[REDACTED]');
+      redacted = replaceAllLiteral(redacted, rawCredential, '[REDACTED]');
+      redacted = replaceAllLiteral(redacted, config.appPassword, '[REDACTED]');
+      return redacted;
+    }
+    if (Array.isArray(entry)) {
+      return entry.map((item) => visit(item));
+    }
+    if (typeof entry === 'object') {
+      return Object.fromEntries(
+        Object.entries(entry as Record<string, unknown>).map(([childKey, childValue]) => [
+          childKey,
+          visit(childValue, childKey),
+        ]),
+      );
+    }
+    return entry;
+  };
+
+  return visit(value);
+}
+
 export class PandataskClient {
   constructor(
     readonly config: PandataskConfig,
@@ -173,6 +216,7 @@ export class PandataskClient {
         payload = { message: text.slice(0, 2000) };
       }
     }
+    payload = redactCredentialMaterial(payload, this.config);
 
     if (!response.ok) {
       const errorPayload = apiErrorPayload(payload);

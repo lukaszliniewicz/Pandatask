@@ -1,13 +1,14 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { queryKeys } from '../query/queryKeys';
 
 export const useTasks = ( filters = {}, overrideBoardName ) => {
 	const { apiClient, boardName: contextBoardName } = useConfig();
 	const activeBoard = overrideBoardName || contextBoardName;
 
 	return useQuery( {
-		queryKey: [ 'tasks', activeBoard, filters ],
-		queryFn: async () => {
+		queryKey: queryKeys.tasks.list( activeBoard, filters ),
+		queryFn: async ( { signal } ) => {
 			if ( ! activeBoard ) {
 				return [];
 			}
@@ -42,11 +43,12 @@ export const useTasks = ( filters = {}, overrideBoardName ) => {
 			}
 
 			params.append( 'include_templates', 'true' );
+			params.append( 'limit', '500' );
 
 			// API fetch
 			const response = await apiClient.get(
 				`boards/${ activeBoard }/tasks`,
-				{ params }
+				{ params, signal }
 			);
 			return response.tasks;
 		},

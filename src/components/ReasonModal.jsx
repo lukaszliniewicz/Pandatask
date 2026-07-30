@@ -13,7 +13,7 @@ const ReasonModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="pandat69-reason-modal-content">
-                <p dangerouslySetInnerHTML={{ __html: message }}></p>
+                <p>{message}</p>
                 <textarea 
                     className="pandat69-textarea" 
                     placeholder="Optional comment..."

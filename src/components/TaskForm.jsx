@@ -65,7 +65,8 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                 type: task?.attachment_type || '',
                 url: task?.attachment_url || '',
                 id: task?.attachment_post_id || '',
-                filename: task?.attachment_filename || ''
+                filename: task?.attachment_filename || '',
+                publicSourceRetained: Boolean(task?.attachment_public_source_retained)
             },
             target_board: task?.board_name || boardName || ''
         }

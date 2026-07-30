@@ -42,8 +42,8 @@ test('Pandatask shortcode uses a dedicated mount boundary and IARF aliases', () 
 	assert.match(shortcode, /pandat69-mount pandat69-root/);
 	assert.match(shortcode, /data-pandatask-board-root/);
 	assert.match(shortcode, /pandat69-bug-tracker-container pandat69-root/);
-	assert.match(entry, /querySelectorAll\('\[data-pandatask-board-root\]'\)/);
-	assert.match(entry, /classList\.remove\('pandat69-container', 'pandat69-viewport-shell'\)/);
+	assert.match(entry, /querySelectorAll\(\s*'\[data-pandatask-board-root\]'/);
+	assert.match(entry, /classList\.remove\(\s*'pandat69-container',\s*'pandat69-viewport-shell'\s*\)/);
 	for (const source of [shortcode, frontend, entry]) {
 		assert.match(source, /iarf-app--pandatask/);
 		assert.match(source, /iarf-plugin--pandatask/);
@@ -148,7 +148,7 @@ test('Pandatask uses an explicit Lucide icon boundary without Dashicons', () => 
 		.map((file) => fs.readFileSync(path.join(repoRoot, 'assets/scss', file), 'utf8'))
 		.join('\n');
 
-	assert.equal(packageJson.dependencies['lucide-react'], '^1.27.0');
+	assert.match(packageJson.dependencies['lucide-react'], /^\^1\.\d+\.\d+$/);
 	assert.match(icon, /from 'lucide-react'/);
 	assert.doesNotMatch(icon, /import\s+\*\s+as/);
 	assert.doesNotMatch(componentSources, /dashicons/i);
@@ -234,6 +234,8 @@ test('Pandatask protects task attachments without web-server-specific delivery',
 	assert.match(media, /pathIsPublic/);
 	assert.match(media, /hash_hmac\(\s*'sha256'/);
 	assert.match(media, /hash_equals/);
+	assert.match(media, /\$viewer_id !== \$current_user_id/);
+	assert.match(media, /PANDATASK_MAX_PROTECTED_ATTACHMENT_BYTES/);
 	assert.match(media, /Accept-Ranges: bytes/);
 	assert.match(media, /Cache-Control: private, no-store/);
 	assert.match(media, /normalizePermissions/);
@@ -261,6 +263,7 @@ test('Pandatask REST API exposes bounded pagination, site metadata, and mutation
 	assert.match(registrar, /'limit'\s*=>\s*array/);
 	assert.match(registrar, /'offset'\s*=>\s*array/);
 	assert.match(handler, /'pagination'\s*=>\s*array/);
+	assert.match(handler, /:\s*500;/);
 	assert.match(middleware, /rest_request_before_callbacks/);
 	assert.match(middleware, /rest_request_after_callbacks/);
 	assert.match(middleware, /pandatask_idempotency_conflict/);
@@ -268,4 +271,55 @@ test('Pandatask REST API exposes bounded pagination, site metadata, and mutation
 	assert.match(middleware, /add_option\(/);
 	assert.match(middleware, /DAY_IN_SECONDS/);
 	assert.match(middleware, /get_current_user_id\(\)/);
+});
+
+test('Frontend navigation, mounting, and embedded layout are host-safe', () => {
+	const entry = fs.readFileSync(path.join(repoRoot, 'src/index.jsx'), 'utf8');
+	const navigation = fs.readFileSync(path.join(repoRoot, 'src/hooks/useBoardNavigation.js'), 'utf8');
+	const containerMode = fs.readFileSync(path.join(repoRoot, 'src/hooks/useContainerMode.js'), 'utf8');
+	const responsive = fs.readFileSync(path.join(repoRoot, 'assets/scss/layouts/_responsive.scss'), 'utf8');
+
+	assert.match(entry, /new WeakMap\(\)/);
+	assert.match(entry, /\.\.\.\( window\.Pandatask \|\| \{\} \)/);
+	assert.match(entry, /document\.readyState === 'loading'/);
+	assert.match(entry, /queueMicrotask\( bootstrapStandaloneMounts \)/);
+	assert.match(navigation, /pandatask_tab/);
+	assert.match(navigation, /pandatask_view/);
+	assert.match(navigation, /open_task/);
+	assert.match(navigation, /popstate/);
+	assert.match(containerMode, /ResizeObserver/);
+	assert.match(containerMode, /COMPACT_BOARD_WIDTH = 1080/);
+	assert.match(responsive, /\.pandat69-container\.is-container-narrow/);
+});
+
+test('Frontend cache policy and typed API boundary are centralized', () => {
+	const keys = fs.readFileSync(path.join(repoRoot, 'src/query/queryKeys.ts'), 'utf8');
+	const client = fs.readFileSync(path.join(repoRoot, 'src/api/client.ts'), 'utf8');
+	const queryClient = fs.readFileSync(path.join(repoRoot, 'src/query/createQueryClient.ts'), 'utf8');
+	const taskHook = fs.readFileSync(path.join(repoRoot, 'src/hooks/useTasks.js'), 'utf8');
+
+	assert.match(keys, /export const queryKeys/);
+	assert.match(client, /class PandataskApiError/);
+	assert.match(client, /readonly status/);
+	assert.match(queryClient, /createPandataskQueryClient/);
+	assert.match(queryClient, /\[ 400, 401, 403, 404, 409, 422 \]/);
+	assert.match(taskHook, /queryKeys\.tasks\.list/);
+	assert.match(taskHook, /\{ params, signal \}/);
+	assert.match(taskHook, /params\.append\( 'limit', '500' \)/);
+});
+
+test('Security-sensitive task edits and public intake have explicit guards', () => {
+	const policy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/TaskAccessPolicy.php'), 'utf8');
+	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');
+	const publicPolicy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/PublicBugSubmissionPolicy.php'), 'utf8');
+	const comments = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/CommentAccessPolicy.php'), 'utf8');
+
+	assert.match(policy, /canManageTaskRoles/);
+	assert.match(policy, /canMoveTask/);
+	assert.match(handler, /validateSensitiveTaskUpdate/);
+	assert.match(handler, /board-scoped relationship/);
+	assert.match(handler, /pandatask_minimum_task_date/);
+	assert.match(publicPolicy, /consumeAnonymousSubmissionBudget/);
+	assert.match(publicPolicy, /REMOTE_ADDR/);
+	assert.match(comments, /canReadTask/);
 });

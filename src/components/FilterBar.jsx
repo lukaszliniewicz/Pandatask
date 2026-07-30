@@ -4,6 +4,73 @@ import { useProjects } from '../hooks/useProjects';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import Icon from './Icon';
 
+const SORT_OPTIONS = [
+    { value: 'name_asc', label: 'Name (A-Z)' },
+    { value: 'priority_desc', label: 'Priority (High)' },
+    { value: 'deadline_asc', label: 'Deadline (Soon)' },
+    { value: 'created_at_desc', label: 'Newest First' },
+];
+
+const STATUS_OPTIONS = [
+    { value: 'pending_in-progress', label: 'Active (Pending/In-Progress)' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'done', label: 'Done' },
+    { value: '', label: 'All Statuses' },
+];
+
+const Dropdown = ({ icon, title, value, options, onChange }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const handleClick = (event) => {
+            if (ref.current && !ref.current.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('pointerdown', handleClick);
+        return () => document.removeEventListener('pointerdown', handleClick);
+    }, [open]);
+
+    return (
+        <div className="pandat69-icon-filter" ref={ref}>
+            <button
+                type="button"
+                className={`pandat69-icon-button ${value && value !== '' && value !== 'name_asc' ? 'active' : ''}`}
+                onClick={() => setOpen((isOpen) => !isOpen)}
+                title={title}
+                aria-label={title}
+                aria-expanded={open}
+                aria-haspopup="menu"
+            >
+                <Icon name={icon} />
+            </button>
+            {open && (
+                <div className="pandat69-filter-dropdown" role="menu">
+                    {options.map((option) => (
+                        <button
+                            type="button"
+                            key={option.value}
+                            className={`pandat69-filter-item ${value === option.value ? 'selected' : ''}`}
+                            onClick={() => {
+                                onChange(option.value);
+                                setOpen(false);
+                            }}
+                            role="menuitemradio"
+                            aria-checked={value === option.value}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSubtaskToggle, onToggleSubtasks, allSubtasksExpanded }) => {
     const { boardName } = useConfig();
     const isUserBoard = boardName?.startsWith('user_');
@@ -22,51 +89,6 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
     useEffect(() => {
         setSearch(filters.search || '');
     }, [filters.search]);
-    
-    // Helper for dropdowns
-    const Dropdown = ({ icon, title, value, options, onChange }) => {
-        const [open, setOpen] = useState(false);
-        const ref = useRef(null);
-        
-        useEffect(() => {
-            const handleClick = (e) => { if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
-            document.addEventListener('mousedown', handleClick);
-            return () => document.removeEventListener('mousedown', handleClick);
-        }, []);
-
-        return (
-            <div className="pandat69-icon-filter" ref={ref}>
-                <button 
-                    type="button"
-                    className={`pandat69-icon-button ${value && value !== '' && value !== 'name_asc' ? 'active' : ''}`} 
-                    onClick={() => setOpen(!open)}
-                    title={title}
-                    aria-label={title}
-                    aria-expanded={open}
-                    aria-haspopup="menu"
-                >
-                    <Icon name={icon} />
-                </button>
-                {open && (
-                    <div className="pandat69-filter-dropdown" role="menu">
-                        {options.map(opt => (
-                            <button
-                                type="button"
-                                key={opt.value} 
-                                className={`pandat69-filter-item ${value === opt.value ? 'selected' : ''}`}
-                                onClick={() => { onChange(opt.value); setOpen(false); }}
-                                role="menuitemradio"
-                                aria-checked={value === opt.value}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="pandat69-filters">
             <div className="pandat69-filter-group-left">
@@ -87,12 +109,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     title="Sort Tasks"
                     value={filters.sort}
                     onChange={(val) => onFilterChange('sort', val)}
-                    options={[
-                        { value: 'name_asc', label: 'Name (A-Z)' },
-                        { value: 'priority_desc', label: 'Priority (High)' },
-                        { value: 'deadline_asc', label: 'Deadline (Soon)' },
-                        { value: 'created_at_desc', label: 'Newest First' },
-                    ]}
+                    options={SORT_OPTIONS}
                 />
 
                 {/* Status Filter Icon */}
@@ -101,13 +118,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     title="Filter by Status"
                     value={filters.status}
                     onChange={(val) => onFilterChange('status', val)}
-                    options={[
-                        { value: 'pending_in-progress', label: 'Active (Pending/In-Progress)' },
-                        { value: 'pending', label: 'Pending' },
-                        { value: 'in-progress', label: 'In Progress' },
-                        { value: 'done', label: 'Done' },
-                        { value: '', label: 'All Statuses' },
-                    ]}
+                    options={STATUS_OPTIONS}
                 />
 
                 {!hideProjectSelect && (

@@ -76,6 +76,51 @@ final class TaskAccessPolicy {
         return $this->board_access_policy->canManageBoard( $task->board_name, $user_id );
     }
 
+    /**
+     * Assignment and supervisor changes are more privileged than ordinary task edits.
+     *
+     * Assignees may update their work, but must not be able to promote themselves to
+     * supervisor and then gain delete authority.
+     */
+    public function canManageTaskRoles( $task_id, $user_id = null ) {
+        $task = $this->task_service->getTaskForAuthorization( (int) $task_id );
+
+        if ( ! $task ) {
+            return new WP_Error( 'rest_task_not_found', __( 'Task not found.', 'pandatask' ), array( 'status' => 404 ) );
+        }
+
+        $user_id = null === $user_id ? get_current_user_id() : (int) $user_id;
+
+        if (
+            user_can( $user_id, 'manage_options' )
+            || ( isset( $task->creator_id ) && (int) $task->creator_id === $user_id )
+            || $this->containsUserId( $task->supervisor_user_ids ?? array(), $user_id )
+        ) {
+            return true;
+        }
+
+        return $this->board_access_policy->canManageBoard( $task->board_name, $user_id );
+    }
+
+    /**
+     * Moving a task changes the board-level security boundary.
+     */
+    public function canMoveTask( $task_id, $user_id = null ) {
+        $task = $this->task_service->getTaskForAuthorization( (int) $task_id );
+
+        if ( ! $task ) {
+            return new WP_Error( 'rest_task_not_found', __( 'Task not found.', 'pandatask' ), array( 'status' => 404 ) );
+        }
+
+        $user_id = null === $user_id ? get_current_user_id() : (int) $user_id;
+
+        if ( user_can( $user_id, 'manage_options' ) ) {
+            return true;
+        }
+
+        return $this->board_access_policy->canManageBoard( $task->board_name, $user_id );
+    }
+
     public function canAccessTask( $task_id, $user_id = null ) {
         return $this->canReadTask( $task_id, $user_id );
     }
