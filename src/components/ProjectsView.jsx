@@ -13,6 +13,7 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
     const { data: noProjectTasks, isLoading: isLoadingTasks } = useTasks({
         project: 'none',
         archived: false,
+        status: 'pending_in-progress',
         onlyMyTasks: privateOnly,
     });
 
@@ -42,7 +43,12 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
 
             <div className="pandat69-project-list-container-view">
                 <ul className="pandat69-project-list-view">
-                    {projects && projects.length > 0 ? projects.map(project => (
+                    {projects && projects.length > 0 ? projects.map(project => {
+                        const activeTasks = ( project.tasks || [] ).filter(
+                            ( task ) => task.status !== 'done'
+                        );
+
+                        return (
                         <li key={project.id} className="pandat69-project-list-item">
                             <div className="pandat69-project-item-header">
                                 <div className="pandat69-project-item-header-main">
@@ -54,6 +60,10 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
                                                 {project.board_display_name}
                                             </span>
                                         )}
+                                        <span className={`pandat69-project-deadline-meta ${project.deadline ? '' : 'is-empty'}`}>
+                                            <Icon name="calendar" size={13} />
+                                            {project.deadline ? `Due ${project.deadline}` : 'No deadline'}
+                                        </span>
                                     </div>
                                     <p>{project.description}</p>
                                 </div>
@@ -80,37 +90,49 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
                                     </div>
                                 )}
                             </div>
-                            <div className="pandat69-project-item-body">
-                                <div className="pandat69-detail-item">
-                                    <strong>Deadline:</strong> <span>{project.deadline || 'Not set'}</span>
-                                </div>
-                                {/* Assigned Users Display could go here */}
-                            </div>
                             <div className="pandat69-project-task-list-container">
-                                <h5>Tasks</h5>
-                                {project.tasks && project.tasks.length > 0 ? (
+                                <div className="pandat69-project-task-heading">
+                                    <h5>Active tasks</h5>
+                                    <span>{activeTasks.length}</span>
+                                </div>
+                                {activeTasks.length > 0 ? (
                                     <ul className="pandat69-project-task-list">
-                                        {project.tasks.map(t => (
-                                            <li key={t.id}>
+                                        {activeTasks.map(t => (
+                                            <li key={t.id} className={`status-${t.status || 'pending'}`}>
+                                                <span
+                                                    className="pandat69-project-task-status"
+                                                    title={t.status === 'in-progress' ? 'In progress' : 'Pending'}
+                                                />
+                                                {t.parent_task_id ? (
+                                                    <Icon name="corner-down-right" size={14} />
+                                                ) : (
+                                                    <span className="pandat69-project-task-icon-spacer" />
+                                                )}
                                                 <a href="#" className="pandat69-project-task-link" onClick={(e) => { e.preventDefault(); onTaskAction('view', t); }}>
                                                     {t.name}
                                                 </a>
+                                                {t.deadline && (
+                                                    <span className="pandat69-project-task-deadline">
+                                                        <Icon name="calendar" size={13} />
+                                                        {t.deadline}
+                                                    </span>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>
                                 ) : (
-                                    <p>No tasks in this project.</p>
+                                    <p className="pandat69-project-empty-tasks">No active tasks in this project.</p>
                                 )}
                             </div>
                         </li>
-                    )) : (
+                    )}) : (
                         <li className="pandat69-no-projects">No projects found.</li>
                     )}
                 </ul>
             </div>
 
-            <div className="pandat69-tasks-without-project-container" style={{ marginTop: '30px' }}>
-                <h4 style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #eee', color: '#384D68' }}>
+            <div className="pandat69-tasks-without-project-container">
+                <h4>
                     Tasks without a project
                 </h4>
                 {isLoadingTasks ? (

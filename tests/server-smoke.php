@@ -197,6 +197,7 @@ foreach ( $index_requirements as $table_suffix => $required_indexes ) {
 $plugin_dir      = untrailingslashit( PANDAT69_PLUGIN_DIR );
 $required_assets = array(
     'build/main.js',
+    'build/215.js',
     'build/226.js',
     'build/477.js',
     'build/499.js',
@@ -224,8 +225,8 @@ if ( ! empty( $missing_assets ) ) {
     $failures[] = 'Missing packaged assets: ' . implode( ', ', $missing_assets );
 }
 
-if ( '1.0.13' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
-    $failures[] = 'Plugin and database versions are not both 1.0.13.';
+if ( '1.0.14' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
+    $failures[] = 'Expected plugin version 1.0.14 with database schema 1.0.13.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

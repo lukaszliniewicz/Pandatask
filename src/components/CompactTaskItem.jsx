@@ -58,8 +58,14 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
 
     return (
         <li ref={setNodeRef} style={style} className={itemClass}>
-            <div className="pandat69-drag-handle" {...listeners} {...attributes}>
-                <Icon name="grip" size={15} />
+            <div
+                className="pandat69-drag-handle"
+                title="Drag onto another task to make this a subtask"
+                aria-label="Drag task to change its parent"
+                {...listeners}
+                {...attributes}
+            >
+                <Icon name="grip" size={17} />
             </div>
 
             <div className="pandat69-compact-status-col">

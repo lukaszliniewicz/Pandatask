@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.13
+**Version:** 1.0.14
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -377,6 +377,13 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.14
+
+- Add a dependency-aware Gantt view with explicit predecessor arrows, parent/subtask roll-ups, conflict warnings, three zoom levels, completed-context handling, and an unscheduled-work tray.
+- Keep hierarchy and sequencing separate: sibling subtasks never gain inferred dependencies, and derived roll-up dates remain display-only.
+- Open the project sidebar by default on desktop, organize personal projects into Private and per-group sections, and improve counter spacing.
+- Refine compact group headings and drag handles, add subtle tab separators, and redesign project cards around active compact task rows with header-level deadline metadata.
 
 ### 1.0.13
 

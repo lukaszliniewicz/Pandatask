@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useProjects } from '../hooks/useProjects';
+import { useConfig } from '../context/ConfigContext';
 import Icon from './Icon';
 
 const TABS = [
@@ -11,6 +12,41 @@ const TABS = [
     { id: 'report', label: 'Report', icon: 'bar-chart' },
 ];
 
+const groupProjects = ( projects, isUserBoard ) => {
+    if ( ! isUserBoard ) {
+        return [ { key: 'projects', label: '', projects: projects || [] } ];
+    }
+
+    const sections = new Map();
+    ( projects || [] ).forEach( ( project ) => {
+        let key = 'other';
+        let label = 'Other projects';
+        let order = 2;
+
+        if ( project.board_scope === 'private' ) {
+            key = 'private';
+            label = 'Private';
+            order = 0;
+        } else if ( project.board_scope === 'group' ) {
+            key = `group-${ project.board_name }`;
+            label = project.board_display_name || 'Group';
+            order = 1;
+        }
+
+        if ( ! sections.has( key ) ) {
+            sections.set( key, { key, label, order, projects: [] } );
+        }
+        sections.get( key ).projects.push( project );
+    } );
+
+    return Array.from( sections.values() ).sort( ( first, second ) => {
+        if ( first.order !== second.order ) {
+            return first.order - second.order;
+        }
+        return first.label.localeCompare( second.label );
+    } );
+};
+
 const ProjectSidebar = ({ 
     selectedProjectId, onSelectProject, onAddProject, 
     isOpen, isMobile, onClose,
@@ -18,6 +54,9 @@ const ProjectSidebar = ({
     privateOnly = false
 }) => {
     const { data: projects, isLoading } = useProjects(undefined, { privateOnly });
+    const { boardName } = useConfig();
+    const isUserBoard = boardName?.startsWith( 'user_' );
+    const projectSections = groupProjects( projects, isUserBoard );
     
     // On mobile, if not open, don't render at all
     if (!isOpen && isMobile) return null;
@@ -99,29 +138,36 @@ const ProjectSidebar = ({
 
                     {isLoading && (isOpen || isMobile) && <li className="pandat69-sidebar-loading" style={{padding:'10px'}}>Loading...</li>}
 
-                    {projects?.map(project => (
-                        <li key={project.id}>
-                            <button
-                                type="button"
-                                className={`pandat69-sidebar-item ${selectedProjectId == project.id ? 'active' : ''}`}
-                                onClick={() => { onSelectProject(project.id); if(isMobile) onClose(); }}
-                                aria-pressed={selectedProjectId == project.id}
-                            >
-                                <Icon name="folder" />
-                                <span className="pandat69-sidebar-item-content">
-                                    <span className="pandat69-sidebar-label">{project.name}</span>
-                                    {(isOpen || isMobile) && project.board_scope === 'group' && (
-                                        <span className="pandat69-sidebar-project-source">{project.board_display_name}</span>
-                                    )}
-                                    {(isOpen || isMobile) && project.deadline && (
-                                        <span className="pandat69-sidebar-project-deadline">Due: {project.deadline}</span>
-                                    )}
-                                </span>
-                                {(isOpen || isMobile) && project.tasks && project.tasks.length > 0 && (
-                                    <span className="pandat69-sidebar-count">{project.tasks.length}</span>
-                                )}
-                            </button>
-                        </li>
+                    {projectSections.map((section) => (
+                        <React.Fragment key={section.key}>
+                            {section.label && (
+                                <li className="pandat69-sidebar-section-heading">{section.label}</li>
+                            )}
+                            {section.projects.map(project => (
+                                <li key={project.id}>
+                                    <button
+                                        type="button"
+                                        className={`pandat69-sidebar-item ${selectedProjectId == project.id ? 'active' : ''}`}
+                                        onClick={() => { onSelectProject(project.id); if(isMobile) onClose(); }}
+                                        aria-pressed={selectedProjectId == project.id}
+                                    >
+                                        <Icon name="folder" />
+                                        <span className="pandat69-sidebar-item-content">
+                                            <span className="pandat69-sidebar-label">{project.name}</span>
+                                            {(isOpen || isMobile) && !isUserBoard && project.board_scope === 'group' && (
+                                                <span className="pandat69-sidebar-project-source">{project.board_display_name}</span>
+                                            )}
+                                            {(isOpen || isMobile) && project.deadline && (
+                                                <span className="pandat69-sidebar-project-deadline">Due: {project.deadline}</span>
+                                            )}
+                                        </span>
+                                        {(isOpen || isMobile) && project.tasks && project.tasks.length > 0 && (
+                                            <span className="pandat69-sidebar-count">{project.tasks.length}</span>
+                                        )}
+                                    </button>
+                                </li>
+                            ))}
+                        </React.Fragment>
                     ))}
                 </ul>
             </div>

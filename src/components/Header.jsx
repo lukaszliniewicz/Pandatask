@@ -7,6 +7,7 @@ const VIEWS = [
     { id: 'list', label: 'List', icon: 'list' },
     { id: 'kanban', label: 'Kanban', icon: 'columns' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+    { id: 'gantt', label: 'Gantt', icon: 'gantt' },
 ];
 
 const Header = ({ 
@@ -17,7 +18,8 @@ const Header = ({
     fullscreenToggleRef,
     currentView,
     onViewChange,
-    toggleSidebar
+    toggleSidebar,
+    isSidebarOpen
 }) => {
     const { boardName } = useConfig();
 
@@ -40,6 +42,7 @@ const Header = ({
                     onClick={toggleSidebar}
                     title="Toggle Sidebar"
                     aria-label="Toggle project sidebar"
+                    aria-expanded={isSidebarOpen}
                 >
                     <Icon name="menu" />
                 </button>

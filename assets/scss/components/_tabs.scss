@@ -11,6 +11,25 @@
 	@media (max-width: 768px) {
 		display: none;
 	}
+
+	.pandat69-tab-navigation {
+		gap: 0;
+
+		> li {
+			display: flex;
+			align-items: center;
+
+			&:not(:last-child)::after {
+				content: "";
+				width: 3px;
+				height: 3px;
+				margin: 0 12px;
+				border-radius: 50%;
+				background: #b8c2cc;
+				opacity: 0.8;
+			}
+		}
+	}
 }
 
 .pandat69-navigation-header {

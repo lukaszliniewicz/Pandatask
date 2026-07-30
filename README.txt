@@ -3,12 +3,12 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.13
+Stable tag: 1.0.14
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress integration. Includes list, kanban, and calendar views, subtasks, dependencies, recurring tasks, and a bug tracker.
+A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress integration. Includes list, Kanban, calendar, and dependency-aware Gantt views, subtasks, recurring tasks, and a bug tracker.
 
 == Description ==
 
@@ -19,7 +19,7 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 = Core features =
 
 *   **Multiple boards** – Each shortcode instance with a unique `board_name` creates a separate board with its own tasks, categories, and projects.
-*   **Four view modes** – Compact list (with subtask tree and drag-and-drop reparenting), full list (with inline actions), Kanban (drag between columns), and monthly calendar.
+*   **Five view modes** – Compact list (with subtask tree and drag-and-drop reparenting), full list (with inline actions), Kanban (drag between columns), monthly calendar, and a dependency-aware Gantt with parent roll-ups and an unscheduled-work tray.
 *   **Five tabs** – All Tasks, Projects (grouped task view), Overview (week/month timeline), Archive (soft-deleted tasks), Report (per-period statistics).
 *   **Task hierarchy** – Tasks can have same-board parent-child relationships (subtasks). Subtasks inherit the parent's project, including descendant cascades when the project changes; parent board moves are blocked until children are moved or detached.
 *   **Task dependencies** – Tasks can list predecessors. A task is blocked until all predecessors are done. Completing a task auto-starts its successors.
@@ -95,6 +95,14 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.14 =
+
+* Add a dependency-aware Gantt view with explicit predecessor arrows, parent/subtask roll-ups, conflict warnings, three zoom levels, completed-context handling, and an unscheduled-work tray.
+* Keep subtasks and dependencies semantically separate: sibling order never creates an implicit dependency, and derived parent dates never overwrite authoritative task dates.
+* Open the project sidebar by default on desktop and group personal-workspace projects into Private and per-group sections.
+* Improve compact-list grouping and drag affordances, add subtle tab separators, and give sidebar counters safe edge spacing.
+* Redesign project cards around active compact task rows, hide completed tasks from summaries, and move project deadlines into subdued header metadata.
 
 = 1.0.13 =
 

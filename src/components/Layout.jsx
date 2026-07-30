@@ -22,13 +22,14 @@ const ProjectForm = lazy(() => import('./ProjectForm'));
 const ReportView = lazy(() => import('./ReportView'));
 const TaskDetail = lazy(() => import('./TaskDetail'));
 const TaskForm = lazy(() => import('./TaskForm'));
+const GanttView = lazy(() => import('./GanttView'));
 const LoadingChunk = () => <div className="pandat69-loading">Loading...</div>;
 
 const Layout = () => {
     const [currentTab, setCurrentTab] = useState('tasks');
     const [currentView, setCurrentView] = useState('compact');
     const [allSubtasksExpanded, setAllSubtasksExpanded] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -124,9 +125,10 @@ const Layout = () => {
     });
 
     // Compute active filters based on view.
-    // Kanban view needs to see ALL statuses to distribute tasks into columns.
+    // Kanban and Gantt need the complete status set. Gantt handles completed
+    // context locally so dependency chains remain intelligible.
     const activeFilters = useMemo(() => {
-        if (currentTab === 'tasks' && currentView === 'kanban') {
+        if (currentTab === 'tasks' && ['kanban', 'gantt'].includes(currentView)) {
             return { ...filters, status: '' };
         }
         return filters;
@@ -271,6 +273,7 @@ const Layout = () => {
                 currentView={currentView}
                 onViewChange={setCurrentView}
                 toggleSidebar={toggleSidebar}
+                isSidebarOpen={isSidebarOpen}
             />
             
             <div className="pandat69-layout-body">
@@ -350,6 +353,12 @@ const Layout = () => {
                                     
                                     {!isLoading && !isError && currentView === 'calendar' && (
                                         <CalendarView tasks={tasks} onTaskAction={handleTaskAction} />
+                                    )}
+
+                                    {!isLoading && !isError && currentView === 'gantt' && (
+                                        <Suspense fallback={<LoadingChunk />}>
+                                            <GanttView tasks={tasks} onTaskAction={handleTaskAction} />
+                                        </Suspense>
                                     )}
                                 </>
                             )}

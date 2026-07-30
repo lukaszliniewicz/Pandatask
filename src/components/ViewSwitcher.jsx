@@ -14,6 +14,7 @@ const VIEWS = [
     { id: 'list', label: 'List', icon: 'list' },
     { id: 'kanban', label: 'Kanban', icon: 'columns' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+    { id: 'gantt', label: 'Gantt', icon: 'gantt' },
 ];
 
 const ViewSwitcher = ({ currentTab, onTabChange, currentView, onViewChange }) => {

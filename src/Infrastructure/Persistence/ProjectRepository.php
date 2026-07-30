@@ -125,10 +125,19 @@ final class ProjectRepository {
         $assignments     = $prefix . 'assignments';
         $history         = $prefix . 'task_history';
         $project_ids_sql = implode( ',', array_map( 'absint', $project_ids ) );
-        $sql             = "SELECT t.id, t.name, t.project_id
+        $sql             = "SELECT
+                                t.id,
+                                t.name,
+                                t.project_id,
+                                t.status,
+                                t.start_date,
+                                t.deadline,
+                                t.priority,
+                                t.parent_task_id
                             FROM {$tasks_table} t
                             WHERE t.project_id IN ({$project_ids_sql})
-                            AND t.archived = 0";
+                            AND t.archived = 0
+                            AND t.status != 'done'";
 
         if ( $workspace_user_id > 0 ) {
             $sql .= $wpdb->prepare(
@@ -151,14 +160,28 @@ final class ProjectRepository {
             );
         }
 
-        $sql .= ' ORDER BY t.name ASC, t.id ASC';
+        $sql .= " ORDER BY
+                    t.project_id ASC,
+                    CASE t.status
+                        WHEN 'in-progress' THEN 0
+                        WHEN 'pending' THEN 1
+                        ELSE 2
+                    END ASC,
+                    COALESCE(t.deadline, '9999-12-31') ASC,
+                    t.name ASC,
+                    t.id ASC";
         $tasks = $wpdb->get_results( $sql );
 
         foreach ( $tasks as $task ) {
             $project_id = (int) $task->project_id;
             $task_map[ $project_id ][] = (object) array(
-                'id'   => (int) $task->id,
-                'name' => $task->name,
+                'id'             => (int) $task->id,
+                'name'           => $task->name,
+                'status'         => $task->status,
+                'start_date'     => $task->start_date,
+                'deadline'       => $task->deadline,
+                'priority'       => (int) $task->priority,
+                'parent_task_id' => $task->parent_task_id ? (int) $task->parent_task_id : null,
             );
         }
 
