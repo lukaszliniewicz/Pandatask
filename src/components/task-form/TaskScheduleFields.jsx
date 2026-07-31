@@ -11,6 +11,7 @@ const TaskScheduleFields = ({
     fieldPrefix,
     isRecurring,
     notifyDeadline,
+    projectId,
     recurrenceFrequency,
     register,
     scheduleMode,
@@ -81,7 +82,10 @@ const TaskScheduleFields = ({
                                 selectedTaskIds={value}
                                 onChange={onChange}
                                 currentTaskId={task?.id}
+                                excludeDone
                                 overrideBoardName={targetBoard}
+                                projectId={projectId}
+                                showDependencyBulkActions
                                 inputLabel="Search for predecessor tasks"
                             />
                         )}

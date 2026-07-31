@@ -65,6 +65,57 @@
 	min-height: 0;
 }
 
+.pandat69-task-select-component > .pandat69-selected-users-container {
+	margin: 0 0 8px;
+}
+
+.pandat69-task-select-bulk-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 8px;
+}
+
+.pandat69-react-modal button.pandat69-task-select-bulk-action {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 30px;
+	margin: 0;
+	padding: 5px 9px;
+	border: 1px solid #cbd6e0;
+	border-radius: 999px;
+	background: #fff;
+	box-shadow: none;
+	color: #465b70;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+
+	> span {
+		min-width: 18px;
+		padding: 1px 5px;
+		border-radius: 999px;
+		background: #e8edf2;
+		color: #5c6d7d;
+		font-size: 10px;
+		text-align: center;
+	}
+
+	&:hover:not(:disabled) {
+		border-color: #7c91a5;
+		background: #f5f8fa;
+		color: $primary-color;
+	}
+
+	&:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+}
+
 .pandat69-selected-user {
 	display: inline-flex;
 	align-items: center;

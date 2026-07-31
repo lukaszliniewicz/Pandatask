@@ -300,10 +300,11 @@ select.pandat69-select,
 /* Form Tabs (Step-by-Step Wizard) */
 .pandat69-form-tabs {
 	display: flex;
+	flex-wrap: wrap;
 	border-bottom: 1px solid #dcdfe4;
 	margin-bottom: 20px;
 	gap: 5px;
-	overflow-x: auto;
+	overflow: hidden;
 
 	.pandat69-form-tab {
 		padding: 10px 15px;
@@ -401,9 +402,9 @@ select.pandat69-select,
 }
 
 .pandat69-dependent-tasks {
-	margin-top: 15px;
-	padding-top: 15px;
-	border-top: 1px solid #dcdfe4;
+	margin-top: 4px;
+	padding-top: 0;
+	border-top: 0;
 }
 
 .pandat69-checkbox-field,

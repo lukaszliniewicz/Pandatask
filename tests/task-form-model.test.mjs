@@ -3,9 +3,35 @@ import assert from 'node:assert/strict';
 import {
 	buildTaskPayload,
 	createTaskFormDefaults,
+	getDatedPredecessorIds,
 	requiresTaskChangeReason,
 	validationErrorTab,
 } from '../src/taskFormModel.mjs';
+
+test( 'bulk dependencies include only active dated tasks in the requested scope', () => {
+	const tasks = [
+		{ id: 1, project_id: 8, status: 'pending', start_date: '2026-08-01' },
+		{ id: 2, project_id: 8, status: 'in-progress', deadline: '2026-08-03' },
+		{ id: 3, project_id: 9, status: 'pending', deadline: '2026-08-04' },
+		{ id: 4, project_id: 8, status: 'done', deadline: '2026-08-05' },
+		{ id: 5, project_id: 8, status: 'pending' },
+		{ id: 6, project_id: 8, status: 'pending', archived: 1, deadline: '2026-08-06' },
+	];
+
+	assert.deepEqual(
+		getDatedPredecessorIds( {
+			tasks,
+			currentTaskId: 2,
+			projectId: 8,
+			scope: 'project',
+		} ),
+		[ 1 ]
+	);
+	assert.deepEqual(
+		getDatedPredecessorIds( { tasks, currentTaskId: 2 } ),
+		[ 1, 3 ]
+	);
+} );
 
 test( 'personal-board defaults assign a new task to the current user', () => {
 	const defaults = createTaskFormDefaults( {

@@ -100,7 +100,7 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
                         />
                     ))}
                     
-                    {taskRows.map((row) => (
+                    {taskRows.map((row, rowIndex) => (
                         row.map((tInfo) => (
                             <button
                                 type="button"
@@ -109,7 +109,7 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
                                 style={{
                                     left: `${tInfo.leftOffset}%`,
                                     width: `${tInfo.width}%`,
-                                    top: `${40 + (rIndex * 40)}px`
+                                    top: `${40 + (rowIndex * 40)}px`
                                 }}
                                 title={tInfo.task.name}
                                 aria-label={`${tInfo.task.name}, ${tInfo.task.start_date || tInfo.task.deadline} to ${tInfo.task.deadline || tInfo.task.start_date}`}

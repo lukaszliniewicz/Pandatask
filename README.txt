@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.16
+Stable tag: 1.0.17
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.17 =
+
+* Collapse project subtasks into accessible, expandable parent rows while preserving orphaned and cyclic data safely.
+* Repair the Overview timeline crash and add regression coverage for populated timeline rows.
+* Hide completed dependency candidates by default and add one-click selection of dated project or board tasks.
+* Normalize project-row spacing, task status pills and circles, filter menus, task-form tabs, and the responsive project sidebar across standalone and IARF Network mounts.
 
 = 1.0.16 =
 

@@ -1,6 +1,31 @@
 const toIntegerIds = ( values = [] ) =>
 	values.map( ( id ) => Number.parseInt( id, 10 ) );
 
+const hasTaskDate = ( task ) =>
+	[ task.start_date, task.deadline ].some(
+		( value ) => value && value !== '0000-00-00'
+	);
+
+export const getDatedPredecessorIds = ( {
+	tasks = [],
+	currentTaskId = null,
+	projectId = null,
+	scope = 'board',
+} ) =>
+	tasks
+		.filter(
+			( task ) =>
+				Number( task.archived ) !== 1 &&
+				task.status !== 'done' &&
+				Number( task.id ) !== Number( currentTaskId ) &&
+				hasTaskDate( task ) &&
+				( scope !== 'project' ||
+					( projectId &&
+						Number( task.project_id ) === Number( projectId ) ) )
+		)
+		.map( ( task ) => Number.parseInt( task.id, 10 ) )
+		.filter( Number.isFinite );
+
 export const createTaskFormDefaults = ( {
 	task = null,
 	defaultTaskType = 'task',

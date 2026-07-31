@@ -348,6 +348,14 @@ test('Interactive frontend primitives expose native accessibility semantics', ()
 	assert.match(base, /\.pandat69-visually-hidden/);
 });
 
+test('Overview timeline rows use their declared render index', () => {
+	const timeline = fs.readFileSync(path.join(repoRoot, 'src/components/TimelineCalendar.jsx'), 'utf8');
+
+	assert.match(timeline, /taskRows\.map\(\(row, rowIndex\) =>/);
+	assert.match(timeline, /rowIndex \* 40/);
+	assert.doesNotMatch(timeline, /\brIndex\b/);
+});
+
 test('Production deployment keeps rollback active through exact release verification', () => {
 	const deploy = fs.readFileSync(path.join(repoRoot, 'deploy.ps1'), 'utf8');
 

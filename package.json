@@ -1,14 +1,15 @@
 {
   "name": "pandatask",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Adds a shortcode [task_board board_name=\"unique_board_id\"] to display a task management board.",
   "main": "build/main.js",
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
-    "test": "npm run test:phase2 && npm run test:gantt && npm run test:task-form && npm run test:security",
+    "test": "npm run test:phase2 && npm run test:gantt && npm run test:project-tasks && npm run test:task-form && npm run test:security",
     "test:phase2": "node --test tests/phase2-contract.test.mjs",
     "test:gantt": "node --test tests/gantt-model.test.mjs",
+    "test:project-tasks": "node --test tests/project-task-model.test.mjs",
     "test:task-form": "node --test tests/task-form-model.test.mjs",
     "test:security": "php tests/security-policy.php",
     "test:mcp": "npm --prefix mcp-server test",

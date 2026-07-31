@@ -1,10 +1,21 @@
 import React, { useId, useMemo, useState, useEffect, useRef } from 'react';
 import { useTasks } from '../hooks/useTasks';
+import { getDatedPredecessorIds } from '../taskFormModel.mjs';
 import Icon from './Icon';
 
 const EMPTY_SELECTED_TASK_IDS = [];
 
-const TaskSelect = ({ selectedTaskIds = EMPTY_SELECTED_TASK_IDS, onChange, currentTaskId, mode = 'multiple', overrideBoardName, inputLabel }) => {
+const TaskSelect = ({
+    selectedTaskIds = EMPTY_SELECTED_TASK_IDS,
+    onChange,
+    currentTaskId,
+    excludeDone = false,
+    mode = 'multiple',
+    overrideBoardName,
+    projectId,
+    showDependencyBulkActions = false,
+    inputLabel
+}) => {
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef(null);
@@ -63,8 +74,34 @@ const TaskSelect = ({ selectedTaskIds = EMPTY_SELECTED_TASK_IDS, onChange, curre
     const filteredTasks = tasks ? tasks.filter(t => 
         (currentTaskId ? t.id != currentTaskId : true) && 
         t.name.toLowerCase().includes(search.toLowerCase()) &&
-        t.archived != 1
+        t.archived != 1 &&
+        (!excludeDone || t.status !== 'done')
     ) : [];
+
+    const projectPredecessorIds = useMemo(
+        () => getDatedPredecessorIds({
+            tasks,
+            currentTaskId,
+            projectId,
+            scope: 'project'
+        }),
+        [tasks, currentTaskId, projectId]
+    );
+    const boardPredecessorIds = useMemo(
+        () => getDatedPredecessorIds({
+            tasks,
+            currentTaskId,
+            scope: 'board'
+        }),
+        [tasks, currentTaskId]
+    );
+    const addPredecessors = (taskIds) => {
+        const nextSelection = new Set(selectedTaskIdSet);
+        taskIds.forEach((id) => nextSelection.add(id));
+        onChange(Array.from(nextSelection));
+    };
+    const unselectedProjectCount = projectPredecessorIds.filter((id) => !selectedTaskIdSet.has(id)).length;
+    const unselectedBoardCount = boardPredecessorIds.filter((id) => !selectedTaskIdSet.has(id)).length;
 
     let selectedTasksDisplay = [];
     if (mode === 'single') {
@@ -80,22 +117,51 @@ const TaskSelect = ({ selectedTaskIds = EMPTY_SELECTED_TASK_IDS, onChange, curre
 
     return (
         <div className="pandat69-task-select-component" ref={wrapperRef} style={{ position: 'relative' }}>
-            <div className="pandat69-selected-users-container">
-                {selectedTasksDisplay.map(task => (
-                    <span key={task.id} className="pandat69-selected-user">
-                        {task.name} 
+            {selectedTasksDisplay.length > 0 && (
+                <div className="pandat69-selected-users-container">
+                    {selectedTasksDisplay.map(task => (
+                        <span key={task.id} className="pandat69-selected-user">
+                            {task.name}
+                            <button
+                                type="button"
+                                className="pandat69-remove-user"
+                                onClick={() => mode === 'single' ? handleRemoveSingle() : toggleTask(task.id)}
+                                aria-label={`Remove ${task.name}`}
+                                style={{ cursor: 'pointer', marginLeft: '5px' }}
+                            >
+                                <Icon name="x" size={14} />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {showDependencyBulkActions && mode === 'multiple' && (
+                <div className="pandat69-task-select-bulk-actions" aria-label="Add task dependencies in bulk">
+                    {projectId && (
                         <button
                             type="button"
-                            className="pandat69-remove-user" 
-                            onClick={() => mode === 'single' ? handleRemoveSingle() : toggleTask(task.id)}
-                            aria-label={`Remove ${task.name}`}
-                            style={{ cursor: 'pointer', marginLeft: '5px' }}
+                            className="pandat69-task-select-bulk-action"
+                            onClick={() => addPredecessors(projectPredecessorIds)}
+                            disabled={unselectedProjectCount === 0}
                         >
-                            <Icon name="x" size={14} />
+                            <Icon name="folder" size={14} />
+                            Project&apos;s dated tasks
+                            <span>{unselectedProjectCount}</span>
                         </button>
-                    </span>
-                ))}
-            </div>
+                    )}
+                    <button
+                        type="button"
+                        className="pandat69-task-select-bulk-action"
+                        onClick={() => addPredecessors(boardPredecessorIds)}
+                        disabled={unselectedBoardCount === 0}
+                    >
+                        <Icon name="list-plus" size={14} />
+                        Board&apos;s dated tasks
+                        <span>{unselectedBoardCount}</span>
+                    </button>
+                </div>
+            )}
             
             {(mode !== 'single' || selectedTasksDisplay.length === 0) && (
                 <>

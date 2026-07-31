@@ -113,17 +113,28 @@
 }
 
 /* Status Indicators */
-.pandat69-task-status {
-	display: inline-block;
-	padding: 3px 8px;
-	font-size: 0.8em;
+.pandat69-container button.pandat69-task-status {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 24px;
+	margin: 0;
+	padding: 4px 10px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	box-shadow: none;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 650;
+	line-height: 1.2;
 	color: #fff !important;
 	text-transform: capitalize;
 	cursor: pointer;
-	border-radius: $border-radius;
 
 	&.pandat69-status-pending {
 		background-color: $status-pending;
+		color: #302a20 !important;
 	}
 
 	&.pandat69-status-in-progress {

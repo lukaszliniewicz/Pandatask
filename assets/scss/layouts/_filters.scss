@@ -75,7 +75,7 @@
 	}
 }
 
-.pandat69-filter-dropdown {
+.pandat69-container .pandat69-filter-dropdown {
 	position: absolute;
 	top: 100%;
 	right: 0;
@@ -85,19 +85,27 @@
 	border-radius: $border-radius;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 	z-index: 1000;
-	min-width: 180px;
+	min-width: 240px;
 	overflow: hidden;
 	padding: 5px 0;
 
-	.pandat69-filter-item {
+	button.pandat69-filter-item {
 		appearance: none;
+		display: block;
 		width: 100%;
+		min-height: 36px;
+		margin: 0;
 		border: 0;
+		border-radius: 0;
 		background: transparent;
+		box-shadow: none;
 		text-align: left;
-		padding: 8px 15px;
+		padding: 8px 32px 8px 15px;
 		font-size: 13px;
+		font-weight: 400;
+		line-height: 1.35;
 		color: $primary-color;
+		text-transform: none;
 		cursor: pointer;
 		transition: background-color 0.1s ease;
 

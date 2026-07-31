@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.16
+**Version:** 1.0.17
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -377,6 +377,13 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.17
+
+- Collapse project subtasks into accessible, expandable parent rows while preserving orphaned and cyclic data safely.
+- Repair the Overview timeline crash and add regression coverage for populated timeline rows.
+- Hide completed dependency candidates by default and add one-click selection of dated project or board tasks.
+- Normalize project-row spacing, task status pills and circles, filter menus, task-form tabs, and the responsive project sidebar across standalone and IARF Network mounts.
 
 ### 1.0.16
 

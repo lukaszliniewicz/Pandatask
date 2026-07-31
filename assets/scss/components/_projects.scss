@@ -144,41 +144,56 @@ ul.pandat69-project-list-view {
 	}
 }
 
-.pandat69-project-task-list {
+.pandat69-container ul.pandat69-project-task-list {
 	list-style: none;
-	padding-left: 0;
-	margin: 0;
+	padding: 0 !important;
+	margin: 0 !important;
 	max-height: 320px;
 	overflow-y: auto;
+	overflow-x: hidden;
 	border: 1px solid $border-color;
 	border-radius: $border-radius;
 	background: $white;
+}
 
-	li {
-		display: grid;
-		grid-template-columns: 18px 18px minmax(0, 1fr) auto;
-		align-items: center;
-		gap: 8px;
-		min-height: 42px;
-		padding: 7px 11px;
-		border-bottom: 1px solid $light-border-color;
-		background-color: $white;
+.pandat69-container .pandat69-project-task-node {
+	list-style: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	background: $white;
 
-		&:last-child {
-			border-bottom: none;
-		}
+	+ .pandat69-project-task-node > .pandat69-project-task-row {
+		border-top: 1px solid $light-border-color;
+	}
+}
 
-		&:hover {
-			background: #f8fafb;
-		}
+.pandat69-container .pandat69-project-task-row {
+	display: grid;
+	grid-template-columns: 18px 24px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 9px 11px 9px calc(11px + var(--pandatask-project-task-indent, 0px));
+	background-color: $white;
 
-		> .pandat69-icon {
-			color: #9aa6b2;
-		}
+	&:hover {
+		background: #f8fafb;
+	}
+}
+
+.pandat69-container ul.pandat69-project-task-children {
+	list-style: none;
+	margin: 0 !important;
+	padding: 0 !important;
+	border-top: 1px solid $light-border-color;
+
+	> .pandat69-project-task-node {
+		background: #fbfcfd;
 	}
 }
 
 .pandat69-project-task-status {
+	display: block;
 	width: 9px;
 	height: 9px;
 	margin: auto;
@@ -191,17 +206,60 @@ ul.pandat69-project-list-view {
 }
 
 .pandat69-project-task-icon-spacer {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 14px;
+	color: #9aa6b2;
 }
 
-.pandat69-project-task-link {
+.pandat69-container button.pandat69-project-task-toggle {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	box-shadow: none;
+	color: #66788a;
+	cursor: pointer;
+
+	&:hover {
+		background: #e9eef3;
+		color: $primary-color;
+	}
+
+	&:focus-visible {
+		outline: 2px solid #2271b1;
+		outline-offset: 1px;
+	}
+}
+
+.pandat69-container button.pandat69-project-task-link {
+	appearance: none;
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
 	text-decoration: none;
 	color: $primary-color;
+	font: inherit;
 	font-weight: 500;
+	line-height: 1.4;
 	overflow: hidden;
 	text-align: left;
+	text-transform: none;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	cursor: pointer;
 
 	&:hover {
 		text-decoration: underline;
@@ -244,8 +302,9 @@ ul.pandat69-project-list-view {
 		flex-direction: column;
 	}
 
-	.pandat69-project-task-list li {
+	.pandat69-container .pandat69-project-task-row {
 		grid-template-columns: 16px 16px minmax(0, 1fr);
+		padding-left: calc(9px + var(--pandatask-project-task-indent, 0px));
 	}
 
 	.pandat69-project-task-deadline {

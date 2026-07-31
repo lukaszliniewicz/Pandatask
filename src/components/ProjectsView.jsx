@@ -1,13 +1,25 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useProjects } from '../hooks/useProjects';
 import { useProjectMutations } from '../hooks/useProjectMutations';
 import { useTasks } from '../hooks/useTasks';
+import { buildProjectTaskTree } from '../projectTaskModel.mjs';
 import TaskList from './TaskList';
 import Icon from './Icon';
+import ProjectTaskTree from './projects/ProjectTaskTree';
 
 const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
     const { data: projects, isLoading: isLoadingProjects } = useProjects(undefined, { privateOnly });
     const { deleteProject } = useProjectMutations();
+    const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
+    const projectTaskTrees = useMemo(
+        () => new Map(
+            (projects || []).map((project) => [
+                project.id,
+                buildProjectTaskTree(project.tasks || [])
+            ])
+        ),
+        [projects]
+    );
     
     // Fetch tasks that don't belong to any project
     const { data: noProjectTasks, isLoading: isLoadingTasks } = useTasks({
@@ -28,6 +40,18 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
         }
     };
 
+    const toggleTask = useCallback((taskId) => {
+        setExpandedTaskIds((current) => {
+            const next = new Set(current);
+            if (next.has(taskId)) {
+                next.delete(taskId);
+            } else {
+                next.add(taskId);
+            }
+            return next;
+        });
+    }, []);
+
     if (isLoadingProjects) return <div className="pandat69-loading">Loading projects...</div>;
 
     return (
@@ -45,9 +69,7 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
             <div className="pandat69-project-list-container-view">
                 <ul className="pandat69-project-list-view">
                     {projects && projects.length > 0 ? projects.map(project => {
-                        const activeTasks = ( project.tasks || [] ).filter(
-                            ( task ) => task.status !== 'done'
-                        );
+                        const taskTree = projectTaskTrees.get(project.id);
 
                         return (
                         <li key={project.id} className="pandat69-project-list-item">
@@ -95,33 +117,15 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
                             <div className="pandat69-project-task-list-container">
                                 <div className="pandat69-project-task-heading">
                                     <h5>Active tasks</h5>
-                                    <span>{activeTasks.length}</span>
+                                    <span>{taskTree.total}</span>
                                 </div>
-                                {activeTasks.length > 0 ? (
-                                    <ul className="pandat69-project-task-list">
-                                        {activeTasks.map(t => (
-                                            <li key={t.id} className={`status-${t.status || 'pending'}`}>
-                                                <span
-                                                    className="pandat69-project-task-status"
-                                                    title={t.status === 'in-progress' ? 'In progress' : 'Pending'}
-                                                />
-                                                {t.parent_task_id ? (
-                                                    <Icon name="corner-down-right" size={14} />
-                                                ) : (
-                                                    <span className="pandat69-project-task-icon-spacer" />
-                                                )}
-                                                <button type="button" className="pandat69-project-task-link" onClick={() => onTaskAction('view', t)}>
-                                                    {t.name}
-                                                </button>
-                                                {t.deadline && (
-                                                    <span className="pandat69-project-task-deadline">
-                                                        <Icon name="calendar" size={13} />
-                                                        {t.deadline}
-                                                    </span>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                {taskTree.total > 0 ? (
+                                    <ProjectTaskTree
+                                        expandedTaskIds={expandedTaskIds}
+                                        nodes={taskTree.roots}
+                                        onTaskAction={onTaskAction}
+                                        onToggle={toggleTask}
+                                    />
                                 ) : (
                                     <p className="pandat69-project-empty-tasks">No active tasks in this project.</p>
                                 )}

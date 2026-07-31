@@ -67,7 +67,9 @@ const ProjectSidebar = ({
                 {/* No hamburger here anymore. It lives in Header.jsx */}
                 
                 <div className="pandat69-sidebar-title-wrapper">
-                    <h3 className="pandat69-sidebar-title">PROJECTS</h3>
+                    <h3 className="pandat69-sidebar-title">
+                        {isMobile ? 'Task Board' : 'Projects'}
+                    </h3>
                     <button 
                         type="button"
                         className="pandat69-add-project-mini-btn"
