@@ -378,5 +378,49 @@ cron plans use the intended indexes. The 39 detached legacy history rows remain
 intentionally preserved. The largest 143-task active board hydrated in 55
 queries / 100 ms on dev.
 
-Commit, production deployment, and post-deploy measurements remain pending and
-will be appended after the production verification gate.
+### Production release and acceptance
+
+Release commit `b7f6f40` (`feat: harden PandaTask backend workflows`) was pushed
+to `origin/main` before deployment. The production deployment then:
+
+- created and integrity-tested the previous-plugin archive at
+  `/home/iarf/deploy-backups/pandatask-20260731074731.tgz`;
+- exported all eight pre-migration PandaTask tables with `DROP TABLE` statements
+  to the access-restricted, gzip-verified
+  `/home/iarf/deploy-backups/pandatask-db-20260731074731.sql.gz`;
+- atomically replaced the plugin directory, installed the locked production
+  autoloader, and verified exact SHA-256 hashes for the plugin entry point,
+  JavaScript, and CSS;
+- activated plugin 1.0.18 with database schema 1.0.14 and registered both daily
+  workflows plus the new hourly buffer-recovery and idempotency-cleanup jobs.
+
+The non-mutating production server suite passed authorization, content
+sanitization/rendering, REST, exact pagination, hierarchy, packaging, schema,
+asset, and index checks. The public group task surface returned HTTP 200 in
+0.508 seconds, and no PandaTask/PHP/database errors appeared in the post-release
+log window.
+
+Production data after the guarded migration:
+
+- 165 tasks, 9 projects, 178 task assignments, 21 comments, and 429 history
+  rows;
+- the three assignments to deleted WordPress users were removed;
+- all 18 non-recurring recurrence residues were cleared and the unusable
+  recurring record was normalized;
+- task, project, comment, and history row counts were otherwise preserved;
+- zero active reference, assignment, comment, recurrence, date, completion,
+  role, dependency-type, reminder-marker, blocked-status, or change-buffer
+  defects;
+- zero hierarchy cycles and zero dependency cycles;
+- the 39 detached legacy history rows remain intentionally preserved.
+
+Every audited hot query now selects the intended composite index:
+`board_active_status_deadline`, `scheduled_start`, `missed_deadline_queue`,
+`recurring_rollover`, or `deadline`. On the 143-active-task / 146-total-task
+largest board, the warmed bulk-hydration probe completed in 53 queries / 70.2
+ms (the first cold probe was 55 / 112 ms). This is comparable to the 52-query /
+68.3-ms legacy baseline while removing `GROUP_CONCAT` truncation and grouping
+risk and keeping assignment/dependency work bounded as result cardinality grows.
+
+The implementation, release, deployment, repair, and verification plan is
+complete.
