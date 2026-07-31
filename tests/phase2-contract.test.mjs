@@ -348,6 +348,22 @@ test('Interactive frontend primitives expose native accessibility semantics', ()
 	assert.match(base, /\.pandat69-visually-hidden/);
 });
 
+test('Production deployment keeps rollback active through exact release verification', () => {
+	const deploy = fs.readFileSync(path.join(repoRoot, 'deploy.ps1'), 'utf8');
+
+	assert.match(deploy, /ExpectedProductionDir = '\/home\/iarf\/htdocs\/iarf\.net\/wp-content\/plugins\/pandatask'/);
+	assert.match(deploy, /set -Eeuo pipefail/);
+	assert.match(deploy, /trap rollback ERR/);
+	assert.match(deploy, /while IFS= read -r -d '' php_file/);
+	assert.match(deploy, /sha256sum -c -/);
+	assert.match(deploy, /wp plugin is-active pandatask/);
+	assert.match(deploy, /actual_version=.*wp plugin get pandatask/);
+	assert.ok(
+		deploy.lastIndexOf('trap - ERR') <
+			deploy.lastIndexOf('rm -rf $RemotePreviousDirQ')
+	);
+});
+
 test('Security-sensitive task edits and public intake have explicit guards', () => {
 	const policy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/TaskAccessPolicy.php'), 'utf8');
 	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');

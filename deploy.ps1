@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 $PluginSlug = 'pandatask'
 $ExpectedProductionDir = '/home/iarf/htdocs/iarf.net/wp-content/plugins/pandatask'
+$RemoteWordPressDir = '/home/iarf/htdocs/iarf.net'
 $Timestamp = Get-Date -Format 'yyyyMMddHHmmss'
 $RootPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $TempBase = [System.IO.Path]::GetFullPath($env:TEMP)
@@ -56,9 +57,21 @@ try {
         Write-Host '1. Skipping local build.' -ForegroundColor Yellow
     }
 
-    if (-not (Test-Path 'build/main.asset.php' -PathType Leaf)) {
-        throw 'Build output is missing: build/main.asset.php'
+    foreach ($BuildFile in @('build/main.asset.php', 'build/main.js', 'build/main.css')) {
+        if (-not (Test-Path $BuildFile -PathType Leaf)) {
+            throw "Build output is missing: $BuildFile"
+        }
     }
+
+    $PluginSource = Get-Content -LiteralPath 'pandatask.php' -Raw
+    $PluginVersionMatch = [regex]::Match($PluginSource, '(?m)^\s*\*\s*Version:\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$')
+    if (-not $PluginVersionMatch.Success) {
+        throw 'Unable to read the Pandatask version from pandatask.php'
+    }
+    $ExpectedVersion = $PluginVersionMatch.Groups[1].Value
+    $ExpectedPluginHash = (Get-FileHash -LiteralPath 'pandatask.php' -Algorithm SHA256).Hash.ToLowerInvariant()
+    $ExpectedMainJsHash = (Get-FileHash -LiteralPath 'build/main.js' -Algorithm SHA256).Hash.ToLowerInvariant()
+    $ExpectedMainCssHash = (Get-FileHash -LiteralPath 'build/main.css' -Algorithm SHA256).Hash.ToLowerInvariant()
 
     Write-Host '2. Creating a clean production plugin package...' -ForegroundColor Cyan
     Remove-TempRoot
@@ -115,18 +128,41 @@ try {
     $RemoteBackupDirQ = Get-ShQuoted $RemoteBackupDir
     $RemoteBackupPathQ = Get-ShQuoted $RemoteBackupPath
     $RemoteOwnerQ = Get-ShQuoted $RemoteOwner
+    $RemoteWordPressDirQ = Get-ShQuoted $RemoteWordPressDir
+    $ExpectedVersionQ = Get-ShQuoted $ExpectedVersion
 
-    Write-Host '4. Backing up and atomically swapping the production plugin...' -ForegroundColor Cyan
+    Write-Host '4. Validating, backing up, atomically swapping, and verifying production...' -ForegroundColor Cyan
     $RemoteSwap = @"
-set -euo pipefail
+set -Eeuo pipefail
 test $RemotePluginDirQ = $ExpectedProductionDirQ
+had_previous=0
+deployed=0
+rollback() {
+    status=`$?
+    trap - ERR
+    set +e
+    if [ "`$deployed" -eq 1 ] && [ -d $RemotePluginDirQ ]; then
+        rm -rf $RemotePluginDirQ
+    fi
+    if [ "`$had_previous" -eq 1 ] && [ -d $RemotePreviousDirQ ]; then
+        mv $RemotePreviousDirQ $RemotePluginDirQ
+    fi
+    rm -rf $RemoteStagingDirQ
+    rm -f $RemotePackagePathQ
+    exit "`$status"
+}
+trap rollback ERR
 mkdir -p $RemoteBackupDirQ
 rm -rf $RemoteStagingDirQ $RemotePreviousDirQ
 mkdir -p $RemoteStagingDirQ
 tar -xzf $RemotePackagePathQ -C $RemoteStagingDirQ
 test -f $RemoteStagingDirQ/pandatask.php
 test -f $RemoteStagingDirQ/build/main.asset.php
-php -l $RemoteStagingDirQ/pandatask.php >/dev/null
+test -s $RemoteStagingDirQ/build/main.js
+test -s $RemoteStagingDirQ/build/main.css
+while IFS= read -r -d '' php_file; do
+    php -l "`$php_file" >/dev/null
+done < <(find $RemoteStagingDirQ -type f -name '*.php' -print0)
 if [ -f $RemoteStagingDirQ/composer.json ] && command -v composer >/dev/null 2>&1; then
     cd $RemoteStagingDirQ
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
@@ -134,18 +170,34 @@ fi
 if [ -d $RemotePluginDirQ ]; then
     tar -czf $RemoteBackupPathQ -C $RemotePluginDirQ .
     mv $RemotePluginDirQ $RemotePreviousDirQ
+    had_previous=1
 fi
-if mv $RemoteStagingDirQ $RemotePluginDirQ; then
-    chown -R $RemoteOwnerQ $RemotePluginDirQ
-    find $RemotePluginDirQ -type d -exec chmod 755 {} +
-    find $RemotePluginDirQ -type f -exec chmod 644 {} +
-    rm -rf $RemotePreviousDirQ
-    rm -f $RemotePackagePathQ
-else
-    if [ -d $RemotePreviousDirQ ]; then
-        mv $RemotePreviousDirQ $RemotePluginDirQ
-    fi
-    exit 1
+mv $RemoteStagingDirQ $RemotePluginDirQ
+deployed=1
+chown -R $RemoteOwnerQ $RemotePluginDirQ
+find $RemotePluginDirQ -type d -exec chmod 755 {} +
+find $RemotePluginDirQ -type f -exec chmod 644 {} +
+test -s $RemotePluginDirQ/build/main.js
+test -s $RemotePluginDirQ/build/main.css
+while IFS= read -r -d '' php_file; do
+    php -l "`$php_file" >/dev/null
+done < <(find $RemotePluginDirQ -type f -name '*.php' -print0)
+printf '%s  %s\n' '$ExpectedPluginHash' $RemotePluginDirQ/pandatask.php | sha256sum -c -
+printf '%s  %s\n' '$ExpectedMainJsHash' $RemotePluginDirQ/build/main.js | sha256sum -c -
+printf '%s  %s\n' '$ExpectedMainCssHash' $RemotePluginDirQ/build/main.css | sha256sum -c -
+command -v wp >/dev/null 2>&1
+sudo -u iarf -- wp plugin is-active pandatask --path=$RemoteWordPressDirQ
+actual_version=`$(sudo -u iarf -- wp plugin get pandatask --field=version --path=$RemoteWordPressDirQ)
+test "`$actual_version" = $ExpectedVersionQ
+if ! sudo -u iarf -- wp cache flush --path=$RemoteWordPressDirQ >/dev/null; then
+    echo 'Warning: WordPress object cache could not be flushed; deployment files and plugin activation were verified.' >&2
+fi
+trap - ERR
+if ! rm -rf $RemotePreviousDirQ; then
+    echo 'Warning: the temporary previous-release directory could not be removed.' >&2
+fi
+if ! rm -f $RemotePackagePathQ; then
+    echo 'Warning: the uploaded deployment package could not be removed.' >&2
 fi
 "@
     $RemoteSwap = $RemoteSwap -replace "`r`n?", "`n"
@@ -155,19 +207,16 @@ fi
         throw "Production swap failed (exit code $LASTEXITCODE)"
     }
 
-    Write-Host '5. Verifying production files and WordPress state...' -ForegroundColor Cyan
+    Write-Host '5. Confirming production release metadata...' -ForegroundColor Cyan
     $RemoteVerify = @"
 set -e
-test -f $RemotePluginDirQ/pandatask.php
-test -f $RemotePluginDirQ/build/main.js
-test -f $RemotePluginDirQ/build/main.css
-php -l $RemotePluginDirQ/pandatask.php >/dev/null
-if command -v wp >/dev/null 2>&1; then
-    sudo -u iarf -- wp plugin is-active pandatask --path=/home/iarf/htdocs/iarf.net
-    if ! sudo -u iarf -- wp cache flush --path=/home/iarf/htdocs/iarf.net >/dev/null; then
-        echo 'Warning: WordPress object cache could not be flushed; deployment files and plugin activation were verified.' >&2
-    fi
-fi
+printf '%s  %s\n' '$ExpectedPluginHash' $RemotePluginDirQ/pandatask.php | sha256sum -c -
+printf '%s  %s\n' '$ExpectedMainJsHash' $RemotePluginDirQ/build/main.js | sha256sum -c -
+printf '%s  %s\n' '$ExpectedMainCssHash' $RemotePluginDirQ/build/main.css | sha256sum -c -
+sudo -u iarf -- wp plugin is-active pandatask --path=$RemoteWordPressDirQ
+actual_version=`$(sudo -u iarf -- wp plugin get pandatask --field=version --path=$RemoteWordPressDirQ)
+test "`$actual_version" = $ExpectedVersionQ
+printf 'Pandatask production version: %s\n' "`$actual_version"
 "@
     $RemoteVerify = $RemoteVerify -replace "`r`n?", "`n"
     $RemoteVerifyEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($RemoteVerify))
