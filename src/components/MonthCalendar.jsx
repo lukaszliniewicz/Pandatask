@@ -142,11 +142,13 @@ const MonthCalendar = ({ tasks, currentDate, onTaskClick }) => {
                                     };
 
                                     return (
-                                        <div 
-                                            key={`${span.task.id}-${idx}`}
+                                        <button
+                                            type="button"
+                                            key={`${span.task.id}-${day.dateStr}`}
                                             className={`pandat69-month-task-bar pandat69-status-${span.task.status}`}
                                             style={style}
                                             title={span.task.name}
+                                            aria-label={`${span.task.name}, ${span.task.start_date || span.task.deadline} to ${span.task.deadline || span.task.start_date}`}
                                             onClick={(e) => { e.stopPropagation(); onTaskClick(span.task); }}
                                         >
                                             {isStart && (
@@ -155,7 +157,7 @@ const MonthCalendar = ({ tasks, currentDate, onTaskClick }) => {
                                                     {span.task.name}
                                                 </span>
                                             )}
-                                        </div>
+                                        </button>
                                     );
                                 })}
                             </div>

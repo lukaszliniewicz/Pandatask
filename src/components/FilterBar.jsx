@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useId, useState, useRef, useEffect } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useProjects } from '../hooks/useProjects';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import Icon from './Icon';
 
 const SORT_OPTIONS = [
@@ -77,18 +76,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
     const { data: projects } = useProjects(undefined, {
         privateOnly: isUserBoard && filters.onlyMyTasks,
     });
-    const [search, setSearch] = useState(filters.search || '');
-    const debouncedSearch = useDebouncedValue(search);
-
-    useEffect(() => {
-        if ((filters.search || '') !== debouncedSearch) {
-            onFilterChange('search', debouncedSearch);
-        }
-    }, [debouncedSearch, filters.search, onFilterChange]);
-
-    useEffect(() => {
-        setSearch(filters.search || '');
-    }, [filters.search]);
+    const projectFilterId = useId();
     return (
         <div className="pandat69-filters">
             <div className="pandat69-filter-group-left">
@@ -97,8 +85,8 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                     className="pandat69-input pandat69-search-input" 
                     placeholder="Search tasks..." 
                     aria-label="Search tasks"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    value={filters.search || ''}
+                    onChange={(e) => onFilterChange('search', e.target.value)}
                 />
             </div>
 
@@ -122,7 +110,10 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                 />
 
                 {!hideProjectSelect && (
+                    <>
+                    <label className="pandat69-visually-hidden" htmlFor={projectFilterId}>Filter tasks by project</label>
                     <select 
+                        id={projectFilterId}
                         className="pandat69-select pandat69-project-filter-select"
                         value={filters.project}
                         onChange={(e) => onFilterChange('project', e.target.value)}
@@ -132,6 +123,7 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                         <option value="none">Unassigned</option>
                         {projects?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
+                    </>
                 )}
 
                 {showSubtaskToggle && (

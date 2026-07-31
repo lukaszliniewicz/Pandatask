@@ -161,18 +161,21 @@ test('Pandatask uses an explicit Lucide icon boundary without Dashicons', () => 
 
 test('Pandatask full view is state-preserving, host-covering, and modal-safe', () => {
 	const layout = fs.readFileSync(path.join(repoRoot, 'src/components/Layout.jsx'), 'utf8');
+	const fullscreen = fs.readFileSync(path.join(repoRoot, 'src/hooks/useBoardFullscreen.js'), 'utf8');
 	const base = fs.readFileSync(path.join(repoRoot, 'assets/scss/base/_base.scss'), 'utf8');
+	const header = fs.readFileSync(path.join(repoRoot, 'assets/scss/layouts/_header.scss'), 'utf8');
 	const modal = fs.readFileSync(path.join(repoRoot, 'assets/scss/components/_modal.scss'), 'utf8');
 	const sidebar = fs.readFileSync(path.join(repoRoot, 'assets/scss/components/_sidebar.scss'), 'utf8');
 
 	assert.match(layout, /createPortal\(board, document\.body\)/);
-	assert.match(layout, /pandat69-viewport-open/);
-	assert.match(layout, /pandat69-viewport-shell/);
-	assert.match(layout, /event\.key !== 'Escape'/);
+	assert.match(fullscreen, /pandat69-viewport-open/);
+	assert.match(fullscreen, /pandat69-viewport-shell/);
+	assert.match(fullscreen, /event\.key !== 'Escape'/);
 	assert.match(base, /z-index:\s*var\(--pandatask-viewport-z,\s*2147483000\)/);
 	assert.match(modal, /--pandatask-modal-z,\s*2147483600/);
 	assert.match(sidebar, /--pandatask-sidebar-z,\s*2147483400/);
 	assert.match(sidebar, /position:\s*fixed/);
+	assert.match(header, /pandat69-fullscreen-body[\s\S]*#iarf-network-shell-root/);
 });
 
 test('Personal workspaces aggregate group projects with a private-only escape hatch', () => {
@@ -306,6 +309,43 @@ test('Frontend cache policy and typed API boundary are centralized', () => {
 	assert.match(taskHook, /queryKeys\.tasks\.list/);
 	assert.match(taskHook, /\{ params, signal \}/);
 	assert.match(taskHook, /params\.append\( 'limit', '500' \)/);
+});
+
+test('Large frontend surfaces keep state, models, and render sections decomposed', () => {
+	const layout = fs.readFileSync(path.join(repoRoot, 'src/components/Layout.jsx'), 'utf8');
+	const ganttView = fs.readFileSync(path.join(repoRoot, 'src/components/GanttView.jsx'), 'utf8');
+	const taskDetail = fs.readFileSync(path.join(repoRoot, 'src/components/TaskDetail.jsx'), 'utf8');
+	const taskForm = fs.readFileSync(path.join(repoRoot, 'src/components/TaskForm.jsx'), 'utf8');
+	const boardShell = fs.readFileSync(path.join(repoRoot, 'src/components/board/BoardShell.jsx'), 'utf8');
+	const boardController = fs.readFileSync(path.join(repoRoot, 'src/hooks/useBoardController.js'), 'utf8');
+	const ganttFacade = fs.readFileSync(path.join(repoRoot, 'src/ganttModel.mjs'), 'utf8');
+	const ganttRow = fs.readFileSync(path.join(repoRoot, 'src/components/gantt/GanttRow.jsx'), 'utf8');
+
+	assert.ok(layout.split('\n').length < 80);
+	assert.ok(ganttView.split('\n').length < 250);
+	assert.ok(taskDetail.split('\n').length < 200);
+	assert.ok(taskForm.split('\n').length < 300);
+	assert.match(layout, /BoardShell/);
+	assert.match(boardShell, /BoardDialogLayer/);
+	assert.match(boardController, /const \[ dialog, setDialog \]/);
+	assert.match(boardController, /kind: 'task'/);
+	assert.match(ganttFacade, /gantt\/model\.mjs/);
+	assert.match(ganttRow, /gantt\/geometry\.mjs/);
+	assert.equal(fs.existsSync(path.join(repoRoot, 'src/components/BoardModals.jsx')), false);
+});
+
+test('Interactive frontend primitives expose native accessibility semantics', () => {
+	const modal = fs.readFileSync(path.join(repoRoot, 'src/components/Modal.jsx'), 'utf8');
+	const taskSelect = fs.readFileSync(path.join(repoRoot, 'src/components/TaskSelect.jsx'), 'utf8');
+	const base = fs.readFileSync(path.join(repoRoot, 'assets/scss/base/_base.scss'), 'utf8');
+
+	assert.match(modal, /<dialog/);
+	assert.match(modal, /\.showModal\(\)/);
+	assert.match(modal, /aria-labelledby/);
+	assert.doesNotMatch(modal, /role="dialog"/);
+	assert.match(taskSelect, /role="combobox"/);
+	assert.match(taskSelect, /aria-expanded/);
+	assert.match(base, /\.pandat69-visually-hidden/);
 });
 
 test('Security-sensitive task edits and public intake have explicit guards', () => {

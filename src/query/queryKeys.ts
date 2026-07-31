@@ -34,7 +34,9 @@ export const queryKeys = {
 			'users',
 			boardName,
 			search,
-			[ ...includeUserIds ].sort( ( left, right ) => left - right ),
+			Array.from( includeUserIds ).sort(
+				( left, right ) => left - right
+			),
 		] as const,
 	reports: {
 		board: ( boardName: string ) =>

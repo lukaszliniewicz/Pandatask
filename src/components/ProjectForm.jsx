@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useProjectMutations } from '../hooks/useProjectMutations';
 import UserSelect from './UserSelect';
 
 const ProjectForm = ({ project = null, onClose }) => {
     const isEdit = !!project;
+    const fieldPrefix = useId();
     const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm({
         defaultValues: {
             name: project?.name || '',
@@ -34,17 +35,21 @@ const ProjectForm = ({ project = null, onClose }) => {
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="pandat69-form">
             <div className="pandat69-form-field">
-                <label>Project Name</label>
+                <label htmlFor={`${fieldPrefix}-name`}>Project Name</label>
                 <input 
+                    id={`${fieldPrefix}-name`}
                     className="pandat69-input" 
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby={errors.name ? `${fieldPrefix}-name-error` : undefined}
                     {...register('name', { required: 'Project name is required' })} 
                 />
-                {errors.name && <span className="pandat69-error-text">{errors.name.message}</span>}
+                {errors.name && <span id={`${fieldPrefix}-name-error`} className="pandat69-error-text">{errors.name.message}</span>}
             </div>
 
             <div className="pandat69-form-field">
-                <label>Description</label>
+                <label htmlFor={`${fieldPrefix}-description`}>Description</label>
                 <textarea 
+                    id={`${fieldPrefix}-description`}
                     className="pandat69-textarea" 
                     rows="4" 
                     {...register('description')} 
@@ -52,31 +57,31 @@ const ProjectForm = ({ project = null, onClose }) => {
             </div>
 
             <div className="pandat69-form-field">
-                <label>Deadline</label>
-                <input type="date" className="pandat69-input" {...register('deadline')} />
+                <label htmlFor={`${fieldPrefix}-deadline`}>Deadline</label>
+                <input id={`${fieldPrefix}-deadline`} type="date" className="pandat69-input" {...register('deadline')} />
             </div>
 
-            <div className="pandat69-form-field">
-                <label>Assigned To</label>
+            <fieldset className="pandat69-form-field pandat69-fieldset">
+                <legend>Assigned To</legend>
                 <Controller
                     control={control}
                     name="assigned_persons"
                     render={({ field: { onChange, value } }) => (
-                        <UserSelect selectedUserIds={value} onChange={onChange} />
+                        <UserSelect selectedUserIds={value} onChange={onChange} inputLabel="Search people to assign" />
                     )}
                 />
-            </div>
+            </fieldset>
 
-            <div className="pandat69-form-field">
-                <label>Supervisors</label>
+            <fieldset className="pandat69-form-field pandat69-fieldset">
+                <legend>Supervisors</legend>
                 <Controller
                     control={control}
                     name="supervisor_persons"
                     render={({ field: { onChange, value } }) => (
-                        <UserSelect selectedUserIds={value} onChange={onChange} />
+                        <UserSelect selectedUserIds={value} onChange={onChange} inputLabel="Search supervisors" />
                     )}
                 />
-            </div>
+            </fieldset>
 
             <div className="pandat69-form-actions">
                 <button 

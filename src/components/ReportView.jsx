@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useReports } from '../hooks/useReports';
 import { parseUtcDateTime } from '../utils';
 import Icon from './Icon';
@@ -38,6 +38,7 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
 const ReportView = () => {
     const [period, setPeriod] = useState('this_week');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
+    const fieldPrefix = useId();
     
     const filters = { period };
     if (period === 'custom') {
@@ -57,8 +58,9 @@ const ReportView = () => {
         <div className="pandat69-tab-report">
             <div className="pandat69-report-controls">
                 <div className="pandat69-report-field">
-                    <label>Select Period:</label>
+                    <label htmlFor={`${fieldPrefix}-period`}>Select Period:</label>
                     <select 
+                        id={`${fieldPrefix}-period`}
                         className="pandat69-select" 
                         value={period} 
                         onChange={(e) => setPeriod(e.target.value)}
@@ -76,8 +78,9 @@ const ReportView = () => {
                 {period === 'custom' && (
                     <div className="pandat69-report-custom-dates" style={{ display: 'flex', gap: '10px' }}>
                         <div className="pandat69-report-field">
-                            <label>From:</label>
+                            <label htmlFor={`${fieldPrefix}-start`}>From:</label>
                             <input 
+                                id={`${fieldPrefix}-start`}
                                 type="date" 
                                 className="pandat69-input" 
                                 value={customRange.start}
@@ -85,8 +88,9 @@ const ReportView = () => {
                             />
                         </div>
                         <div className="pandat69-report-field">
-                            <label>To:</label>
+                            <label htmlFor={`${fieldPrefix}-end`}>To:</label>
                             <input 
+                                id={`${fieldPrefix}-end`}
                                 type="date" 
                                 className="pandat69-input" 
                                 value={customRange.end}
@@ -98,6 +102,7 @@ const ReportView = () => {
                 
                 <div className="pandat69-report-field">
                     <button 
+                        type="button"
                         className="pandat69-button" 
                         onClick={handleGenerate}
                         disabled={!isCustomValid || isLoading}
@@ -108,7 +113,7 @@ const ReportView = () => {
             </div>
 
             <div className="pandat69-report-results">
-                {isError && <div className="pandat69-error">Error: {error.message}</div>}
+                {isError && <div className="pandat69-error" role="alert">Error: {error.message}</div>}
                 
                 {!isLoading && data && (
                     <>
@@ -120,8 +125,8 @@ const ReportView = () => {
                             <h4>Current Open Tasks Per Person</h4>
                             {data.tasks_per_person.length > 0 ? (
                                 <ul className="pandat69-report-list">
-                                    {data.tasks_per_person.map((person, idx) => (
-                                        <li key={idx}><strong>{person.display_name}:</strong> {person.task_count} tasks</li>
+                                    {data.tasks_per_person.map((person) => (
+                                        <li key={person.id || person.user_id || person.display_name}><strong>{person.display_name}:</strong> {person.task_count} tasks</li>
                                     ))}
                                 </ul>
                             ) : (

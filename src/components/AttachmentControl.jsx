@@ -1,21 +1,64 @@
-import React, { useState, useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import Icon from './Icon';
 
+const subscribeToMediaSelection = ( frame, onSelect ) => {
+	frame.on( 'select', onSelect );
+	return () => frame.off( 'select', onSelect );
+};
+
 const AttachmentControl = ({ value, onChange }) => {
-    const [mode, setMode] = useState('none');
-    const [linkUrl, setLinkUrl] = useState('');
-    const [mediaFrameRequested, setMediaFrameRequested] = useState(false);
     const mediaFrameRef = useRef(null);
+    const mediaCleanupRef = useRef(null);
     const onChangeRef = useRef(onChange);
     const radioName = `pandatask-attachment-${useId().replace(/[^a-z0-9_-]/gi, '')}`;
+    const mode = value?.type === 'link'
+        ? 'link'
+        : value?.type === 'file'
+            ? 'upload'
+            : 'none';
+    const linkUrl = mode === 'link' ? value?.url || '' : '';
 
     useEffect(() => {
         onChangeRef.current = onChange;
     }, [onChange]);
 
-    useEffect(() => {
-        if (!mediaFrameRequested) {
-            return undefined;
+    useEffect(() => () => {
+        const frame = mediaFrameRef.current;
+        if (frame) {
+            mediaCleanupRef.current?.();
+            frame.remove?.();
+            mediaFrameRef.current = null;
+            mediaCleanupRef.current = null;
+        }
+    }, []);
+
+    const handleModeChange = (newMode) => {
+        if (newMode === 'none') {
+            onChange({ type: '', url: '', id: '', filename: '' });
+        } else if (newMode === 'link') {
+            onChange({ type: 'link', url: linkUrl, id: '', filename: linkUrl });
+        } else if (newMode === 'upload') {
+            if (value?.type !== 'file') {
+                onChange({ type: 'file', url: '', id: '', filename: '' });
+            }
+        }
+    };
+
+    const handleLinkChange = (e) => {
+        const url = e.target.value;
+        onChange({ type: 'link', url: url, id: '', filename: url });
+    };
+
+    const openMediaUploader = () => {
+        if (typeof wp === 'undefined' || !wp.media) {
+            console.error('WordPress Media Uploader not available.');
+            alert('Media Uploader not available.');
+            return;
+        }
+
+        if (mediaFrameRef.current) {
+            mediaFrameRef.current.open();
+            return;
         }
 
         const frame = wp.media({
@@ -36,61 +79,9 @@ const AttachmentControl = ({ value, onChange }) => {
                 filename: attachment.filename
             });
         };
-
-        frame.on('select', handleSelect);
+        mediaCleanupRef.current = subscribeToMediaSelection(frame, handleSelect);
         mediaFrameRef.current = frame;
         frame.open();
-
-        return () => {
-            frame.off('select', handleSelect);
-            frame.remove?.();
-            mediaFrameRef.current = null;
-        };
-    }, [mediaFrameRequested]);
-
-    useEffect(() => {
-        if (value?.type === 'link') {
-            setMode('link');
-            setLinkUrl(value.url || '');
-        } else if (value?.type === 'file') {
-            setMode('upload');
-        } else {
-            setMode('none');
-        }
-    }, [value?.type, value?.url]);
-
-    const handleModeChange = (newMode) => {
-        setMode(newMode);
-        if (newMode === 'none') {
-            onChange({ type: '', url: '', id: '', filename: '' });
-        } else if (newMode === 'link') {
-            onChange({ type: 'link', url: linkUrl, id: '', filename: linkUrl });
-        } else if (newMode === 'upload') {
-            if (value?.type !== 'file') {
-                onChange({ type: 'file', url: '', id: '', filename: '' });
-            }
-        }
-    };
-
-    const handleLinkChange = (e) => {
-        const url = e.target.value;
-        setLinkUrl(url);
-        onChange({ type: 'link', url: url, id: '', filename: url });
-    };
-
-    const openMediaUploader = () => {
-        if (typeof wp === 'undefined' || !wp.media) {
-            console.error('WordPress Media Uploader not available.');
-            alert('Media Uploader not available.');
-            return;
-        }
-
-        if (mediaFrameRef.current) {
-            mediaFrameRef.current.open();
-            return;
-        }
-
-        setMediaFrameRequested(true);
     };
 
     const handleRemove = () => {

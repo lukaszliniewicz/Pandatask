@@ -13,15 +13,19 @@ const TaskBoard = ({ boardName, apiSettings, currentUser, isStandalone = false }
     const queryClient = useMemo(() => createPandataskQueryClient(), []);
 
     // Create API Client
+    const suppliedApiClient = apiSettings?.apiClient;
+    const apiRoot = apiSettings?.root;
+    const apiNonce = apiSettings?.nonce;
+    const localizedText = apiSettings?.text;
     const apiClient = useMemo(() => {
         // If apiSettings provides an axios instance (apiClient), use it.
         // This supports the 'Integrated Mode' where the host app passes its own client.
-        if (apiSettings?.apiClient) {
-            return apiSettings.apiClient;
+        if (suppliedApiClient) {
+            return suppliedApiClient;
         }
         // Otherwise create one from root/nonce (Standalone Mode)
-        return createApiClient(apiSettings);
-    }, [apiSettings?.apiClient, apiSettings?.nonce, apiSettings?.root]);
+        return createApiClient({ root: apiRoot, nonce: apiNonce });
+    }, [suppliedApiClient, apiNonce, apiRoot]);
 
     const config = useMemo(() => ({
         boardName,
@@ -29,8 +33,8 @@ const TaskBoard = ({ boardName, apiSettings, currentUser, isStandalone = false }
         currentUser,
         isStandalone,
         // Pass specific settings like text strings if they exist
-        text: apiSettings?.text || {}
-    }), [boardName, apiClient, currentUser, isStandalone, apiSettings?.text]);
+        text: localizedText || {}
+    }), [boardName, apiClient, currentUser, isStandalone, localizedText]);
 
     return (
         <ConfigProvider config={config}>

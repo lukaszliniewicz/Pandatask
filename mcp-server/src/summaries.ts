@@ -12,10 +12,18 @@ export function collection(value: unknown, key: string): UnknownRecord[] {
 
 export function numberIds(value: unknown): number[] {
   if (Array.isArray(value)) {
-    return value.map(Number).filter((item) => Number.isInteger(item) && item > 0);
+    return value.reduce<number[]>((ids, item) => {
+      const id = Number(item);
+      if (Number.isInteger(id) && id > 0) ids.push(id);
+      return ids;
+    }, []);
   }
   if (typeof value === 'string' && value.trim()) {
-    return value.split(',').map(Number).filter((item) => Number.isInteger(item) && item > 0);
+    return value.split(',').reduce<number[]>((ids, item) => {
+      const id = Number(item);
+      if (Number.isInteger(id) && id > 0) ids.push(id);
+      return ids;
+    }, []);
   }
   return [];
 }
@@ -118,8 +126,8 @@ export function workload(tasks: UnknownRecord[], today: string): UnknownRecord[]
 export function deadlineReview(tasks: UnknownRecord[], days: number, today: string): UnknownRecord {
   const horizon = addDays(today, days);
   const relevant = actionableTasks(tasks)
-    .filter((task) => task.status !== 'done')
     .filter((task) => {
+      if (task.status === 'done') return false;
       const deadline = dateValue(task.deadline);
       return deadline !== null && deadline <= horizon;
     })

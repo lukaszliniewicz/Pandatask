@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import CompactTaskItem from './CompactTaskItem';
 import { useTaskMutations } from '../hooks/useTaskMutations';
@@ -12,27 +12,20 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
     
     const isUserBoard = boardName.startsWith('user_');
 
-    // Set for Expanded IDs
-    const [expandedIds, setExpandedIds] = useState(new Set());
-
     const parentIds = useMemo(
         () => Array.from(
             new Set(
-                safeTasks
-                    .map((task) => Number(task.parent_task_id))
-                    .filter(Boolean)
+                safeTasks.flatMap((task) => {
+                    const parentId = Number(task.parent_task_id);
+                    return parentId ? [parentId] : [];
+                })
             )
         ),
         [safeTasks]
     );
-
-    useEffect(() => {
-        if (allSubtasksExpanded) {
-            setExpandedIds(new Set(parentIds));
-        } else {
-            setExpandedIds(new Set());
-        }
-    }, [allSubtasksExpanded, parentIds]);
+    const [expandedIds, setExpandedIds] = useState(
+        () => allSubtasksExpanded ? new Set(parentIds) : new Set()
+    );
 
     const toggleExpand = (taskId) => {
         const newSet = new Set(expandedIds);

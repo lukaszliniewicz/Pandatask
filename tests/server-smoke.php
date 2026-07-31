@@ -225,8 +225,8 @@ if ( ! empty( $missing_assets ) ) {
     $failures[] = 'Missing packaged assets: ' . implode( ', ', $missing_assets );
 }
 
-if ( '1.0.15' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
-    $failures[] = 'Expected plugin version 1.0.15 with database schema 1.0.13.';
+if ( '1.0.16' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
+    $failures[] = 'Expected plugin version 1.0.16 with database schema 1.0.13.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

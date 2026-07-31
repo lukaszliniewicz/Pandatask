@@ -18,6 +18,7 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
     });
 
     const handleDelete = async (id) => {
+        if (deleteProject.isPending) return;
         if (confirm('Are you sure you want to delete this project? Tasks will be unassigned.')) {
             try {
                 await deleteProject.mutateAsync(id);
@@ -84,6 +85,7 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
                                             title="Delete Project"
                                             aria-label={`Delete project ${project.name}`}
                                             onClick={() => handleDelete(project.id)}
+                                            disabled={deleteProject.isPending}
                                         >
                                             <Icon name="trash" />
                                         </button>
@@ -108,9 +110,9 @@ const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
                                                 ) : (
                                                     <span className="pandat69-project-task-icon-spacer" />
                                                 )}
-                                                <a href="#" className="pandat69-project-task-link" onClick={(e) => { e.preventDefault(); onTaskAction('view', t); }}>
+                                                <button type="button" className="pandat69-project-task-link" onClick={() => onTaskAction('view', t)}>
                                                     {t.name}
-                                                </a>
+                                                </button>
                                                 {t.deadline && (
                                                     <span className="pandat69-project-task-deadline">
                                                         <Icon name="calendar" size={13} />

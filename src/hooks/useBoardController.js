@@ -1,0 +1,207 @@
+import { useEffect, useMemo, useState } from 'react';
+import { generateGCalUrl } from '../utils';
+import { useConfig } from '../context/ConfigContext';
+import { useBoardFullscreen } from './useBoardFullscreen';
+import { useBoardNavigation } from './useBoardNavigation';
+import { useContainerMode } from './useContainerMode';
+import { useDebouncedValue } from './useDebouncedValue';
+import { useTaskMutations } from './useTaskMutations';
+import { useTasks } from './useTasks';
+
+/* eslint-disable no-alert -- Destructive actions require synchronous user confirmation. */
+
+const INITIAL_FILTERS = {
+	search: '',
+	sort: 'deadline_asc',
+	status: 'pending_in-progress',
+	project: 'all',
+	onlyMyTasks: false,
+	archived: false,
+};
+
+const normalizeTaskId = ( taskId ) => {
+	if ( typeof taskId !== 'string' || ! taskId.startsWith( 'virtual-' ) ) {
+		return taskId;
+	}
+	const id = Number.parseInt( taskId.split( '-' )[ 1 ], 10 );
+	return Number.isInteger( id ) ? id : taskId;
+};
+
+export const useBoardController = () => {
+	const navigation = useBoardNavigation();
+	const { containerRef, isContainerNarrow } = useContainerMode();
+	const fullscreen = useBoardFullscreen();
+	const { boardName, text } = useConfig();
+	const isUserBoard = boardName?.startsWith( 'user_' );
+	const [ filters, setFilters ] = useState( INITIAL_FILTERS );
+	const [ allSubtasksExpanded, setAllSubtasksExpanded ] = useState( false );
+	const [ isSidebarOpen, setIsSidebarOpen ] = useState(
+		() => window.innerWidth >= 1080
+	);
+	const [ dialog, setDialog ] = useState( null );
+	const debouncedSearch = useDebouncedValue( filters.search );
+	const { deleteTask, updateTask } = useTaskMutations();
+
+	useEffect( () => {
+		if ( isContainerNarrow ) {
+			setIsSidebarOpen( false );
+		}
+	}, [ isContainerNarrow ] );
+
+	const activeFilters = useMemo( () => {
+		const queryFilters = { ...filters, search: debouncedSearch };
+		if (
+			navigation.currentTab === 'tasks' &&
+			[ 'kanban', 'gantt' ].includes( navigation.currentView )
+		) {
+			queryFilters.status = '';
+		}
+		return queryFilters;
+	}, [
+		debouncedSearch,
+		filters,
+		navigation.currentTab,
+		navigation.currentView,
+	] );
+	const taskQuery = useTasks( activeFilters );
+
+	const setFilter = ( key, value ) => {
+		setFilters( ( current ) => ( {
+			...current,
+			[ key ]: value,
+			...( isUserBoard && key === 'onlyMyTasks' && value
+				? { project: 'all' }
+				: {} ),
+		} ) );
+	};
+
+	const closeDialogs = () => {
+		if ( navigation.isDetailModalOpen ) {
+			navigation.closeTask();
+		}
+		setDialog( null );
+	};
+
+	const handleTaskAction = async ( action, task ) => {
+		const taskId = normalizeTaskId( task.id );
+
+		if ( action === 'view' ) {
+			navigation.openTask( taskId );
+			return;
+		}
+		if ( action === 'edit' ) {
+			setDialog( { kind: 'task', task, defaults: {} } );
+			return;
+		}
+		if ( action === 'add-subtask' ) {
+			setDialog( {
+				kind: 'task',
+				task: null,
+				defaults: {
+					parent_task_id: taskId,
+					project_id: task.project_id || '',
+					target_board: task.board_name || '',
+				},
+			} );
+			return;
+		}
+		if ( action === 'gcal-export' ) {
+			const url = generateGCalUrl( task );
+			if ( url ) {
+				window.open( url, '_blank', 'noopener,noreferrer' );
+			}
+			return;
+		}
+		if ( action === 'delete' ) {
+			if ( Number( task.is_recurring ) === 1 ) {
+				setDialog( { kind: 'recurring-delete', task } );
+				return;
+			}
+			const message =
+				text?.confirm_delete_task ||
+				`Are you sure you want to delete "${ task.name }"?`;
+			if ( deleteTask.isPending || ! window.confirm( message ) ) {
+				return;
+			}
+			try {
+				await deleteTask.mutateAsync( { id: task.id } );
+			} catch {
+				window.alert( 'Failed to delete task.' );
+			}
+			return;
+		}
+		if ( action === 'archive' || action === 'unarchive' ) {
+			const archived = action === 'archive';
+			if (
+				updateTask.isPending ||
+				! window.confirm(
+					`Are you sure you want to ${ action } "${ task.name }"?`
+				)
+			) {
+				return;
+			}
+			try {
+				await updateTask.mutateAsync( {
+					id: task.id,
+					data: { archived: archived ? 1 : 0 },
+				} );
+			} catch {
+				window.alert( `Failed to ${ action } task.` );
+			}
+		}
+	};
+
+	const addSubtask = ( parentId, projectId = '', targetBoard = '' ) => {
+		navigation.closeTask( { replace: true } );
+		setDialog( {
+			kind: 'task',
+			task: null,
+			defaults: {
+				parent_task_id: parentId,
+				project_id: projectId,
+				target_board: targetBoard,
+			},
+		} );
+	};
+
+	const confirmRecurringDelete = async ( scope ) => {
+		if ( dialog?.kind !== 'recurring-delete' || deleteTask.isPending ) {
+			return;
+		}
+		try {
+			await deleteTask.mutateAsync( { id: dialog.task.id, scope } );
+			closeDialogs();
+		} catch {
+			window.alert( 'Failed to delete task.' );
+		}
+	};
+
+	return {
+		...fullscreen,
+		...navigation,
+		...taskQuery,
+		addSubtask,
+		allSubtasksExpanded,
+		closeDialogs,
+		confirmRecurringDelete,
+		containerRef,
+		dialog,
+		filters,
+		handleTaskAction,
+		isContainerNarrow,
+		isSidebarOpen,
+		isUserBoard,
+		navigateTask: ( taskId ) =>
+			navigation.openTask( taskId, { replace: true } ),
+		openCategoryDialog: () => setDialog( { kind: 'category' } ),
+		openProjectDialog: ( project = null ) =>
+			setDialog( { kind: 'project', project } ),
+		openTaskDialog: () =>
+			setDialog( { kind: 'task', task: null, defaults: {} } ),
+		setFilter,
+		setIsSidebarOpen,
+		toggleAllSubtasks: () =>
+			setAllSubtasksExpanded( ( expanded ) => ! expanded ),
+		toggleSidebar: () => setIsSidebarOpen( ( open ) => ! open ),
+	};
+};

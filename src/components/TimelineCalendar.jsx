@@ -19,7 +19,7 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
         // Task distribution
         const rows = [];
         // Sort
-        const sortedTasks = [...tasks].sort((a, b) => {
+        const sortedTasks = Array.from(tasks).sort((a, b) => {
             const startA = a.start_date ? parseDate(a.start_date) : parseDate(a.deadline);
             const startB = b.start_date ? parseDate(b.start_date) : parseDate(b.deadline);
             if (!startA || !startB) return 0;
@@ -84,8 +84,8 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
     return (
         <div className="pandat69-calendar-view">
             <div className="pandat69-calendar-header">
-                {days.map((day, i) => (
-                    <div key={i} className="pandat69-calendar-day-column">
+                {days.map((day) => (
+                    <div key={day.toISOString()} className="pandat69-calendar-day-column">
                         {day.toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })}
                     </div>
                 ))}
@@ -94,16 +94,17 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
                 <div className="pandat69-calendar-grid" style={{ height: `${gridHeight}px`, position: 'relative' }}>
                     {days.map((day, i) => (
                         <div 
-                            key={i} 
+                            key={day.toISOString()}
                             className="pandat69-calendar-day-cell"
                             style={{ left: `${i * (100/days.length)}%`, width: `${100/days.length}%`, height: '100%' }}
                         />
                     ))}
                     
-                    {taskRows.map((row, rIndex) => (
-                        row.map((tInfo, tIndex) => (
-                            <div 
-                                key={`${tInfo.task.id}-${rIndex}-${tIndex}`}
+                    {taskRows.map((row) => (
+                        row.map((tInfo) => (
+                            <button
+                                type="button"
+                                key={tInfo.task.id}
                                 className={`pandat69-improved-task-bar pandat69-status-${tInfo.task.status}`}
                                 style={{
                                     left: `${tInfo.leftOffset}%`,
@@ -111,13 +112,14 @@ const TimelineCalendar = ({ tasks, startDate, endDate, onTaskClick }) => {
                                     top: `${40 + (rIndex * 40)}px`
                                 }}
                                 title={tInfo.task.name}
+                                aria-label={`${tInfo.task.name}, ${tInfo.task.start_date || tInfo.task.deadline} to ${tInfo.task.deadline || tInfo.task.start_date}`}
                                 onClick={(e) => { e.stopPropagation(); onTaskClick(tInfo.task); }}
                             >
                                 <span className="pandat69-task-bar-text">
                                     {tInfo.task.is_recurring == 1 && <Icon name="refresh" size={13} />}
                                     {tInfo.task.name}
                                 </span>
-                            </div>
+                            </button>
                         ))
                     ))}
                 </div>

@@ -4,6 +4,14 @@ import Modal from './Modal';
 import Icon from './Icon';
 
 const TaskForm = lazy(() => import('./TaskForm'));
+const BUG_WIDGET_POSITION_KEY = 'pandat69_bug_widget_pos:v1';
+
+const getSystemInfo = () => {
+    const ua = navigator.userAgent;
+    const screenRes = `${window.screen.width}x${window.screen.height}`;
+    const viewport = `${window.innerWidth}x${window.innerHeight}`;
+    return `\n\n<hr><p><strong>System Info:</strong><br>UA: ${ua}<br>Screen: ${screenRes}<br>Viewport: ${viewport}</p>`;
+};
 
 const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false }) => {
     const [isOpen, setIsOpen] = useState(Boolean(initialOpen));
@@ -12,7 +20,7 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
     const isDragging = useRef(false);
 
     useEffect(() => {
-        const savedPos = localStorage.getItem('pandat69_bug_widget_pos');
+        const savedPos = localStorage.getItem(BUG_WIDGET_POSITION_KEY);
         if (savedPos) {
             try {
                 const pos = JSON.parse(savedPos);
@@ -66,7 +74,7 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
             if (isDragging.current) {
                 // Save position
                 const currentRect = widget.getBoundingClientRect();
-                localStorage.setItem('pandat69_bug_widget_pos', JSON.stringify({
+                localStorage.setItem(BUG_WIDGET_POSITION_KEY, JSON.stringify({
                     left: `${currentRect.left}px`,
                     top: `${currentRect.top}px`
                 }));
@@ -80,13 +88,6 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
-    };
-
-    const getSystemInfo = () => {
-        const ua = navigator.userAgent;
-        const screenRes = `${window.screen.width}x${window.screen.height}`;
-        const viewport = `${window.innerWidth}x${window.innerHeight}`;
-        return `\n\n<hr><p><strong>System Info:</strong><br>UA: ${ua}<br>Screen: ${screenRes}<br>Viewport: ${viewport}</p>`;
     };
 
     const handleClick = (e) => {
@@ -108,13 +109,14 @@ const FloatingBugReporter = ({ boardName, defaultAssigneeId, initialOpen = false
                     cursor: 'grab',
                     ...position
                 }}
-                onMouseDown={handleMouseDown}
             >
                 <button 
                     type="button"
                     className="pandat69-floating-btn"
                     onClick={handleClick}
+                    onMouseDown={handleMouseDown}
                     title="Report a bug"
+                    aria-label="Report a bug"
                 >
                     <Icon name="bug" />
                 </button>

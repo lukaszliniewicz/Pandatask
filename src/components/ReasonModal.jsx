@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import Modal from './Modal';
 
 const ReasonModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     const [comment, setComment] = useState('');
+    const commentId = useId();
 
     const handleConfirm = () => {
         onConfirm(comment);
@@ -14,9 +15,11 @@ const ReasonModal = ({ isOpen, onClose, onConfirm, title, message }) => {
         <Modal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="pandat69-reason-modal-content">
                 <p>{message}</p>
+                <label htmlFor={commentId}>Reason (optional)</label>
                 <textarea 
+                    id={commentId}
                     className="pandat69-textarea" 
-                    placeholder="Optional comment..."
+                    placeholder="Add context for this change"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={3}

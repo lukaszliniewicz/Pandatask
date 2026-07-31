@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useId, useMemo, useState, useEffect, useRef } from 'react';
 import { useTasks } from '../hooks/useTasks';
 import Icon from './Icon';
 
-const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'multiple', overrideBoardName }) => {
+const EMPTY_SELECTED_TASK_IDS = [];
+
+const TaskSelect = ({ selectedTaskIds = EMPTY_SELECTED_TASK_IDS, onChange, currentTaskId, mode = 'multiple', overrideBoardName, inputLabel }) => {
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef(null);
+    const searchId = useId();
     
     const { data: tasks, isLoading } = useTasks({ status: '' }, overrideBoardName);
 
     useEffect(() => {
+        if (!isOpen) return undefined;
+
         const handleClickOutside = (event) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
                 setIsOpen(false);
@@ -17,7 +22,16 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [isOpen]);
+
+    const selectedTaskIdSet = useMemo(
+        () => new Set(
+            (Array.isArray(selectedTaskIds) ? selectedTaskIds : [selectedTaskIds])
+                .filter(Boolean)
+                .map((id) => Number(id))
+        ),
+        [selectedTaskIds]
+    );
 
     const handleSearch = (e) => {
         setSearch(e.target.value);
@@ -32,7 +46,7 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
             setIsOpen(false); 
         } else {
             let newSelection;
-            if (selectedTaskIds.includes(id)) {
+            if (selectedTaskIdSet.has(id)) {
                 newSelection = selectedTaskIds.filter(tid => tid !== id);
             } else {
                 newSelection = [...selectedTaskIds, id];
@@ -60,7 +74,7 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
         }
     } else {
         selectedTasksDisplay = tasks 
-            ? tasks.filter(t => selectedTaskIds.includes(parseInt(t.id, 10)))
+            ? tasks.filter(t => selectedTaskIdSet.has(parseInt(t.id, 10)))
             : [];
     }
 
@@ -84,18 +98,29 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
             </div>
             
             {(mode !== 'single' || selectedTasksDisplay.length === 0) && (
-                <input 
+                <>
+                <label className="pandat69-visually-hidden" htmlFor={searchId}>
+                    {inputLabel || (mode === 'single' ? 'Search for a parent task' : 'Search for predecessor tasks')}
+                </label>
+                <input
+                    id={searchId}
                     type="text" 
                     className="pandat69-input" 
                     placeholder={mode === 'single' ? "Select parent task..." : "Search tasks..."} 
                     value={search}
                     onChange={handleSearch} 
                     onFocus={() => setIsOpen(true)}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isOpen}
+                    aria-haspopup="listbox"
+                    aria-controls={`${searchId}-suggestions`}
                 />
+                </>
             )}
             
             {isOpen && (
-                <ul className="pandat69-user-suggestions" style={{ display: 'block', position: 'absolute', zIndex: 1000, width: '100%', maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', marginTop: '0', background: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                <ul id={`${searchId}-suggestions`} className="pandat69-user-suggestions" aria-label="Task suggestions" style={{ display: 'block', position: 'absolute', zIndex: 1000, width: '100%', maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', marginTop: '0', background: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                     {isLoading ? (
                         <li className="pandat69-loading-small" style={{ padding: '8px' }}>Loading...</li>
                     ) : filteredTasks.length > 0 ? (
@@ -104,19 +129,23 @@ const TaskSelect = ({ selectedTaskIds = [], onChange, currentTaskId, mode = 'mul
                             if (mode === 'single') {
                                 isSelected = parseInt(selectedTaskIds, 10) === parseInt(task.id, 10);
                             } else {
-                                isSelected = selectedTaskIds.includes(parseInt(task.id, 10));
+                                isSelected = selectedTaskIdSet.has(parseInt(task.id, 10));
                             }
 
                             if (isSelected) return null;
                             
                             return (
-                                <li 
+                                <li
                                     key={task.id} 
                                     className="pandat69-user-suggestion-item"
-                                    onClick={() => toggleTask(task.id)}
-                                    style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
                                 >
-                                    #{task.id} - {task.name} <span style={{fontSize: '0.8em', color: '#888'}}>({task.status})</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleTask(task.id)}
+                                        style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee', width: '100%', textAlign: 'left' }}
+                                    >
+                                        #{task.id} - {task.name} <span style={{fontSize: '0.8em', color: '#888'}}>({task.status})</span>
+                                    </button>
                                 </li>
                             );
                         })

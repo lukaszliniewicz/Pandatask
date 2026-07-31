@@ -253,6 +253,7 @@
 	.pandat69-compact-title {
 		flex: 1;
 		min-width: 0; /* Enable truncation flex child */
+		text-align: left;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;

@@ -4,6 +4,13 @@ import KanbanColumn from './KanbanColumn';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { wouldCreateTaskCycle } from '../utils';
 
+const KANBAN_COLUMNS = [
+    { id: 'pending', title: 'Pending' },
+    { id: 'in-progress', title: 'In Progress' },
+    { id: 'done', title: 'Done' }
+];
+const VALID_STATUSES = new Set(KANBAN_COLUMNS.map((column) => column.id));
+
 const KanbanView = ({ tasks, onTaskAction }) => {
     // Tasks might be null/undefined during loading
     const safeTasks = tasks || [];
@@ -42,23 +49,15 @@ const KanbanView = ({ tasks, onTaskAction }) => {
         }
 
         const newStatus = over.id;
-        const validStatuses = ['pending', 'in-progress', 'done'];
-        
-        if (validStatuses.includes(newStatus) && activeTask.status !== newStatus) {
+        if (VALID_STATUSES.has(newStatus) && activeTask.status !== newStatus) {
             updateTask.mutate({ id: taskId, data: { status: newStatus } });
         }
     };
 
-    const columns = [
-        { id: 'pending', title: 'Pending' },
-        { id: 'in-progress', title: 'In Progress' },
-        { id: 'done', title: 'Done' }
-    ];
-
     return (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="pandat69-kanban-board">
-                {columns.map(col => (
+                {KANBAN_COLUMNS.map(col => (
                     <KanbanColumn 
                         key={col.id} 
                         status={col.id} 

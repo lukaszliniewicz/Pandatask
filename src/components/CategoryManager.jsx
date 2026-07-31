@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useCategories } from '../hooks/useCategories';
 import { useCategoryMutations } from '../hooks/useCategoryMutations';
 import Icon from './Icon';
@@ -7,10 +7,11 @@ const CategoryManager = () => {
     const { data: categories, isLoading } = useCategories();
     const { createCategory, deleteCategory } = useCategoryMutations();
     const [newCategory, setNewCategory] = useState('');
+    const categoryNameId = useId();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!newCategory.trim()) return;
+        if (!newCategory.trim() || createCategory.isPending) return;
         try {
             await createCategory.mutateAsync(newCategory);
             setNewCategory('');
@@ -44,6 +45,8 @@ const CategoryManager = () => {
                                     className="pandat69-icon-button pandat69-delete-category-btn" 
                                     onClick={() => handleDelete(cat.id)}
                                     title="Delete Category"
+                                    aria-label={`Delete category ${cat.name}`}
+                                    disabled={deleteCategory.isPending}
                                 >
                                     <Icon name="trash" size={16} />
                                 </button>
@@ -57,8 +60,9 @@ const CategoryManager = () => {
             
             <form className="pandat69-form pandat69-add-category-form" onSubmit={handleSubmit}>
                 <div className="pandat69-form-field">
-                    <label>New Category Name</label>
+                    <label htmlFor={categoryNameId}>New Category Name</label>
                     <input 
+                        id={categoryNameId}
                         type="text" 
                         className="pandat69-input" 
                         value={newCategory} 

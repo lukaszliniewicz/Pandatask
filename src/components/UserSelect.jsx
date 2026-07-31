@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { useUsers } from '../hooks/useUsers';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import Icon from './Icon';
 
-const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
+const EMPTY_SELECTED_USER_IDS = [];
+
+const UserSelect = ({ selectedUserIds = EMPTY_SELECTED_USER_IDS, onChange, overrideBoardName, inputLabel = 'Search users' }) => {
     const [search, setSearch] = useState('');
+    const searchId = useId();
     const debouncedSearch = useDebouncedValue(search.trim());
     const { data: users, isLoading } = useUsers(debouncedSearch, overrideBoardName, selectedUserIds);
+    const selectedUserIdSet = useMemo(
+        () => new Set(selectedUserIds.map((id) => Number(id))),
+        [selectedUserIds]
+    );
 
     const handleSearch = (e) => {
         setSearch(e.target.value);
@@ -15,7 +22,7 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
     const toggleUser = (userId) => {
         const id = parseInt(userId, 10);
         let newSelection;
-        if (selectedUserIds.includes(id)) {
+        if (selectedUserIdSet.has(id)) {
             newSelection = selectedUserIds.filter(uid => uid !== id);
         } else {
             newSelection = [...selectedUserIds, id];
@@ -25,7 +32,7 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
 
     // Derived state for display
     const selectedUsersDisplay = users 
-        ? users.filter(u => selectedUserIds.includes(parseInt(u.id, 10)))
+        ? users.filter(u => selectedUserIdSet.has(parseInt(u.id, 10)))
         : [];
 
     return (
@@ -47,10 +54,14 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
                 ))}
             </div>
             
-            <input 
+            <label className="pandat69-visually-hidden" htmlFor={searchId}>{inputLabel}</label>
+            <input
+                id={searchId}
                 type="text" 
                 className="pandat69-input" 
                 placeholder="Search users..." 
+                aria-autocomplete="list"
+                aria-controls={`${searchId}-suggestions`}
                 value={search}
                 onChange={handleSearch} 
             />
@@ -58,9 +69,9 @@ const UserSelect = ({ selectedUserIds = [], onChange, overrideBoardName }) => {
             {isLoading && <div className="pandat69-loading-small" aria-live="polite">Searching...</div>}
             
             {users && users.length > 0 && search.length > 0 && (
-                <ul className="pandat69-user-suggestions" style={{ display: 'block', position: 'relative', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', marginTop: '-1px' }}>
+                <ul id={`${searchId}-suggestions`} className="pandat69-user-suggestions" aria-label="User suggestions" style={{ display: 'block', position: 'relative', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', marginTop: '-1px' }}>
                     {users.map(user => {
-                        const isSelected = selectedUserIds.includes(parseInt(user.id, 10));
+                        const isSelected = selectedUserIdSet.has(parseInt(user.id, 10));
                         if (isSelected) return null; // Hide already selected from suggestions
                         
                         return (

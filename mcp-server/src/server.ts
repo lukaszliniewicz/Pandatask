@@ -118,7 +118,8 @@ function boardPath(board: string, suffix: string): string {
 }
 
 function mutationBody(input: Record<string, unknown>, excluded: readonly string[]): JsonRecord {
-  return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excluded.includes(key) && value !== undefined));
+  const excludedKeys = new Set(excluded);
+  return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excludedKeys.has(key) && value !== undefined));
 }
 
 function effectiveDryRun(client: PandataskClient, input: { dry_run?: boolean }): boolean {

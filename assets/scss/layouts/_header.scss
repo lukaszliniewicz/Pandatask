@@ -154,6 +154,12 @@
 /* Fullscreen Specific Overrides to fix "off" look */
 body.pandat69-fullscreen-body {
 
+	/* The plugin-owned legacy route is a standalone surface. Host app chrome
+	   injected from wp_footer must not cover its board. */
+	> #iarf-network-shell-root {
+		display: none !important;
+	}
+
 	.pandat69-header {
 		padding: 20px 30px; /* More breathing room */
 		background: $white;

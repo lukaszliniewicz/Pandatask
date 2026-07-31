@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.15
+Stable tag: 1.0.16
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.16 =
+
+* Clear the static React accessibility backlog with native dialog, label/control, button, keyboard, stable-key, and combobox semantics, backed by a zero-finding CI gate.
+* Split the board shell/controller/dialog layer, Gantt model/renderers, task details, and task form into focused modules with behavior and architecture contract tests.
+* Remove avoidable render allocations, lookup scans, prop-sync effects, stale hook dependencies, and ambiguous WordPress media subscriptions.
+* Upgrade WordPress Scripts 34, bestzip 3, and the TypeScript 7 native compiler while retaining TypeScript 6 for ESLint's compiler API; keep React 18 aligned with WordPress.
 
 = 1.0.15 =
 

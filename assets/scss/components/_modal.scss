@@ -18,12 +18,23 @@
 	transition: opacity 0.3s ease, visibility 0.3s ease;
 	overflow: hidden;
 	pointer-events: none;
+	max-width: none;
+	max-height: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
 
 	&.active {
 		opacity: 1;
 		visibility: visible;
 		pointer-events: auto;
 	}
+}
+
+dialog.pandat69-react-modal::backdrop {
+	background-color: rgba(0, 0, 0, 0.75);
 }
 
 .pandat69-modal-overlay {

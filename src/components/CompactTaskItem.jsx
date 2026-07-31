@@ -12,12 +12,14 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
     const menuRef = useRef(null);
 
     useEffect(() => {
+        if (!showMenu) return undefined;
+
         const handleClick = (e) => {
             if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
         };
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
+    }, [showMenu]);
 
     const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
         id: task.id,
@@ -43,17 +45,11 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
     const itemClass = `pandat69-compact-item ${isOver && !isDragging ? 'pandat69-dnd-over' : ''} ${isArchived ? 'pandat69-archived-row' : ''}`;
 
     const handleArchiveToggle = async () => {
+        if (updateTask.isPending) return;
         try {
             await updateTask.mutateAsync({ id: task.id, data: { archived: isArchived ? 0 : 1 } });
             setShowMenu(false);
-        } catch(e) { alert('Action failed'); }
-    };
-
-    const handleQuickStatus = async (status) => {
-        try {
-            await updateTask.mutateAsync({ id: task.id, data: { status } });
-            setShowMenu(false);
-        } catch(e) { alert('Action failed'); }
+        } catch { alert('Action failed'); }
     };
 
     return (
@@ -78,6 +74,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
                 <div className="pandat69-compact-expander">
                     {hasChildren ? (
                         <button 
+                            type="button"
                             className={`pandat69-expand-btn ${isExpanded ? 'expanded' : ''}`} 
                             onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
                             aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
@@ -98,14 +95,14 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
                     )}
                 </div>
 
-                <div className="pandat69-compact-title" onClick={() => onAction('view', task)}>
+                <button type="button" className="pandat69-compact-title" onClick={() => onAction('view', task)}>
                     {isSubtask && (
                         <Icon name="corner-down-right" size={15} />
                     )}
                     <span style={{ textDecoration: isArchived ? 'line-through' : 'none', color: isArchived ? '#999' : 'inherit' }}>
                         {task.name}
                     </span>
-                </div>
+                </button>
             </div>
 
             <div className="pandat69-compact-meta">
@@ -158,7 +155,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
 
                         <div style={{borderTop:'1px solid #eee', margin:'5px 0'}}></div>
 
-                        <button type="button" onClick={handleArchiveToggle}>
+                        <button type="button" onClick={handleArchiveToggle} disabled={updateTask.isPending}>
                             <Icon name={isArchived ? 'undo' : 'archive'} /> {isArchived ? 'Unarchive' : 'Archive'}
                         </button>
                         

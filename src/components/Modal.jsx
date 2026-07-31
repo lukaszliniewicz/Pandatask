@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import Icon from './Icon';
 
-const openModals = [];
+const openModals = new Set();
 const focusableSelector = [
     'a[href]',
     'button:not([disabled])',
@@ -13,7 +13,7 @@ const focusableSelector = [
 ].join(',');
 
 const Modal = ({ isOpen, onClose, title, children }) => {
-    const containerRef = useRef(null);
+    const dialogRef = useRef(null);
     const returnFocusRef = useRef(null);
     const onCloseRef = useRef(onClose);
     const modalTokenRef = useRef({});
@@ -26,53 +26,33 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     useEffect(() => {
         if (!isOpen) return undefined;
 
+        const dialog = dialogRef.current;
+        if (!dialog) return undefined;
+
         const token = modalTokenRef.current;
         returnFocusRef.current = document.activeElement;
-        openModals.push(token);
+        openModals.add(token);
         document.body.classList.add('pandat69-modal-open');
+        if (!dialog.open) dialog.showModal();
 
         const focusFrame = window.requestAnimationFrame(() => {
-            const firstFocusable = containerRef.current?.querySelector(focusableSelector);
-            (firstFocusable || containerRef.current)?.focus();
+            const firstFocusable = dialog.querySelector(focusableSelector);
+            (firstFocusable || dialog)?.focus();
         });
 
-        const handleKeyDown = (event) => {
-            if (openModals[openModals.length - 1] !== token) return;
-
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                onCloseRef.current();
-                return;
-            }
-
-            if (event.key !== 'Tab' || !containerRef.current) return;
-
-            const focusable = Array.from(containerRef.current.querySelectorAll(focusableSelector));
-            if (focusable.length === 0) {
-                event.preventDefault();
-                containerRef.current.focus();
-                return;
-            }
-
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
-            }
+        const handleCancel = (event) => {
+            event.preventDefault();
+            onCloseRef.current();
         };
 
-        document.addEventListener('keydown', handleKeyDown);
+        dialog.addEventListener('cancel', handleCancel);
 
         return () => {
             window.cancelAnimationFrame(focusFrame);
-            document.removeEventListener('keydown', handleKeyDown);
-            const tokenIndex = openModals.lastIndexOf(token);
-            if (tokenIndex !== -1) openModals.splice(tokenIndex, 1);
-            if (openModals.length === 0) document.body.classList.remove('pandat69-modal-open');
+            dialog.removeEventListener('cancel', handleCancel);
+            if (dialog.open) dialog.close();
+            openModals.delete(token);
+            if (openModals.size === 0) document.body.classList.remove('pandat69-modal-open');
             if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
         };
     }, [isOpen]);
@@ -80,15 +60,13 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
     return ReactDOM.createPortal(
-        <div className="pandat69-react-modal active">
-            <div className="pandat69-modal-overlay" onClick={onClose} aria-hidden="true"></div>
+        <dialog
+            className="pandat69-react-modal active"
+            ref={dialogRef}
+            aria-labelledby={titleId}
+        >
             <div
                 className="pandat69-modal-container"
-                ref={containerRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                tabIndex="-1"
             >
                 <div className="pandat69-modal-content">
                     <div className="pandat69-modal-header">
@@ -107,7 +85,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
                     </div>
                 </div>
             </div>
-        </div>,
+        </dialog>,
         document.body
     );
 };

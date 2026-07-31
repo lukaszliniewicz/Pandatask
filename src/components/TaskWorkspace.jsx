@@ -42,6 +42,7 @@ const TaskWorkspace = ( {
 
 		{ ! isLoading && ! isError && currentView === 'compact' && (
 			<CompactListView
+				key={ allSubtasksExpanded ? 'expanded' : 'collapsed' }
 				tasks={ tasks }
 				onTaskAction={ onTaskAction }
 				allSubtasksExpanded={ allSubtasksExpanded }

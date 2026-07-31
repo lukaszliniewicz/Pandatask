@@ -1,7 +1,8 @@
 # PandaTask frontend and ecosystem audit
 
 Date: 2026-07-30  
-Target release: 1.0.15  
+Completed: 2026-07-31
+Target releases: 1.0.15 initial audit; 1.0.16 accessibility/toolchain follow-up
 Baseline reviewed: `a26a7fe` (`main`)  
 Security scan: `8dad8ede-6c6f-4546-a0e8-ad52a3f85dbc`
 
@@ -20,6 +21,14 @@ The 1.0.15 work addresses the release-blocking and high-value findings:
 - frontend infrastructure has strict TypeScript coverage and a staged migration boundary;
 - CI now checks types, PHP compatibility, policies, lint, tests, production dependencies, and bundle budgets;
 - the dev release path builds a clean runtime package, validates it in staging, swaps atomically, and rolls back on a failed post-swap check.
+
+The 1.0.16 follow-up closes the two largest frontend debt items left by the
+initial audit. React Doctor accessibility diagnostics fell from 73 to zero,
+and its entire repository-wide advisory set fell from 122 to one intentional
+MCP rollback warning. `Layout`, Gantt, `TaskDetail`, and `TaskForm` are now
+composition boundaries backed by focused state/model/render modules and
+behavior contracts. The release also completes the tested migrations to
+WordPress Scripts 34, bestzip 3, and TypeScript 7.
 
 There are deliberate residuals. The task endpoint is now bounded to 500 rows, but a proper paginated/infinite-query user experience is still required for boards above that size. Public WordPress Media Library originals remain public even though PandaTask's task copy is protected; the UI and API now disclose that fact, but a future private-ingest path is the complete solution. Aggregate attachment quotas and content-addressed deduplication also remain follow-up architecture work.
 
@@ -140,17 +149,20 @@ The integration contract is intentionally small:
 - Lazy-loaded Gantt, report, task detail, task form, and project form with one retry for transient stale-chunk failures.
 - Added stable avatar dimensions, native lazy loading, and asynchronous decoding.
 
-**Residual decomposition backlog.**
+**1.0.16 decomposition follow-up.** The residual surfaces were split behind
+their existing public boundaries while preserving the Gantt and navigation
+behavior contracts:
 
-| Component | Approximate lines | Recommended seam |
-|---|---:|---|
-| `GanttView.jsx` | 819 | viewport/header, dependency overlay, row renderer, interaction controller |
-| `ganttModel.mjs` | 496 | date window, hierarchy, dependency graph, geometry |
-| `TaskForm.jsx` | 491 | identity/schedule/roles/recurrence/attachment fieldsets |
-| `TaskDetail.jsx` | 414 | summary, roles, comments, history, attachment |
-| `Layout.jsx` | 364 after extraction | reducer/controller hook, fullscreen shell, project navigation |
+| Original surface | Focused seams |
+|---|---|
+| `Layout.jsx` | `useBoardController`, `useBoardFullscreen`, shell, tab navigation, content, and dialog layer |
+| `GanttView.jsx` | view-model controller, toolbar, summary, legend, timeline, row, dependency, and unscheduled renderers |
+| `ganttModel.mjs` | date, relationship, task-set, timeline, geometry, and composed-model modules |
+| `TaskDetail.jsx` | header, metadata, description, subtasks, comments, and history |
+| `TaskForm.jsx` | pure defaults/payload model, tabs, general fields, schedule, people, and actions |
 
-Decomposition should follow behavior tests, not line count alone. Gantt in particular now has safety tests and should be split only with those invariants preserved.
+The facade/component imports remain stable, so standalone and IARF-hosted
+mounts use the same implementation after decomposition.
 
 ### 5. TypeScript
 
@@ -180,8 +192,8 @@ Current production output:
 
 | Asset | Raw | Gzip | Budget |
 |---|---:|---:|---:|
-| `build/main.js` | 206.0 KiB | 65.2 KiB | 260 KiB raw |
-| `build/main.css` | 88.8 KiB | 14.4 KiB | 100 KiB raw |
+| `build/main.js` | 208.4 KiB | 65.9 KiB | 260 KiB raw |
+| `build/main.css` | 92.4 KiB | 15.0 KiB | 100 KiB raw |
 
 Webpack reports an entrypoint warning because it sums both LTR and RTL stylesheets; WordPress loads one direction-specific stylesheet, not both. CSS is nevertheless close enough to its budget that future visual work should prefer removing duplication over raising the limit.
 
@@ -233,24 +245,35 @@ Rate limiting deliberately uses the direct server address instead of trusting ar
 
 Safe compatible updates were applied and lockfiles regenerated:
 
-| Package | Baseline | 1.0.15 | Decision |
+| Package | Baseline | 1.0.15 | 1.0.16 decision |
 |---|---:|---:|---|
 | `@tanstack/react-query` | 5.90.20 | 5.101.4 | compatible update |
 | `axios` | 1.18.1 | 1.19.0 | compatible update |
 | `lucide-react` | 1.27.0 | 1.28.0 | compatible update |
 | `react-hook-form` | broad `^7.0.0` | 7.83.0 | current v7 lock |
-| `bestzip` | 2.2.1 | 2.2.5 | compatible update; v3 deferred |
+| `bestzip` | 2.2.1 | 2.2.5 | upgraded and archive-tested on 3.0.1; Node floor is now 22 |
+| `@wordpress/scripts` | 32.x | 32.6.0 | upgraded to 34.0.0; lint/build migration passes |
 | `@modelcontextprotocol/sdk` | 1.29.0 | 1.30.0 | compatible update |
-| TypeScript | indirect only | 5.9.3 direct | strict frontend check |
+| TypeScript | indirect only | 5.9.3 direct | native 7.0.2 compiler; TypeScript 6.0.2 API alias retained for ESLint |
 | Sass | indirect only | 1.102.0 direct | deterministic style tool |
+| React Doctor | ad hoc | 0.9.2 ad hoc | pinned 0.9.2 with a zero-accessibility-finding CI wrapper |
 
-Deliberate major-version holds:
+Current compatibility decisions:
 
 - React/ReactDOM stay on 18.3.1 because WordPress 7.0's externalized React runtime is React 18. Upgrading source types/build dependencies to React 19 while the host supplies React 18 is unsafe.
-- `@wordpress/scripts` stays on the compatible 32.6.0 lock; 34.0.0 needs a separate WordPress toolchain migration.
-- TypeScript 7, `bestzip` 3, and React 19 type packages require explicit migration testing.
+- React 19 type packages are held with the runtime; compiling against React 19 types while loading React 18 is also unsafe.
+- Root TypeScript uses the TypeScript team's supported 6/7 transition layout: `@typescript/native` provides TypeScript 7's `tsc`, while the `typescript` alias exposes TypeScript 6's programmatic API to `typescript-eslint`. The MCP package has no compiler-API consumer and therefore uses TypeScript 7 directly.
+- MCP `@types/node` stays on major 24 because the supported/tested runtime and CI are Node 24; a type-only move to Node 26 would describe APIs the runtime does not guarantee.
 
-The production npm dependency graph reports zero known vulnerabilities. The complete development graph reports 42 high advisories (40 transitive, two direct roots: `@wordpress/scripts` and `bestzip`) in lint/test/build/archive tooling. None is shipped as a browser/runtime dependency. CI therefore blocks on the production graph and separately constrains build inputs through lockfiles, pinned actions, and clean runners. A future WordPress toolchain migration should retire the remaining development advisories instead of applying forced incompatible downgrades.
+The production npm dependency graph reports zero known vulnerabilities. After
+the major upgrades, the complete development graph reports 52 advisories
+(36 high and 16 moderate), with `@wordpress/scripts` the only affected direct
+root. These remain in lint/test/build tooling and are not shipped in the
+browser/runtime package. CI blocks on the production graph and separately
+constrains build inputs through lockfiles, pinned actions, and clean runners.
+Forced audit remediation would replace incompatible WordPress tooling and is
+not appropriate; the graph should be reassessed with each WordPress Scripts
+release.
 
 The invalid global `minimatch` override was removed because it forced an obsolete version across unrelated tools and made resolution less trustworthy.
 
@@ -299,7 +322,7 @@ Production deployment was intentionally not broadened as part of a dev-only rele
 | 9 | Dev deployment plus standalone/profile/group QA | Complete with the browser-capture limitation documented below |
 | 10 | Retire temporary QA account and record final evidence | Complete |
 
-## Verification record
+## 1.0.15 verification record
 
 | Check | Final result |
 |---|---|
@@ -326,7 +349,7 @@ Production deployment was intentionally not broadened as part of a dev-only rele
 | Live group-board browser QA | Pass |
 | Profile/standalone route QA | Partial visual capture; details below |
 
-## Dev deployment outcome
+## 1.0.15 dev deployment outcome
 
 PandaTask 1.0.15 was deployed to:
 
@@ -376,15 +399,127 @@ Cleanup completed after QA:
 - browser QA tabs were finalized;
 - no `.pandatask.deploy-new-*`, `.pandatask.backup-*`, or upload archive remained.
 
+## 1.0.16 follow-up implementation
+
+### Accessibility
+
+The follow-up replaced simulated controls with native buttons, associated
+labels and controls with stable `useId` values, added persistent labels where
+placeholders had been the only instruction, corrected combobox semantics,
+removed non-keyboard click surfaces, stabilized list keys, and migrated the
+shared modal to the native `<dialog>` lifecycle with Escape handling and focus
+return. It also added a reusable visually-hidden utility.
+
+React Doctor's accessibility category now reports zero findings across 119
+files, down from 73. A JSON-based wrapper verifies that the scan completed and
+fails CI on any accessibility warning or error; this avoids relying on the
+tool's currently inconsistent CLI exit status for an empty category report.
+
+### Decomposition and React lifecycle
+
+- `Layout` is now a small portal/composition boundary. `useBoardController`
+  owns board state/actions, `useBoardFullscreen` owns full-view behavior, and
+  focused board components own tabs, content, shell, and dialogs.
+- Dialog state is a single discriminated object rather than parallel boolean
+  flags and nullable payloads.
+- Gantt date parsing, relationship construction, timeline selection, task-set
+  filtering, geometry, controller state, and render sections are separate
+  modules behind the original facade.
+- `TaskDetail` and `TaskForm` are composition controllers with focused
+  sections; task-form defaults/payload/change-reason logic is a pure model with
+  dedicated Node tests.
+- Search debouncing no longer synchronizes duplicate parent/child state.
+  Media selection has explicit subscription cleanup, hook dependencies are
+  complete, repeated lookups use sets/maps, and static values are module
+  constants.
+
+The full repository-wide React Doctor result is one advisory warning and zero
+errors. The remaining warning is the reverse-order MCP rollback loop. Its
+deletions intentionally await sequentially so rollback evidence is ordered and
+each result can be recorded; parallelizing it would change failure semantics
+for negligible user-facing gain.
+
+### Follow-up plan status
+
+| Phase | Deliverable | Status |
+|---|---|---|
+| 11 | Accessibility semantic remediation | Complete: 73 to zero findings |
+| 12 | Board, Gantt, task-detail, and task-form decomposition | Complete |
+| 13 | Model and architecture contract coverage | Complete |
+| 14 | WordPress Scripts 34, bestzip 3, and TypeScript 7 migrations | Complete |
+| 15 | Repeatable accessibility CI gate | Complete |
+| 16 | Full 1.0.16 regression, package inspection, dev deployment, and live QA | Complete |
+
+## 1.0.16 final verification and deployment
+
+The final root `npm run check` passed against the exact release source:
+
+| Check | Final result |
+|---|---|
+| TypeScript 7 frontend check | Pass |
+| WordPress ESLint and Stylelint | Pass |
+| React Doctor accessibility gate | Zero findings across 119 files |
+| Architecture/phase contracts | 16/16 pass |
+| Gantt model tests | 9/9 pass |
+| Task-form model tests | 5/5 pass |
+| PHP security policy suite | Pass |
+| Production webpack build | Pass |
+| Enforced main JS/CSS budgets | 208.4/260 KiB and 92.4/100 KiB |
+| Root production npm audit | Zero findings |
+| MCP TypeScript and tests | Pass; 23/23 |
+| MCP production dependency audit | Zero findings |
+| PHP syntax | 64 tracked files pass |
+| PHPCS | Pass |
+| PHPStan | Pass, zero errors |
+| Composer audit | Zero advisories |
+
+Webpack still emits its generic 393 KiB entrypoint advisory because it sums
+the mutually exclusive 92.4 KiB LTR and RTL stylesheets. The separately
+enforced assets that WordPress actually serves remain within budget.
+
+The installable `pandatask.zip` was rebuilt with bestzip 3 and inspected
+directly. It contains 171 entries under one `pandatask/` root, reports version
+1.0.16, contains no Node manifests, tests, scripts, CI files, or
+`node_modules`, and is 364,533 bytes. Its SHA-256 is:
+
+`444e15a64c0f225722307dd1b9e898c044f4eb9e1079d98900a7688d82570dc7`
+
+The atomic dev deployment completed at:
+
+`/home/iarf-dev/htdocs/dev.iarf.net/wp-content/plugins/pandatask`
+
+WordPress reports PandaTask active at 1.0.16. The final local and deployed
+runtime bytes match exactly:
+
+- `pandatask.php`: `203b8776552d3f1d658092cbb6491b58aab056809a91e72135f0657d4296d27b`
+- `build/main.js`: `8d6aa6bf90777ab709873b377b4ed545ac88a047507279ffe9cad7a1a097f157`
+- `build/main.css`: `cac7da91c3af64de6b8d1b3d38f485e4cbb364a4c61b6c44bef3a4b6ecc8dab9`
+
+Authenticated live QA covered:
+
+- group and profile boards in wide mode with matching 240px/818px
+  sidebar/main geometry, no horizontal overflow, and no console errors;
+- the group task form as a labelled native dialog with visible keyboard focus,
+  focus return on close, and no leaked body lock;
+- task-detail query/history behavior, including browser Back closing the dialog
+  and restoring task focus;
+- the Gantt ARIA grid, dependency rendering, and console state;
+- the 900px compact breakpoint and its overlay project drawer;
+- full-view entry/exit, body-class cleanup, zero overflow, and focus return;
+- the legacy standalone route with the host IARF shell suppressed, the
+  PandaTask mount beginning at x=0, zero horizontal overflow, correct
+  `noindex` policy, and a clean console.
+
+The only visible broken media during group QA was the host-owned group avatar
+above the PandaTask mount; it is outside this plugin's DOM and release scope.
+
 ## Prioritized follow-up backlog
 
 ### Next release
 
 1. Add explicit task pagination/infinite query and a visible “more results” state.
 2. Add focused browser tests for URL history, task-dialog Back behavior, container breakpoints, and host remount cleanup.
-3. Address the highest-impact accessibility findings: persistent labels, button semantics, keyboard activation, and stable list keys.
-4. Split `TaskForm` and `TaskDetail` behind behavior tests.
-5. Add a trusted-proxy address abstraction if infrastructure requires it.
+3. Add a trusted-proxy address abstraction if infrastructure requires it.
 
 ### Storage/security architecture
 
@@ -395,24 +530,27 @@ Cleanup completed after QA:
 
 ### Toolchain and release engineering
 
-1. Migrate and test `@wordpress/scripts` 34 and remove resolved development advisories.
-2. Replace or upgrade `bestzip` after validating archive compatibility.
-3. Apply atomic staging/rollback to production deployment.
-4. Add automated deployment artifact manifests/checksums and provenance.
-5. Reassess React 19 only when the supported WordPress runtime externalizes a compatible major.
+1. Apply atomic staging/rollback to production deployment.
+2. Add automated deployment artifact manifests/checksums and provenance.
+3. Reassess React 19 only when the supported WordPress runtime externalizes a compatible major.
+4. Reassess WordPress Scripts transitive development advisories on each major/minor toolchain release.
 
-## Release acceptance record
+## 1.0.16 release acceptance record
 
 | Criterion | Result |
 |---|---|
-| Final root and MCP checks pass | Pass |
-| Package reports 1.0.15 and contains current assets | Pass |
-| Atomic deployment, active-plugin state, PHP, and byte identity | Pass |
-| Embedded group board renders without application/console errors | Pass |
-| Standalone and profile mounts | Routes reached; detailed visual capture incomplete because the browser bridge reset |
-| Container-aware narrow/wide switch | Wide live geometry pass; narrow behavior covered by source/contract checks, not a second live capture |
-| URL tab/view/task history | Source and contract pass; interactive live history sequence not captured |
-| Existing board and authenticated read path | Pass through live group UI and server REST smoke |
-| Temporary QA access and artifacts removed | Pass |
+| Final root, MCP, PHP, and security checks | Pass |
+| Package reports 1.0.16 and excludes development content | Pass |
+| Atomic deployment, active-plugin state, and byte identity | Pass |
+| Embedded group and profile boards | Pass |
+| Standalone board without host-shell overlap | Pass |
+| Container-aware narrow/wide behavior | Pass in both live modes |
+| URL tab/view/task history | Pass in live interaction and contracts |
+| Native dialog semantics and focus lifecycle | Pass |
+| Full-view lifecycle and focus return | Pass |
+| Browser console and horizontal overflow | Clean across exercised surfaces |
+| Temporary deployment/browser artifacts | Removed/finalized |
 
-The dev deployment is accepted because the release, server, security, and reported group-layout paths passed and the incomplete checks are interaction-capture gaps with automated contract coverage, not observed product failures. The next browser suite should automate those remaining interaction sequences so they do not depend on an interactive control bridge.
+PandaTask 1.0.16 is accepted for the IARF dev environment. Production remains
+out of scope until its deployment path receives the same atomic
+staging/rollback protection.

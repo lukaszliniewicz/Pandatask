@@ -177,7 +177,14 @@ const ProjectSidebar = ({
     if (isMobile) {
         return createPortal(
             <>
-                {isOpen && <div className="pandat69-sidebar-overlay" onClick={onClose}></div>}
+                {isOpen && (
+                    <button
+                        type="button"
+                        className="pandat69-sidebar-overlay"
+                        onClick={onClose}
+                        aria-label="Close project menu"
+                    />
+                )}
                 {sidebarContent}
             </>,
             document.body

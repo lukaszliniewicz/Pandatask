@@ -26,6 +26,7 @@ const BugTracker = ({ boardName, defaultAssigneeId }) => {
             <div className="pandat69-bug-tracker-header">
                 <h3>Existing Issues</h3>
                 <button 
+                    type="button"
                     className="pandat69-button pandat69-toggle-bug-form-btn"
                     onClick={() => setIsFormOpen(true)}
                 >
@@ -68,7 +69,10 @@ const BugTracker = ({ boardName, defaultAssigneeId }) => {
             >
                 {selectedTaskId && (
                     <Suspense fallback={<div className="pandat69-loading">Loading...</div>}>
-                        <TaskDetail taskId={selectedTaskId} />
+                        <TaskDetail
+                            taskId={selectedTaskId}
+                            onNavigate={setSelectedTaskId}
+                        />
                     </Suspense>
                 )}
             </Modal>

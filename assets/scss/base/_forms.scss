@@ -108,6 +108,21 @@ textarea.pandat69-textarea {
 	}
 }
 
+.pandat69-fieldset {
+	min-width: 0;
+	padding: 0;
+	border: 0;
+
+	legend {
+		display: block;
+		width: 100%;
+		margin-bottom: 5px;
+		padding: 0;
+		font-weight: 600;
+		color: $primary-color;
+	}
+}
+
 .pandat69-form-row {
 	display: flex;
 	gap: 20px;
@@ -333,6 +348,124 @@ select.pandat69-select,
 	&.active {
 		display: block;
 	}
+}
+
+.pandat69-board-target-field {
+	padding: 10px;
+	border: 1px solid #d1d9e6;
+	border-radius: 4px;
+	background: #f0f4f8;
+}
+
+.pandat69-inline-control {
+	display: flex;
+	gap: 5px;
+	align-items: stretch;
+
+	.pandat69-input,
+	.pandat69-select {
+		flex: 1;
+	}
+}
+
+.pandat69-compact-control {
+	flex: 0 0 auto;
+	padding: 0 10px;
+}
+
+.pandat69-choice-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 20px;
+
+	label {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0;
+		font-weight: 400;
+		cursor: pointer;
+	}
+}
+
+.pandat69-form-panel {
+	margin-bottom: 20px;
+	padding: 15px;
+	border: 1px solid #e0e5eb;
+	border-radius: 4px;
+	background: #fcfcfc;
+}
+
+.pandat69-dynamic-schedule {
+	background: #f5f7fa;
+}
+
+.pandat69-dependent-tasks {
+	margin-top: 15px;
+	padding-top: 15px;
+	border-top: 1px solid #dcdfe4;
+}
+
+.pandat69-checkbox-field,
+.pandat69-checkbox-label {
+
+	label,
+	& {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 400;
+		cursor: pointer;
+	}
+}
+
+.pandat69-indented-field {
+	padding-left: 25px;
+}
+
+.pandat69-small-number {
+	max-width: 100px;
+}
+
+.pandat69-recurrence-fieldset,
+.pandat69-attachment-fieldset {
+	margin-top: 20px;
+	padding-top: 20px;
+	border-top: 1px solid #eee;
+}
+
+.pandat69-recurrence-options {
+	margin-top: 15px;
+	margin-bottom: 0;
+}
+
+.pandat69-weekday-choices {
+	gap: 10px;
+}
+
+.pandat69-task-form-actions {
+	justify-content: space-between;
+	margin-top: 25px;
+	padding-top: 15px;
+	border-top: 1px solid #e0e5eb;
+
+	> div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
+}
+
+.pandat69-cancel-button {
+	border-color: #ccc;
+	background: #f5f5f5;
+	color: #333;
+}
+
+.pandat69-submit-task-btn {
+	background: $primary-color;
+	color: $white;
+	font-weight: 700;
 }
 
 @keyframes pandat69FadeIn {

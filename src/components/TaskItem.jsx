@@ -10,6 +10,8 @@ const TaskItem = ({ task, onAction }) => {
     const dropdownRef = useRef(null);
 
     useEffect(() => {
+        if (!showStatusDropdown) return undefined;
+
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowStatusDropdown(false);
@@ -17,9 +19,10 @@ const TaskItem = ({ task, onAction }) => {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [showStatusDropdown]);
 
     const handleStatusChange = async (newStatus) => {
+        if (updateTask.isPending) return;
         setShowStatusDropdown(false);
         if (task.status !== newStatus) {
             try {
@@ -57,7 +60,7 @@ const TaskItem = ({ task, onAction }) => {
     const hasDescription = !!(task.description || task.description_rendered);
 
     return (
-        <li className={itemClasses} data-task-id={task.id} onClick={(e) => handleAction('view', e)}>
+        <li className={itemClasses} data-task-id={task.id}>
             <div className="pandat69-task-item-details">
                 {isSubtask && (
                     <div className="pandat69-subtask-indicator">
@@ -66,36 +69,42 @@ const TaskItem = ({ task, onAction }) => {
                 )}
                 
                 <div className="pandat69-task-item-name">
-                    <a href="#" className="pandat69-view-task-link" onClick={(e) => handleAction('view', e)}>
+                    <button type="button" className="pandat69-view-task-link" onClick={(e) => handleAction('view', e)}>
                         {isRecurring && (
                             <span className="pandat69-recurring-label">
                                 <Icon name="refresh" size={15} /> Recurring
                             </span>
                         )}
                         {task.name}
-                    </a>
+                    </button>
                 </div>
 
                 <div className="pandat69-task-item-meta">
                     <span style={{ position: 'relative' }} ref={dropdownRef}>
-                        <span 
+                        <button
+                            type="button"
                             className={statusClass} 
                             data-status={task.status}
                             onClick={(e) => { e.stopPropagation(); setShowStatusDropdown(!showStatusDropdown); }}
-                            style={{ cursor: 'pointer' }}
+                            aria-expanded={showStatusDropdown}
+                            aria-haspopup="menu"
                         >
                             {task.status.replace('-', ' ')}
-                        </span>
+                        </button>
                         {showStatusDropdown && (
-                            <div className="pandat69-status-dropdown">
+                            <div className="pandat69-status-dropdown" role="menu" aria-label="Change task status">
                                 {['pending', 'in-progress', 'done'].map(status => (
-                                    <div 
+                                    <button
+                                        type="button"
                                         key={status}
                                         className={`pandat69-status-option pandat69-status-${status} ${task.status === status ? 'pandat69-current-status' : ''}`}
                                         onClick={(e) => { e.stopPropagation(); handleStatusChange(status); }}
+                                        role="menuitemradio"
+                                        aria-checked={task.status === status}
+                                        disabled={updateTask.isPending}
                                     >
                                         {status.replace('-', ' ')}
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         )}
@@ -135,10 +144,10 @@ const TaskItem = ({ task, onAction }) => {
             
             <div className="pandat69-task-item-footer">
                 <div className="pandat69-footer-left">
-                    <button type="button" className="pandat69-icon-button pandat69-edit-task-btn" title="Edit Task" onClick={(e) => handleAction('edit', e)}>
+                    <button type="button" className="pandat69-icon-button pandat69-edit-task-btn" title="Edit Task" aria-label={`Edit ${task.name}`} onClick={(e) => handleAction('edit', e)}>
                         <Icon name="pencil" />
                     </button>
-                    <button type="button" className="pandat69-icon-button pandat69-delete-task-btn" title="Delete Task" onClick={(e) => handleAction('delete', e)}>
+                    <button type="button" className="pandat69-icon-button pandat69-delete-task-btn" title="Delete Task" aria-label={`Delete ${task.name}`} onClick={(e) => handleAction('delete', e)}>
                         <Icon name="trash" />
                     </button>
                     
@@ -147,6 +156,8 @@ const TaskItem = ({ task, onAction }) => {
                             type="button" 
                             className="pandat69-icon-button pandat69-show-description-btn" 
                             title={showDescription ? "Hide Description" : "Show Description"} 
+                            aria-label={`${showDescription ? 'Hide' : 'Show'} description for ${task.name}`}
+                            aria-expanded={showDescription}
                             onClick={(e) => { e.stopPropagation(); setShowDescription(!showDescription); }}
                         >
                             <Icon name="align-left" />
@@ -154,28 +165,28 @@ const TaskItem = ({ task, onAction }) => {
                     )}
 
                     {isArchived ? (
-                        <button type="button" className="pandat69-icon-button pandat69-unarchive-task-btn" title="Unarchive Task" onClick={(e) => handleAction('unarchive', e)}>
+                        <button type="button" className="pandat69-icon-button pandat69-unarchive-task-btn" title="Unarchive Task" aria-label={`Unarchive ${task.name}`} onClick={(e) => handleAction('unarchive', e)}>
                             <Icon name="undo" />
                         </button>
                     ) : (
-                        <button type="button" className="pandat69-icon-button pandat69-archive-task-btn" title="Archive Task" onClick={(e) => handleAction('archive', e)}>
+                        <button type="button" className="pandat69-icon-button pandat69-archive-task-btn" title="Archive Task" aria-label={`Archive ${task.name}`} onClick={(e) => handleAction('archive', e)}>
                             <Icon name="archive" />
                         </button>
                     )}
                     
                     {!isSubtask && !isArchived && (
-                        <button type="button" className="pandat69-icon-button pandat69-add-subtask-btn" title="Add Subtask" onClick={(e) => handleAction('add-subtask', e)}>
+                        <button type="button" className="pandat69-icon-button pandat69-add-subtask-btn" title="Add Subtask" aria-label={`Add subtask to ${task.name}`} onClick={(e) => handleAction('add-subtask', e)}>
                             <Icon name="list-plus" />
                         </button>
                     )}
 
                     {!isArchived && task.deadline && (
-                        <button type="button" className="pandat69-icon-button pandat69-gcal-export-btn" title="Export to Google Calendar" onClick={(e) => handleAction('gcal-export', e)}>
+                        <button type="button" className="pandat69-icon-button pandat69-gcal-export-btn" title="Export to Google Calendar" aria-label={`Export ${task.name} to Google Calendar`} onClick={(e) => handleAction('gcal-export', e)}>
                             <Icon name="calendar-plus" />
                         </button>
                     )}
 
-                    <button type="button" className="pandat69-icon-button pandat69-show-comments-btn" title="View Details" onClick={(e) => handleAction('view', e)}>
+                    <button type="button" className="pandat69-icon-button pandat69-show-comments-btn" title="View Details" aria-label={`View details for ${task.name}`} onClick={(e) => handleAction('view', e)}>
                         <Icon name="message" />
                     </button>
                 </div>

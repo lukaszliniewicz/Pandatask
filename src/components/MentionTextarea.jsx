@@ -2,7 +2,7 @@ import React from 'react';
 import { MentionsInput, Mention } from 'react-mentions';
 import { useConfig } from '../context/ConfigContext';
 
-const MentionTextarea = ({ value, onChange, placeholder, minHeight = 80 }) => {
+const MentionTextarea = ({ id, ariaLabel, value, onChange, placeholder, minHeight = 80 }) => {
     const { apiClient, boardName } = useConfig();
 
     const fetchUsers = async (query, callback) => {
@@ -63,6 +63,8 @@ const MentionTextarea = ({ value, onChange, placeholder, minHeight = 80 }) => {
 
     return (
         <MentionsInput
+            id={id}
+            aria-label={ariaLabel}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}

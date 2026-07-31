@@ -80,9 +80,11 @@
 	font-size: 1.1em;
 	margin-bottom: 5px;
 
-	a {
+	a,
+	.pandat69-view-task-link {
 		text-decoration: none;
 		color: inherit;
+		text-align: left;
 
 		&:hover {
 			text-decoration: underline;

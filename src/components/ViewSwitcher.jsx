@@ -22,12 +22,16 @@ const ViewSwitcher = ({ currentTab, onTabChange, currentView, onViewChange }) =>
         <div className="pandat69-navigation-header">
             <ul className="pandat69-tab-navigation">
                 {TABS.map(tab => (
-                    <li 
-                        key={tab.id}
-                        className={`pandat69-tab-item ${currentTab === tab.id ? 'active' : ''}`}
-                        onClick={() => onTabChange(tab.id)}
-                    >
-                        {tab.label}
+                    <li key={tab.id}>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={currentTab === tab.id}
+                            className={`pandat69-tab-item ${currentTab === tab.id ? 'active' : ''}`}
+                            onClick={() => onTabChange(tab.id)}
+                        >
+                            {tab.label}
+                        </button>
                     </li>
                 ))}
             </ul>

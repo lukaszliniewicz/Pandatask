@@ -74,8 +74,27 @@
 .pandat69-project-sidebar.is-mobile :where(button, [type="button"], [type="submit"], [role="button"]) {
 	appearance: none;
 	-webkit-appearance: none;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	color: inherit;
+	cursor: pointer;
+	margin: 0;
+	padding: 0;
 	text-transform: none;
 	text-shadow: none;
+}
+
+.pandat69-root button:focus-visible,
+.pandat69-container button:focus-visible,
+.pandat69-bug-tracker-container button:focus-visible,
+#pandat69-floating-bug-reporter-root button:focus-visible,
+.pandat69-react-modal button:focus-visible,
+.pandat69-project-sidebar.is-mobile button:focus-visible,
+[data-iarf-plugin="pandatask"] button:focus-visible {
+	outline: 2px solid var(--pandatask-ui-focus-color, #2271b1);
+	outline-offset: 2px;
 }
 
 .pandat69-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
