@@ -4,6 +4,7 @@ namespace Pandatask\Application\Project;
 
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Security\BoardAccessPolicy;
+use Pandatask\Application\Task\TaskCacheInvalidator;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\ProjectRepository;
 
@@ -15,10 +16,13 @@ final class ProjectService {
 
     private $board_access_policy;
 
-    public function __construct( $repository = null, $board_service = null, $board_access_policy = null ) {
+    private $cache_invalidator;
+
+    public function __construct( $repository = null, $board_service = null, $board_access_policy = null, $cache_invalidator = null ) {
         $this->repository          = $repository ?: new ProjectRepository();
         $this->board_service       = $board_service ?: new BoardService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
+        $this->cache_invalidator   = $cache_invalidator ?: new TaskCacheInvalidator();
     }
 
     public function getProjects( $board_name, $private_only = false ) {
@@ -81,7 +85,7 @@ final class ProjectService {
         $result  = $this->repository->update( $project_id, $data );
 
         if ( $result && $project ) {
-            DatabaseContext::invalidateBoardCache( $project->board_name, array( 'projects', 'tasks' ) );
+            $this->cache_invalidator->invalidateBoard( $project->board_name, array( 'projects', 'tasks' ) );
             delete_transient( 'pandat69_project_' . $project_id );
         }
 
@@ -98,7 +102,7 @@ final class ProjectService {
         $result = $this->repository->delete( $project_id );
 
         if ( $result ) {
-            DatabaseContext::invalidateBoardCache( $project->board_name, array( 'projects', 'tasks', 'parent_tasks' ) );
+            $this->cache_invalidator->invalidateBoard( $project->board_name, array( 'projects', 'tasks', 'parent_tasks', 'reports' ) );
             delete_transient( 'pandat69_project_' . $project_id );
         }
 

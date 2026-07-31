@@ -2,6 +2,7 @@
 
 namespace Pandatask\Application\Category;
 
+use Pandatask\Application\Task\TaskCacheInvalidator;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\CategoryRepository;
 
@@ -9,8 +10,11 @@ final class CategoryService {
 
     private $repository;
 
-    public function __construct( $repository = null ) {
+    private $cache_invalidator;
+
+    public function __construct( $repository = null, $cache_invalidator = null ) {
         $this->repository = $repository ?: new CategoryRepository();
+        $this->cache_invalidator = $cache_invalidator ?: new TaskCacheInvalidator();
     }
 
     public function getCategories( $board_name ) {
@@ -42,7 +46,7 @@ final class CategoryService {
         $result = $this->repository->delete( $category_id, $board_name );
 
         if ( $result ) {
-            DatabaseContext::invalidateBoardCache( $board_name, array( 'categories', 'tasks', 'parent_tasks' ) );
+            $this->cache_invalidator->invalidateBoard( $board_name, array( 'categories', 'tasks', 'parent_tasks', 'reports' ) );
         }
 
         return $result;

@@ -19,13 +19,10 @@ final class ReportRepository {
 
         $tasks_added = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT t.id, t.name, t.created_at, GROUP_CONCAT(DISTINCT u.display_name SEPARATOR ', ') as assigned_user_names
+                "SELECT t.id, t.name, t.created_at
                  FROM {$tasks_table} t
-                 LEFT JOIN {$assignments_table} a ON t.id = a.task_id AND a.role = 'assignee'
-                 LEFT JOIN {$users_table} u ON a.user_id = u.ID
                  WHERE t.board_name = %s AND t.created_at >= %s AND t.created_at < %s
-                 GROUP BY t.id
-                ORDER BY t.created_at DESC",
+                 ORDER BY t.created_at DESC, t.id DESC",
                 $board_name,
                 $range_start_utc,
                 $range_end_utc
@@ -34,13 +31,10 @@ final class ReportRepository {
 
         $tasks_completed = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT t.id, t.name, t.completed_at, GROUP_CONCAT(DISTINCT u.display_name SEPARATOR ', ') as assigned_user_names
+                "SELECT t.id, t.name, t.completed_at
                  FROM {$tasks_table} t
-                 LEFT JOIN {$assignments_table} a ON t.id = a.task_id AND a.role = 'assignee'
-                 LEFT JOIN {$users_table} u ON a.user_id = u.ID
                  WHERE t.board_name = %s AND t.status = 'done' AND t.completed_at IS NOT NULL AND t.completed_at >= %s AND t.completed_at < %s
-                 GROUP BY t.id
-                 ORDER BY t.completed_at DESC",
+                 ORDER BY t.completed_at DESC, t.id DESC",
                 $board_name,
                 $range_start_utc,
                 $range_end_utc
@@ -49,13 +43,10 @@ final class ReportRepository {
 
         $missed_deadlines = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT t.id, t.name, t.deadline, DATEDIFF(%s, t.deadline) as days_overdue, GROUP_CONCAT(DISTINCT u.display_name SEPARATOR ', ') as assigned_user_names
+                "SELECT t.id, t.name, t.deadline, DATEDIFF(%s, t.deadline) as days_overdue
                  FROM {$tasks_table} t
-                 LEFT JOIN {$assignments_table} a ON t.id = a.task_id AND a.role = 'assignee'
-                 LEFT JOIN {$users_table} u ON a.user_id = u.ID
                  WHERE t.board_name = %s AND t.deadline IS NOT NULL AND t.deadline < %s AND t.status != 'done' AND archived = 0 AND t.deadline BETWEEN %s AND %s
-                 GROUP BY t.id
-                 ORDER BY t.deadline ASC",
+                 ORDER BY t.deadline ASC, t.id ASC",
                 $today,
                 $board_name,
                 $today,
@@ -77,11 +68,46 @@ final class ReportRepository {
             )
         );
 
+        $this->hydrateAssignedUserNames(
+            array_merge( (array) $tasks_added, (array) $tasks_completed, (array) $missed_deadlines )
+        );
+
         return array(
             'tasks_added'      => $tasks_added,
             'tasks_completed'  => $tasks_completed,
             'missed_deadlines' => $missed_deadlines,
             'tasks_per_person' => $tasks_per_person,
         );
+    }
+
+    private function hydrateAssignedUserNames( array $tasks ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_unique( array_filter( array_map( 'absint', wp_list_pluck( $tasks, 'id' ) ) ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return;
+        }
+
+        $assignments = DatabaseContext::getDbPrefix() . 'assignments';
+        $users = $wpdb->users;
+        $task_ids_sql = implode( ',', $task_ids );
+        $rows = $wpdb->get_results(
+            "SELECT assignment.task_id, user_record.display_name
+             FROM {$assignments} assignment
+             INNER JOIN {$users} user_record ON user_record.ID = assignment.user_id
+             WHERE assignment.task_id IN ({$task_ids_sql})
+               AND assignment.role = 'assignee'
+             ORDER BY assignment.task_id ASC, user_record.display_name ASC, assignment.user_id ASC"
+        );
+        $names = array();
+
+        foreach ( $rows as $row ) {
+            $names[ (int) $row->task_id ][] = $row->display_name;
+        }
+
+        foreach ( $tasks as $task ) {
+            $task->assigned_user_names = implode( ', ', array_values( array_unique( $names[ (int) $task->id ] ?? array() ) ) );
+        }
     }
 }

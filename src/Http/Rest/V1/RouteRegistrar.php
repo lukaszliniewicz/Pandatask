@@ -250,6 +250,14 @@ final class RouteRegistrar {
                     'methods'             => WP_REST_Server::DELETABLE,
                     'callback'            => array( $this->task_route_handler, 'delete_task' ),
                     'permission_callback' => array( $this->permission_checker, 'check_task_delete_permission' ),
+                    'args'                => array(
+                        'delete_scope' => array(
+                            'description'       => __( 'For recurring tasks, advance only this occurrence or delete the full series.', 'pandatask' ),
+                            'type'              => 'string',
+                            'enum'              => array( 'single', 'all' ),
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                    ),
                 ),
             )
         );

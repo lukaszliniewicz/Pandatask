@@ -32,11 +32,11 @@ final class TaskHistoryRepository {
 
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT h.*, u.display_name as user_name
+                "SELECT h.*, COALESCE(u.display_name, 'System or deleted user') as user_name
                  FROM {$history_table} h
                  LEFT JOIN {$users_table} u ON h.user_id = u.ID
                  WHERE h.task_id = %d
-                 ORDER BY h.changed_at DESC",
+                 ORDER BY h.changed_at DESC, h.id DESC",
                 $task_id
             )
         );

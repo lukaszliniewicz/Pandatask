@@ -219,7 +219,7 @@ Fields available when creating or updating tasks.
 | `project_id` | Integer | ID of project. For a subtask, the server always replaces this with the parent task's project. |
 | `parent_task_id` | Integer | ID of a same-board parent task. Changing a parent task's project cascades to all descendants; a task with descendants cannot change boards until they are moved or detached. |
 | `is_recurring` | Boolean | `true` if this is a recurring template |
-| `recurrence_frequency`| String | `weekly`, `monthly`, `custom_weekly` |
+| `recurrence_frequency`| String | `weekly`, `bi-weekly`, `monthly`, `custom_weekly` |
 | `recurrence_interval` | Integer | e.g., `1` for every week, `2` for bi-weekly |
 | `recurrence_days` | String | Comma-separated day numbers (e.g. `"1,3,5"` for Mon,Wed,Fri) |
 | `recurrence_ends_on` | String | `YYYY-MM-DD` — recurrence stops after this date |
@@ -382,11 +382,11 @@ Fields available when creating or updating tasks.
 ### 5. Delete a Task
 
 -   **Endpoint:** `DELETE /tasks/{id}`
--   **Description:** Deletes a task. For recurring tasks, supports partial deletion scopes.
+-   **Description:** Deletes a task. A recurring task is one durable series row, so `single` advances it past the current occurrence while `all` removes the series.
 -   **URL Parameters:**
     -   `id` (integer, required): The ID of the task to delete.
 -   **Query Parameters:**
-    -   `delete_scope` (string, optional): Controls deletion for recurring task instances. `"all"` — delete the template and all instances; `"this"` — delete only this instance; `"following"` — delete this and future instances. Default behaviour (when omitted) deletes a single non-recurring task.
+    -   `delete_scope` (string, optional): `"single"` advances a recurring task to its next occurrence; `"all"` removes the recurring series. Omitting the scope deletes the task (and therefore the series for a recurring row).
 -   **Permissions:** User must have read access to the board the task belongs to, be assigned to the task, supervise it, or be its creator.
 -   **Example Response (200 OK):**
     ```json

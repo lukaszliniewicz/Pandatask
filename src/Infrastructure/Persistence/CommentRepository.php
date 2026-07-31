@@ -12,11 +12,11 @@ final class CommentRepository {
         $users_table    = $wpdb->users;
         $comments       = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT c.*, u.display_name as user_name
+                "SELECT c.*, COALESCE(u.display_name, 'Deleted user') as user_name
                  FROM {$comments_table} c
-                 JOIN {$users_table} u ON c.user_id = u.ID
+                 LEFT JOIN {$users_table} u ON c.user_id = u.ID
                  WHERE c.task_id = %d
-                 ORDER BY c.created_at ASC",
+                 ORDER BY c.created_at ASC, c.id ASC",
                 $task_id
             )
         );
@@ -51,9 +51,9 @@ final class CommentRepository {
         $comment_id = $wpdb->insert_id;
         $comment    = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT c.*, u.display_name as user_name
+                "SELECT c.*, COALESCE(u.display_name, 'Deleted user') as user_name
                  FROM {$comments_table} c
-                 JOIN {$users_table} u ON c.user_id = u.ID
+                 LEFT JOIN {$users_table} u ON c.user_id = u.ID
                  WHERE c.id = %d",
                 $comment_id
             )

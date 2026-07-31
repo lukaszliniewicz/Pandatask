@@ -30,19 +30,27 @@ final class ProtectedAttachmentService {
     public static function syncTask( $task_id ) {
         $task_id = (int) $task_id;
         $task = ( new TaskRepository() )->findById( $task_id );
+        $previous_registry = self::registry( $task_id );
+        $previous_key = (string) ( $previous_registry['key'] ?? '' );
+
         if ( ! $task || 'file' !== (string) $task->attachment_type || empty( $task->attachment_post_id ) ) {
-            self::deleteTaskFiles( $task_id );
-            return false;
+            delete_option( self::OPTION_PREFIX . $task_id );
+
+            return array(
+                'protected'    => false,
+                'obsolete_keys' => $previous_key ? array( $previous_key ) : array(),
+                'created_keys' => array(),
+            );
         }
 
         $attachment_id = (int) $task->attachment_post_id;
-        $registry = self::registry( $task_id );
-        if ( ! empty( $registry['attachment_id'] ) && (int) $registry['attachment_id'] !== $attachment_id ) {
-            self::deleteTaskFiles( $task_id );
-            $registry = array();
-        }
+        $registry = $previous_registry;
+        $existing = (int) ( $registry['attachment_id'] ?? 0 ) === $attachment_id && $previous_key
+            ? self::pathForKey( $previous_key, true )
+            : false;
+        $created_keys = array();
+        $obsolete_keys = array();
 
-        $existing = ! empty( $registry['key'] ) ? self::pathForKey( $registry['key'], true ) : false;
         if ( ! $existing ) {
             $source = get_attached_file( $attachment_id );
             if ( ! $source || ! is_readable( $source ) ) {
@@ -76,7 +84,8 @@ final class ProtectedAttachmentService {
             }
 
             $extension = strtolower( pathinfo( $source, PATHINFO_EXTENSION ) ) ?: 'bin';
-            $key = $task_id . '/original.' . sanitize_key( $extension );
+            $generation = time();
+            $key = $task_id . '/original-' . $generation . '-' . wp_generate_password( 8, false, false ) . '.' . sanitize_key( $extension );
             $target = self::pathForKey( $key, false );
             if ( is_wp_error( $target ) ) return $target;
             if ( ! wp_mkdir_p( dirname( $target ) ) || ! copy( $source, $target ) ) {
@@ -89,20 +98,50 @@ final class ProtectedAttachmentService {
                 'key'            => $key,
                 'filename'       => (string) ( $task->attachment_filename ?: wp_basename( $source ) ),
                 'mime_type'      => (string) get_post_mime_type( $attachment_id ),
-                'generation'     => time(),
+                'generation'     => $generation,
                 'public_removed' => false,
             );
+            $created_keys[] = $key;
+
+            if ( $previous_key && $previous_key !== $key ) {
+                $obsolete_keys[] = $previous_key;
+            }
         } else {
             self::normalizePermissions( $existing );
+            $registry['filename'] = (string) ( $task->attachment_filename ?: ( $registry['filename'] ?? 'attachment' ) );
+            $registry['mime_type'] = (string) ( get_post_mime_type( $attachment_id ) ?: ( $registry['mime_type'] ?? '' ) );
         }
 
-        self::saveRegistry( $task_id, $registry );
         // Never remove Media Library originals automatically. A selected attachment may
         // be referenced outside post content (templates, options, drafts, CSS, or another
         // plugin), so automatic unlinking is not a recoverable ownership boundary.
         $registry['public_removed'] = false;
         self::saveRegistry( $task_id, $registry );
-        return array( 'protected' => true, 'public_removed' => ! empty( $registry['public_removed'] ) );
+
+        return array(
+            'protected'     => true,
+            'public_removed' => false,
+            'obsolete_keys' => $obsolete_keys,
+            'created_keys'  => $created_keys,
+        );
+    }
+
+    /**
+     * Remove only superseded files after the database transaction commits.
+     */
+    public static function finalizeSync( $sync_result ) {
+        if ( is_array( $sync_result ) ) {
+            self::deleteStorageKeys( (array) ( $sync_result['obsolete_keys'] ?? array() ) );
+        }
+    }
+
+    /**
+     * Remove newly copied files if the database transaction rolls back.
+     */
+    public static function rollbackSync( $sync_result ) {
+        if ( is_array( $sync_result ) ) {
+            self::deleteStorageKeys( (array) ( $sync_result['created_keys'] ?? array() ) );
+        }
     }
 
     public static function prepareTask( $task, $viewer_id = null ) {
@@ -144,6 +183,25 @@ final class ProtectedAttachmentService {
         $directory = self::baseDir() . '/' . $task_id;
         if ( is_dir( $directory ) ) @rmdir( $directory );
         delete_option( self::OPTION_PREFIX . $task_id );
+    }
+
+    private static function deleteStorageKeys( array $keys ) {
+        $directories = array();
+
+        foreach ( array_unique( array_filter( $keys ) ) as $key ) {
+            $path = self::pathForKey( $key, true );
+
+            if ( $path ) {
+                $directories[] = dirname( $path );
+                @unlink( $path );
+            }
+        }
+
+        foreach ( array_unique( $directories ) as $directory ) {
+            if ( is_dir( $directory ) ) {
+                @rmdir( $directory );
+            }
+        }
     }
 
     public static function cliMigrate( $args, $assoc_args ) {

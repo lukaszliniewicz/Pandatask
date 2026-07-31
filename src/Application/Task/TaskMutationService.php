@@ -6,6 +6,7 @@ use DateInterval;
 use DateTime;
 use Exception;
 use Throwable;
+use Pandatask\Domain\Task\RecurrenceCalculator;
 use Pandatask\Infrastructure\Notifications\BuddyPressNotifier;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
@@ -22,14 +23,26 @@ final class TaskMutationService {
 
     private $history_service;
 
-    public function __construct( $repository = null, $task_repository = null, $history_service = null ) {
+    private $invariant_service;
+
+    private $history_buffer_service;
+
+    private $recurrence_calculator;
+
+    private $cache_invalidator;
+
+    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null ) {
         $this->repository      = $repository ?: new TaskCommandRepository();
         $this->task_repository = $task_repository ?: new TaskRepository();
         $this->history_service = $history_service ?: new HistoryService();
+        $this->invariant_service = $invariant_service ?: new TaskInvariantService( $this->task_repository );
+        $this->history_buffer_service = $history_buffer_service ?: new TaskHistoryBufferService( null, $this->history_service, $this->task_repository );
+        $this->recurrence_calculator = $recurrence_calculator ?: new RecurrenceCalculator();
+        $this->cache_invalidator = $cache_invalidator ?: new TaskCacheInvalidator( $this->task_repository );
     }
 
     public function createTask( $data ) {
-        $data = $this->applyParentProjectInheritance( $data );
+        $data = $this->invariant_service->applyAndValidate( $data );
 
         if ( is_wp_error( $data ) ) {
             return $data;
@@ -94,153 +107,87 @@ final class TaskMutationService {
             $task_data['recurrence_ends_on']   = null;
         }
 
-        $format = array(
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%d',
-            '%d',
-            '%d',
-            '%d',
-            '%d',
-            '%d',
-            '%d',
-            '%d',
-            '%s',
-            '%d',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%d',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-        );
+        $task_data['recurrence_anchor_day'] = (
+            ! empty( $task_data['is_recurring'] )
+            && 'monthly' === $task_data['recurrence_frequency']
+            && ! empty( $task_data['start_date'] )
+        )
+            ? (int) substr( $task_data['start_date'], 8, 2 )
+            : null;
 
-        if ( is_null( $task_data['category_id'] ) ) {
-            $format[6] = '%s';
-        }
-        if ( is_null( $task_data['project_id'] ) ) {
-            $format[7] = '%s';
-        }
-        if ( is_null( $task_data['deadline_days_after_start'] ) ) {
-            $format[9] = '%s';
-        }
-        if ( is_null( $task_data['parent_task_id'] ) ) {
-            $format[12] = '%s';
-        }
-        if ( is_null( $task_data['recurrence_interval'] ) ) {
-            $format[15] = '%s';
-        }
-        if ( is_null( $task_data['attachment_post_id'] ) ) {
-            $format[19] = '%s';
-        }
+        $format = $this->formatsForTaskData( $task_data );
 
         if ( ! DatabaseContext::beginTransaction() ) {
             return new WP_Error( 'pandatask_transaction_failed', __( 'The task could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
+        $task_id = 0;
+        $attachment_sync = null;
+
         try {
-        $task_id = $this->repository->insertTask( $task_data, $format );
+            $task_id = $this->repository->insertTask( $task_data, $format );
 
-        if ( ! $task_id ) {
-            throw new Exception( 'Failed to insert the task.' );
-        }
+            if ( ! $task_id ) {
+                throw new Exception( 'Failed to insert the task.' );
+            }
 
-        $attachment_result = ProtectedAttachmentService::syncTask( $task_id );
+            $attachment_sync = ProtectedAttachmentService::syncTask( $task_id );
 
-        if ( is_wp_error( $attachment_result ) ) {
-            throw new Exception( $attachment_result->get_error_message() );
-        }
+            if ( is_wp_error( $attachment_sync ) ) {
+                throw new Exception( $attachment_sync->get_error_message() );
+            }
 
-        $assigned_persons   = $data['assigned_persons'] ?? array();
-        $supervisor_persons = $data['supervisor_persons'] ?? array();
-        $predecessors       = $data['predecessors'] ?? array();
+            $assigned_persons   = $data['assigned_persons'] ?? array();
+            $supervisor_persons = $data['supervisor_persons'] ?? array();
+            $predecessors       = $data['predecessors'] ?? array();
 
-        if ( ! empty( $predecessors ) ) {
-            $predecessors = array_map( 'absint', (array) $predecessors );
-            $predecessors = array_unique( array_filter( $predecessors ) );
+            if ( ! empty( $predecessors ) ) {
+                $predecessors = array_map( 'absint', (array) $predecessors );
+                $predecessors = array_unique( array_filter( $predecessors ) );
 
-            foreach ( $predecessors as $predecessor_id ) {
-                if ( $predecessor_id === $task_id ) {
-                    continue;
-                }
+                foreach ( $predecessors as $predecessor_id ) {
+                    if ( $predecessor_id === $task_id ) {
+                        continue;
+                    }
 
-                if ( ! $this->repository->insertTaskRelationship( $task_id, $predecessor_id ) ) {
-                    throw new Exception( 'Failed to create a task dependency.' );
+                    if ( ! $this->repository->insertTaskRelationship( $task_id, $predecessor_id ) ) {
+                        throw new Exception( 'Failed to create a task dependency.' );
+                    }
                 }
             }
-        }
 
-        if ( preg_match( '/^user_(\d+)$/', $task_data['board_name'], $matches ) ) {
-            $board_owner_id = intval( $matches[1] );
+            if ( preg_match( '/^user_(\d+)$/', $task_data['board_name'], $matches ) ) {
+                $board_owner_id = intval( $matches[1] );
 
-            if ( $board_owner_id > 0 && ! in_array( $board_owner_id, $assigned_persons ) ) {
-                $assigned_persons[] = $board_owner_id;
+                if ( $board_owner_id > 0 && ! in_array( $board_owner_id, $assigned_persons ) ) {
+                    $assigned_persons[] = $board_owner_id;
+                }
             }
-        }
 
-        $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
-        $creator_id         = get_current_user_id();
+            $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
+            $creator_id         = get_current_user_id();
 
-        if ( ! $this->history_service->addEntry( $task_id, $creator_id, 'task_created', '', $task_data['name'] ) ) {
-            throw new Exception( 'Failed to create task history.' );
-        }
+            if ( ! $this->history_service->addEntry( $task_id, $creator_id, 'task_created', '', $task_data['name'] ) ) {
+                throw new Exception( 'Failed to create task history.' );
+            }
 
-        if ( ! DatabaseContext::commit() ) {
-            throw new Exception( 'The task could not be committed.' );
-        }
+            if ( ! DatabaseContext::commit() ) {
+                throw new Exception( 'The task could not be committed.' );
+            }
         } catch ( Throwable $exception ) {
             DatabaseContext::rollback();
-
-            if ( ! empty( $task_id ) ) {
-                ProtectedAttachmentService::deleteTaskFiles( $task_id );
-            }
+            ProtectedAttachmentService::rollbackSync( $attachment_sync );
 
             return new WP_Error( 'pandatask_create_failed', __( 'The task could not be created.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
-        if ( ! empty( $assignment_changes['assignee']['added'] ) ) {
-            $new_assignee_ids     = array_keys( $assignment_changes['assignee']['added'] );
-            $assignees_to_notify = array_diff( $new_assignee_ids, array( $creator_id ) );
+        ProtectedAttachmentService::finalizeSync( $attachment_sync );
 
-            if ( ! empty( $assignees_to_notify ) ) {
-                EmailNotifier::send_assignment_notification( $task_id, $assignees_to_notify, 'assignee' );
-
-                foreach ( $assignees_to_notify as $user_id ) {
-                    BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $creator_id, 'assignee' );
-                }
-            }
-        }
-
-        if ( ! empty( $assignment_changes['supervisor']['added'] ) ) {
-            $new_supervisor_ids     = array_keys( $assignment_changes['supervisor']['added'] );
-            $supervisors_to_notify = array_diff( $new_supervisor_ids, array( $creator_id ) );
-
-            if ( ! empty( $supervisors_to_notify ) ) {
-                EmailNotifier::send_assignment_notification( $task_id, $supervisors_to_notify, 'supervisor' );
-
-                foreach ( $supervisors_to_notify as $user_id ) {
-                    BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $creator_id, 'supervisor' );
-                }
-            }
-        }
-
-        DatabaseContext::invalidateBoardCache( $task_data['board_name'], array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
+        $this->sendAssignmentNotifications( $task_id, $assignment_changes, $creator_id );
         delete_transient( 'pandat69_all_board_names' );
 
         $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons, array( $creator_id ) ) );
-
-        foreach ( $all_affected_users as $user_id ) {
-            DatabaseContext::invalidateUserCache( (int) $user_id );
-        }
+        $this->cache_invalidator->invalidateTask( $task_id, $task_data['board_name'], $all_affected_users );
 
         return $task_id;
     }
@@ -254,7 +201,7 @@ final class TaskMutationService {
             return false;
         }
 
-        $data = $this->applyParentProjectInheritance( $data, $current_task );
+        $data = $this->invariant_service->applyAndValidate( $data, $current_task );
 
         if ( is_wp_error( $data ) ) {
             return $data;
@@ -288,10 +235,10 @@ final class TaskMutationService {
             }
         }
 
-        $final_deadline       = $data['deadline'] ?? null;
-        $is_deadline_changing = isset( $data['deadline'] ) || isset( $data['deadline_days_after_start'] );
+        $final_deadline = array_key_exists( 'deadline', $data ) ? $data['deadline'] : $current_task->deadline;
+        $is_deadline_changing = array_key_exists( 'deadline', $data ) || array_key_exists( 'deadline_days_after_start', $data );
 
-        if ( isset( $data['deadline_days_after_start'] ) ) {
+        if ( array_key_exists( 'deadline_days_after_start', $data ) ) {
             $start_date_for_calc = $data['start_date'] ?? $current_task->start_date;
 
             if ( ! empty( $start_date_for_calc ) ) {
@@ -310,6 +257,15 @@ final class TaskMutationService {
             ( isset( $data['status'] ) && 'done' !== $data['status'] && 'done' === $current_task->status )
         ) {
             $data['missed_deadline_notified'] = 0;
+        }
+
+        if (
+            $is_deadline_changing
+            || array_key_exists( 'notify_deadline', $data )
+            || array_key_exists( 'notify_days_before', $data )
+            || array_key_exists( 'assigned_persons', $data )
+        ) {
+            $data['deadline_reminder_sent_for'] = null;
         }
 
         $allowed_task_fields = array(
@@ -335,11 +291,13 @@ final class TaskMutationService {
             'recurrence_interval',
             'recurrence_days',
             'recurrence_ends_on',
+            'recurrence_anchor_day',
             'attachment_type',
             'attachment_url',
             'attachment_post_id',
             'attachment_filename',
             'missed_deadline_notified',
+            'deadline_reminder_sent_for',
         );
 
         $update_data         = array();
@@ -351,7 +309,7 @@ final class TaskMutationService {
                 continue;
             }
 
-            if ( isset( $data[ $key ] ) ) {
+            if ( array_key_exists( $key, $data ) ) {
                 if ( 'status' === $key ) {
                     $update_data['status'] = $value;
                     $format[]              = '%s';
@@ -383,10 +341,10 @@ final class TaskMutationService {
                         $update_data['deadline'] = $value;
                         $format[]                = '%s';
                     }
-                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url' ), true ) ) {
+                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for' ), true ) ) {
                     $update_data[ $key ] = $value;
                     $format[]            = '%s';
-                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'recurrence_interval', 'attachment_post_id' ), true ) ) {
+                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id' ), true ) ) {
                     $update_data[ $key ] = ! empty( $value ) ? absint( $value ) : null;
                     $format[]            = is_null( $update_data[ $key ] ) ? '%s' : '%d';
                 } else {
@@ -397,7 +355,7 @@ final class TaskMutationService {
         }
 
         if ( array_key_exists( 'is_recurring', $data ) && empty( $data['is_recurring'] ) ) {
-            foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on' ) as $field ) {
+            foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on', 'recurrence_anchor_day' ) as $field ) {
                 if ( ! array_key_exists( $field, $update_data ) ) {
                     $format[] = '%s';
                 }
@@ -429,7 +387,35 @@ final class TaskMutationService {
             }
         }
 
-        $logged_fields         = array();
+        $final_is_recurring = array_key_exists( 'is_recurring', $data )
+            ? ! empty( $data['is_recurring'] )
+            : ! empty( $current_task->is_recurring );
+        $final_frequency = array_key_exists( 'recurrence_frequency', $data )
+            ? $data['recurrence_frequency']
+            : $current_task->recurrence_frequency;
+        $final_start_date = array_key_exists( 'start_date', $data )
+            ? $data['start_date']
+            : $current_task->start_date;
+
+        if ( $final_is_recurring && 'monthly' === $final_frequency && $final_start_date ) {
+            if ( array_key_exists( 'recurrence_anchor_day', $data ) ) {
+                $update_data['recurrence_anchor_day'] = max( 1, min( 31, (int) $data['recurrence_anchor_day'] ) );
+            } elseif (
+                array_key_exists( 'start_date', $data )
+                || array_key_exists( 'recurrence_frequency', $data )
+                || empty( $current_task->recurrence_anchor_day )
+            ) {
+                $update_data['recurrence_anchor_day'] = (int) substr( $final_start_date, 8, 2 );
+            }
+        } elseif ( ! empty( $current_task->recurrence_anchor_day ) || array_key_exists( 'recurrence_anchor_day', $update_data ) ) {
+            $update_data['recurrence_anchor_day'] = null;
+        }
+
+        $logged_fields = array(
+            'deadline_reminder_sent_for' => true,
+            'missed_deadline_notified'    => true,
+            'recurrence_anchor_day'       => true,
+        );
         $new_absolute_deadline = $update_data['deadline'] ?? $current_task->deadline;
 
         if ( $new_absolute_deadline !== $current_task->deadline ) {
@@ -437,7 +423,7 @@ final class TaskMutationService {
             $logged_fields['deadline'] = true;
         }
 
-        if ( isset( $update_data['deadline_days_after_start'] ) && $update_data['deadline_days_after_start'] != $current_task->deadline_days_after_start ) {
+        if ( array_key_exists( 'deadline_days_after_start', $update_data ) && $update_data['deadline_days_after_start'] != $current_task->deadline_days_after_start ) {
             if ( ! isset( $logged_fields['deadline'] ) ) {
                 $changes_for_buffer[] = array(
                     'field' => 'deadline_days_after_start',
@@ -468,6 +454,8 @@ final class TaskMutationService {
         if ( ! DatabaseContext::beginTransaction() ) {
             return new WP_Error( 'pandatask_transaction_failed', __( 'The task update could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
         }
+
+        $attachment_sync = null;
 
         try {
         if ( isset( $data['predecessors'] ) ) {
@@ -527,16 +515,13 @@ final class TaskMutationService {
 
         if ( ! empty( $update_data ) ) {
             $update_data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
-            $format[]                  = '%s';
+            $format = $this->formatsForTaskData( $update_data );
             $update_result = $this->repository->updateTask( $task_id, $update_data, $format );
 
             if ( false === $update_result ) {
                 throw new Exception( 'The task database update failed.' );
             }
 
-            if ( isset( $update_data['board_name'] ) && $update_data['board_name'] !== $current_task->board_name ) {
-                $changes_for_buffer[] = array( 'field' => 'board_name', 'from' => $current_task->board_name, 'to' => $update_data['board_name'] );
-            }
         }
 
         if ( $project_is_changing && ! empty( $descendant_ids ) ) {
@@ -566,30 +551,47 @@ final class TaskMutationService {
             }
         }
 
+        $attachment_sync = ProtectedAttachmentService::syncTask( $task_id );
+
+        if ( is_wp_error( $attachment_sync ) ) {
+            throw new Exception( $attachment_sync->get_error_message() );
+        }
+
+        if ( $actor_id > 0 ) {
+            if ( ! $this->history_buffer_service->buffer( $task_id, $actor_id, $changes_for_buffer, $change_comment ) ) {
+                throw new Exception( 'The task change buffer could not be persisted.' );
+            }
+        } else {
+            foreach ( $changes_for_buffer as $change ) {
+                if (
+                    ! $this->history_service->addEntry(
+                        $task_id,
+                        0,
+                        (string) $change['field'],
+                        $change['from'] ?? '',
+                        $change['to'] ?? '',
+                        $change_comment
+                    )
+                ) {
+                    throw new Exception( 'A system task change could not be recorded.' );
+                }
+            }
+        }
+
         if ( ! DatabaseContext::commit() ) {
             throw new Exception( 'The task database update could not be committed.' );
         }
         } catch ( Throwable $exception ) {
             DatabaseContext::rollback();
+            ProtectedAttachmentService::rollbackSync( $attachment_sync );
 
             return new WP_Error( 'pandatask_update_failed', __( 'The task could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
-        DatabaseContext::invalidateTaskCache( $task_id );
-        DatabaseContext::invalidateBoardCache( $current_task->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
+        ProtectedAttachmentService::finalizeSync( $attachment_sync );
 
         foreach ( $descendant_ids as $descendant_id ) {
             DatabaseContext::invalidateTaskCache( $descendant_id );
-        }
-
-        if ( isset( $update_data['board_name'] ) && $update_data['board_name'] !== $current_task->board_name ) {
-            DatabaseContext::invalidateBoardCache( $update_data['board_name'], array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
-        }
-
-        $attachment_result = ProtectedAttachmentService::syncTask( $task_id );
-
-        if ( is_wp_error( $attachment_result ) ) {
-            return $attachment_result;
         }
 
         $this->sendAssignmentNotifications( $task_id, $assignment_changes, $actor_id );
@@ -598,27 +600,7 @@ final class TaskMutationService {
             $this->processDependencyCascade( $task_id );
         }
 
-        if ( $actor_id > 0 && ( ! empty( $changes_for_buffer ) || ! empty( $change_comment ) ) ) {
-            $transient_key   = 'pandat69_buffered_changes_' . $task_id . '_' . $actor_id;
-            $existing_buffer = get_transient( $transient_key );
-
-            if ( ! is_array( $existing_buffer ) || ! isset( $existing_buffer['changes'] ) ) {
-                $existing_buffer = array( 'changes' => array(), 'comment' => '' );
-            }
-
-            $all_changes  = array_merge( $existing_buffer['changes'], $changes_for_buffer );
-            $all_comments = array_filter( array( $existing_buffer['comment'], $change_comment ) );
-            $new_comment  = implode( "\n\n", $all_comments );
-            $new_buffer   = array( 'changes' => $all_changes, 'comment' => $new_comment );
-
-            set_transient( $transient_key, $new_buffer, 6 * MINUTE_IN_SECONDS );
-
-            if ( wp_next_scheduled( 'pandatask_process_buffered_changes', array( $task_id, $actor_id ) ) ) {
-                wp_clear_scheduled_hook( 'pandatask_process_buffered_changes', array( $task_id, $actor_id ) );
-            }
-
-            wp_schedule_single_event( time() + ( 5 * MINUTE_IN_SECONDS ), 'pandatask_process_buffered_changes', array( $task_id, $actor_id ) );
-        }
+        $this->history_buffer_service->schedule( $task_id, $actor_id );
 
         $old_users = array_merge(
             ! empty( $current_task->assigned_user_ids ) ? $current_task->assigned_user_ids : array(),
@@ -637,81 +619,21 @@ final class TaskMutationService {
             )
         );
 
-        foreach ( $all_affected_users as $user_id ) {
-            DatabaseContext::invalidateUserCache( (int) $user_id );
+        $this->cache_invalidator->invalidateTask( $task_id, $current_task->board_name, $all_affected_users );
+
+        if ( $board_is_changing ) {
+            $this->cache_invalidator->invalidateBoard( $next_board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ), $all_affected_users );
         }
 
         return true;
     }
 
     public function processBufferedChanges( $task_id, $actor_id ) {
-        $transient_key = 'pandat69_buffered_changes_' . $task_id . '_' . $actor_id;
-        $buffered_data = get_transient( $transient_key );
+        return $this->history_buffer_service->process( (int) $task_id, (int) $actor_id );
+    }
 
-        if ( empty( $buffered_data ) || ! is_array( $buffered_data ) ) {
-            return;
-        }
-
-        $changes            = $buffered_data['changes'] ?? array();
-        $aggregated_comment = $buffered_data['comment'] ?? '';
-
-        if ( empty( $changes ) && empty( $aggregated_comment ) ) {
-            delete_transient( $transient_key );
-
-            return;
-        }
-
-        delete_transient( $transient_key );
-
-        $task = $this->task_repository->findById( $task_id );
-
-        if ( ! $task ) {
-            return;
-        }
-
-        $final_changes = array();
-
-        foreach ( $changes as $change ) {
-            $final_changes[ $change['field'] ][] = $change;
-        }
-
-        $log_changes = array();
-
-        foreach ( $final_changes as $field => $change_list ) {
-            if ( false !== strpos( $field, '_added' ) || false !== strpos( $field, '_removed' ) ) {
-                $names                = wp_list_pluck( $change_list, false !== strpos( $field, '_added' ) ? 'to' : 'from' );
-                $log_changes[ $field ] = array( 'values' => array_unique( $names ) );
-            } else {
-                $last_change          = end( $change_list );
-                $log_changes[ $field ] = array( 'from' => $last_change['from'], 'to' => $last_change['to'] );
-            }
-        }
-
-        if ( ! empty( $log_changes ) ) {
-            $this->history_service->addEntry(
-                $task_id,
-                $actor_id,
-                'task_updated_multiple',
-                '',
-                wp_json_encode( $log_changes ),
-                trim( $aggregated_comment )
-            );
-        }
-
-        $supervisor_ids = ! empty( $task->supervisor_user_ids ) ? array_map( 'intval', $task->supervisor_user_ids ) : array();
-        $assignee_ids   = ! empty( $task->assigned_user_ids ) ? array_map( 'intval', $task->assigned_user_ids ) : array();
-
-        if ( in_array( $actor_id, $supervisor_ids, true ) ) {
-            $recipients = $assignee_ids;
-        } else {
-            $recipients = $supervisor_ids;
-        }
-
-        $final_recipients = array_unique( array_diff( $recipients, array( $actor_id ) ) );
-
-        if ( ! empty( $final_recipients ) && ! empty( $log_changes ) ) {
-            EmailNotifier::send_aggregated_update_notification( $task_id, $final_recipients, $actor_id, $log_changes, trim( $aggregated_comment ), $task );
-        }
+    public function recoverBufferedChanges() {
+        return $this->history_buffer_service->recoverDue();
     }
 
     public function deleteTask( $task_id, $delete_scope = null ) {
@@ -722,12 +644,19 @@ final class TaskMutationService {
             return false;
         }
 
-        if ( $task_to_delete->is_recurring && 'single' === $delete_scope ) {
-            $next_date_str = $this->calculateNextRecurrenceDate(
+        $delete_scope = null === $delete_scope ? null : sanitize_key( $delete_scope );
+
+        if ( ! in_array( $delete_scope, array( null, 'single', 'this', 'all', 'series', 'future' ), true ) ) {
+            return new WP_Error( 'pandatask_invalid_delete_scope', __( 'Invalid recurring-task deletion scope.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        if ( $task_to_delete->is_recurring && in_array( $delete_scope, array( 'single', 'this' ), true ) ) {
+            $next_date_str = $this->recurrence_calculator->next(
                 $task_to_delete->start_date,
                 $task_to_delete->recurrence_frequency,
                 $task_to_delete->recurrence_interval,
-                $task_to_delete->recurrence_days
+                $task_to_delete->recurrence_days,
+                (int) ( $task_to_delete->recurrence_anchor_day ?? 0 )
             );
 
             if ( $next_date_str && ( ! $task_to_delete->recurrence_ends_on || $next_date_str <= $task_to_delete->recurrence_ends_on ) ) {
@@ -748,29 +677,28 @@ final class TaskMutationService {
                     'deadline'     => $new_deadline_date->format( 'Y-m-d' ),
                     'status'       => 'pending',
                     'completed_at' => null,
+                    'deadline_reminder_sent_for' => null,
+                    'missed_deadline_notified' => 0,
+                    'recurrence_anchor_day' => (int) ( $task_to_delete->recurrence_anchor_day ?? 0 ),
                 );
 
-                $result = $this->repository->updateTask( $task_id, $update_data, array( '%s', '%s', '%s', '%s' ) );
+                $result = $this->updateTask(
+                    $task_id,
+                    $update_data,
+                    sprintf(
+                        /* translators: %s: skipped recurring occurrence date. */
+                        __( 'Skipped recurring occurrence scheduled for %s.', 'pandatask' ),
+                        $task_to_delete->start_date
+                    ),
+                    get_current_user_id()
+                );
 
-                if ( false === $result ) {
+                if ( true !== $result ) {
+                    if ( is_wp_error( $result ) ) {
+                        return $result;
+                    }
+
                     return new WP_Error( 'pandatask_update_failed', __( 'The recurring task could not be advanced.', 'pandatask' ), array( 'status' => 500 ) );
-                }
-
-                $this->history_service->addEntry( $task_id, get_current_user_id(), 'recurring_instance_skipped', 'Skipped instance for ' . $task_to_delete->start_date );
-
-                DatabaseContext::invalidateTaskCache( $task_id );
-                DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
-
-                foreach (
-                    array_unique(
-                        array_merge(
-                            $task_to_delete->assigned_user_ids ?? array(),
-                            $task_to_delete->supervisor_user_ids ?? array(),
-                            array( (int) ( $task_to_delete->creator_id ?? 0 ) )
-                        )
-                    ) as $user_id
-                ) {
-                    DatabaseContext::invalidateUserCache( (int) $user_id );
                 }
 
                 return true;
@@ -786,6 +714,7 @@ final class TaskMutationService {
                 ! $this->repository->deleteTaskAssignments( $task_id )
                 || ! $this->repository->deleteTaskComments( $task_id )
                 || ! $this->repository->deleteTaskHistory( $task_id )
+                || ! $this->repository->deleteTaskChangeBuffers( $task_id )
                 || ! $this->repository->deleteTaskRelationships( $task_id )
                 || false === $this->repository->unlinkChildTasks( $task_id )
                 || false === $this->repository->deleteTask( $task_id )
@@ -802,9 +731,7 @@ final class TaskMutationService {
             return new WP_Error( 'pandatask_delete_failed', __( 'The task could not be deleted.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
-        DatabaseContext::invalidateTaskCache( $task_id );
         ProtectedAttachmentService::deleteTaskFiles( $task_id );
-        DatabaseContext::invalidateBoardCache( $task_to_delete->board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ) );
 
         $all_affected_users = array_unique(
             array_merge(
@@ -814,18 +741,17 @@ final class TaskMutationService {
             )
         );
 
-        foreach ( $all_affected_users as $user_id ) {
-            DatabaseContext::invalidateUserCache( (int) $user_id );
-        }
+        $this->cache_invalidator->invalidateTask( $task_id, $task_to_delete->board_name, $all_affected_users );
 
         return true;
     }
 
     public function processDependencyCascade( $completed_task_id ) {
         $successors = $this->repository->findSuccessorIds( $completed_task_id );
+        $stats = array( 'started' => 0, 'deferred' => 0, 'failed' => 0 );
 
         if ( empty( $successors ) ) {
-            return;
+            return $stats;
         }
 
         foreach ( $successors as $successor_id ) {
@@ -837,60 +763,88 @@ final class TaskMutationService {
                 }
 
                 if ( 'pending' === $task->status ) {
-                    $update_data = array(
-                        'status'     => 'in-progress',
-                        'start_date' => current_time( 'Y-m-d' ),
-                    );
+                    $today = wp_date( 'Y-m-d' );
 
-                    if ( ! empty( $task->deadline_days_after_start ) ) {
-                        $start_date = new DateTime( $update_data['start_date'] );
-                        $days       = absint( $task->deadline_days_after_start );
-                        $start_date->add( new DateInterval( 'P' . $days . 'D' ) );
-                        $update_data['deadline'] = $start_date->format( 'Y-m-d' );
+                    if ( ! empty( $task->start_date ) && $task->start_date > $today ) {
+                        $stats['deferred']++;
+                        continue;
                     }
 
-                    $this->updateTask( $successor_id, $update_data, "Auto-started via dependency: Predecessor #{$completed_task_id} completed." );
+                    $result = $this->updateTask(
+                        $successor_id,
+                        array( 'status' => 'in-progress' ),
+                        "Auto-started via dependency: Predecessor #{$completed_task_id} completed.",
+                        0
+                    );
+                    $stats[ true === $result ? 'started' : 'failed' ]++;
                 }
             }
         }
+
+        return $stats;
     }
 
     public function checkTasksToStart() {
         $today = wp_date( 'Y-m-d' );
         $tasks = $this->repository->findPendingTasksToStart( $today );
+        $started = 0;
 
         foreach ( $tasks as $task ) {
-            $this->updateTask(
+            $result = $this->updateTask(
                 $task->id,
                 array(
                     'status' => 'in-progress',
-                )
+                ),
+                '',
+                0
             );
+
+            if ( true === $result ) {
+                $started++;
+            }
         }
 
-        return count( $tasks );
+        return $started;
     }
 
     public function rollOverCompletedRecurringTasks() {
         $today             = wp_date( 'Y-m-d' );
         $tasks_to_roll_over = $this->repository->findRecurringTasksToRollOver( $today );
+        $stats = array(
+            'scanned'  => count( $tasks_to_roll_over ),
+            'advanced' => 0,
+            'disabled' => 0,
+            'failed'   => 0,
+        );
 
         foreach ( $tasks_to_roll_over as $task ) {
-            $current_start_date = $this->calculateRecurrenceDateOnOrAfter(
+            $next_occurrence = $this->recurrence_calculator->next(
                 $task->start_date,
+                $task->recurrence_frequency,
+                $task->recurrence_interval,
+                $task->recurrence_days,
+                (int) ( $task->recurrence_anchor_day ?? 0 )
+            );
+            $current_start_date = $next_occurrence
+                ? $this->recurrence_calculator->onOrAfter(
+                $next_occurrence,
                 $today,
                 $task->recurrence_frequency,
                 $task->recurrence_interval,
-                $task->recurrence_days
-            );
+                $task->recurrence_days,
+                (int) ( $task->recurrence_anchor_day ?? 0 )
+                )
+                : null;
 
             if ( ! $current_start_date ) {
-                $this->repository->setTaskRecurringState( $task->id, 0 );
+                $result = $this->updateTask( $task->id, array( 'is_recurring' => 0 ), '', 0 );
+                $stats[ true === $result ? 'disabled' : 'failed' ]++;
                 continue;
             }
 
             if ( $task->recurrence_ends_on && $current_start_date > $task->recurrence_ends_on ) {
-                $this->repository->setTaskRecurringState( $task->id, 0 );
+                $result = $this->updateTask( $task->id, array( 'is_recurring' => 0 ), '', 0 );
+                $stats[ true === $result ? 'disabled' : 'failed' ]++;
                 continue;
             }
 
@@ -911,13 +865,20 @@ final class TaskMutationService {
                 'deadline'     => $new_deadline_date->format( 'Y-m-d' ),
                 'status'       => 'pending',
                 'completed_at' => null,
+                'recurrence_anchor_day' => (int) ( $task->recurrence_anchor_day ?? 0 ),
             );
 
-            $this->repository->updateTask( $task->id, $update_data, array( '%s', '%s', '%s', '%s' ) );
+            $result = $this->updateTask( $task->id, $update_data, '', 0 );
 
-            DatabaseContext::invalidateTaskCache( $task->id );
-            DatabaseContext::invalidateBoardCache( $task->board_name, array( 'tasks', 'parent_tasks', 'reports' ) );
+            if ( true !== $result ) {
+                $stats['failed']++;
+                continue;
+            }
+
+            $stats['advanced']++;
         }
+
+        return $stats;
     }
 
     public function updateTaskAssignments( $task_id, $assigned_user_ids = array(), $supervisor_user_ids = array() ) {
@@ -945,31 +906,6 @@ final class TaskMutationService {
                 BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $actor_id, $role );
             }
         }
-    }
-
-    private function applyParentProjectInheritance( $data, $current_task = null ) {
-        $parent_task_id = array_key_exists( 'parent_task_id', $data )
-            ? (int) $data['parent_task_id']
-            : (int) ( $current_task->parent_task_id ?? 0 );
-
-        if ( $parent_task_id <= 0 ) {
-            return $data;
-        }
-
-        $parent = $this->task_repository->findHierarchyRecordById( $parent_task_id );
-        $target_board = $data['board_name'] ?? ( $current_task->board_name ?? '' );
-
-        if ( ! $parent || $parent->board_name !== $target_board ) {
-            return new WP_Error(
-                'pandatask_invalid_parent',
-                __( 'The selected parent task is invalid for this board.', 'pandatask' ),
-                array( 'status' => 422 )
-            );
-        }
-
-        $data['project_id'] = $parent->project_id ?: null;
-
-        return $data;
     }
 
     private function updateTaskRoleAssignments( $task_id, $user_ids, $role = 'assignee' ) {
@@ -1007,124 +943,32 @@ final class TaskMutationService {
         return $changes;
     }
 
-    private function calculateNextRecurrenceDate( $from_date_str, $frequency, $interval, $days_of_week_str ) {
-        if ( empty( $from_date_str ) || empty( $frequency ) ) {
-            return null;
-        }
-
-        try {
-            $from_date = new DateTime( $from_date_str );
-            $next_date = clone $from_date;
-            $interval  = absint( $interval ) ?: 1;
-
-            if ( 'weekly' === $frequency || 'bi-weekly' === $frequency ) {
-                $next_date->modify( '+' . $interval . ' week' );
-            } elseif ( 'monthly' === $frequency ) {
-                $next_date->modify( '+' . $interval . ' month' );
-            } elseif ( 'custom_weekly' === $frequency ) {
-                if ( empty( $days_of_week_str ) ) {
-                    return null;
-                }
-
-                $days_of_week = array_map( 'intval', explode( ',', $days_of_week_str ) );
-                sort( $days_of_week );
-
-                $current_day_of_week = (int) $from_date->format( 'N' );
-                $next_day_found      = false;
-
-                foreach ( $days_of_week as $day ) {
-                    if ( $day > $current_day_of_week ) {
-                        $next_date->modify( '+' . ( $day - $current_day_of_week ) . ' days' );
-                        $next_day_found = true;
-                        break;
-                    }
-                }
-
-                if ( ! $next_day_found ) {
-                    $first_day_of_list               = $days_of_week[0];
-                    $days_until_next_week_first_day = ( 7 - $current_day_of_week ) + $first_day_of_list;
-                    $next_date->modify( '+' . $days_until_next_week_first_day . ' days' );
-                }
-            } else {
-                return null;
-            }
-
-            return $next_date->format( 'Y-m-d' );
-        } catch ( Exception $exception ) {
-            return null;
-        }
-    }
-
     /**
-     * Find the first occurrence on or after a target without an unbounded catch-up loop.
+     * Keep wpdb formats aligned with associative data after derived fields are
+     * added or overwritten.
      */
-    private function calculateRecurrenceDateOnOrAfter( $from_date_str, $target_date_str, $frequency, $interval, $days_of_week_str ) {
-        if ( empty( $from_date_str ) || empty( $target_date_str ) || empty( $frequency ) ) {
-            return null;
+    private function formatsForTaskData( array $data ): array {
+        $integer_fields = array(
+            'category_id',
+            'project_id',
+            'priority',
+            'deadline_days_after_start',
+            'notify_deadline',
+            'notify_days_before',
+            'archived',
+            'parent_task_id',
+            'is_recurring',
+            'recurrence_interval',
+            'recurrence_anchor_day',
+            'attachment_post_id',
+            'missed_deadline_notified',
+        );
+        $formats = array();
+
+        foreach ( $data as $field => $value ) {
+            $formats[] = null !== $value && in_array( $field, $integer_fields, true ) ? '%d' : '%s';
         }
 
-        try {
-            $from_date = new \DateTimeImmutable( $from_date_str );
-            $target_date = new \DateTimeImmutable( $target_date_str );
-            $interval = absint( $interval ) ?: 1;
-
-            if ( $from_date >= $target_date ) {
-                return $from_date->format( 'Y-m-d' );
-            }
-
-            if ( 'weekly' === $frequency || 'bi-weekly' === $frequency ) {
-                $period_days = 7 * $interval;
-                $elapsed_days = (int) $from_date->diff( $target_date )->format( '%a' );
-                $periods = max( 1, (int) ceil( $elapsed_days / $period_days ) );
-
-                return $from_date->modify( '+' . ( $periods * $period_days ) . ' days' )->format( 'Y-m-d' );
-            }
-
-            if ( 'custom_weekly' === $frequency ) {
-                $days_of_week = array_values(
-                    array_unique(
-                        array_filter(
-                            array_map( 'intval', explode( ',', (string) $days_of_week_str ) ),
-                            static function ( $day ) {
-                                return $day >= 1 && $day <= 7;
-                            }
-                        )
-                    )
-                );
-
-                if ( empty( $days_of_week ) ) {
-                    return null;
-                }
-
-                $candidate = $target_date;
-
-                // Seven checks are sufficient because every valid weekday recurs weekly.
-                for ( $offset = 0; $offset < 7; $offset++ ) {
-                    if ( in_array( (int) $candidate->format( 'N' ), $days_of_week, true ) ) {
-                        return $candidate->format( 'Y-m-d' );
-                    }
-
-                    $candidate = $candidate->modify( '+1 day' );
-                }
-
-                return null;
-            }
-
-            if ( 'monthly' !== $frequency ) {
-                return null;
-            }
-
-            $candidate = $from_date;
-
-            // 2,400 iterations covers the supported 1900–2200 date range while
-            // guaranteeing that corrupted legacy data cannot monopolize cron.
-            for ( $iteration = 0; $iteration < 2400 && $candidate < $target_date; $iteration++ ) {
-                $candidate = $candidate->modify( '+' . $interval . ' month' );
-            }
-
-            return $candidate >= $target_date ? $candidate->format( 'Y-m-d' ) : null;
-        } catch ( Exception $exception ) {
-            return null;
-        }
+        return $formats;
     }
 }

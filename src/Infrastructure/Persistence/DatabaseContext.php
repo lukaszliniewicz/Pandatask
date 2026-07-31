@@ -32,6 +32,13 @@ final class DatabaseContext {
         }
     }
 
+    public static function getUserCacheVersion( $user_id ) {
+        $key     = 'pandat69_v_user_' . (int) $user_id;
+        $version = get_transient( $key );
+
+        return false === $version ? 1 : (int) $version;
+    }
+
     public static function getTaskCacheKey( $task_id ) {
         return 'pandat69_task_v2_' . (int) $task_id;
     }
@@ -66,15 +73,8 @@ final class DatabaseContext {
         set_transient( $key, $version + 1, YEAR_IN_SECONDS );
     }
 
-    private static function getUserCacheVersion( $user_id ) {
-        $key     = "pandat69_v_user_{$user_id}";
-        $version = get_transient( $key );
-
-        return false === $version ? 1 : (int) $version;
-    }
-
     private static function incrementUserCacheVersion( $user_id ) {
-        $key     = "pandat69_v_user_{$user_id}";
+        $key     = 'pandat69_v_user_' . (int) $user_id;
         $version = self::getUserCacheVersion( $user_id );
 
         set_transient( $key, $version + 1, YEAR_IN_SECONDS );

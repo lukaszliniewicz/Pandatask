@@ -50,13 +50,13 @@ final class TaskService {
         $cached_tasks  = get_transient( $transient_key );
 
         if ( false !== $cached_tasks ) {
-            return ProtectedAttachmentService::prepareTasks( $cached_tasks );
+            return ProtectedAttachmentService::prepareTasks( $this->cloneTasks( $cached_tasks ) );
         }
 
         $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id, $limit, $offset );
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
-        return ProtectedAttachmentService::prepareTasks( $tasks );
+        return ProtectedAttachmentService::prepareTasks( $this->cloneTasks( $tasks ) );
     }
 
     public function getTask( $task_id ) {
@@ -105,24 +105,19 @@ final class TaskService {
     }
 
     public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0 ) {
-        $version       = $this->getUserCacheVersion( $user_id );
+        $version       = DatabaseContext::getUserCacheVersion( $user_id );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_user_tasks_{$user_id}_{$version}_{$args_key}";
         $cached_tasks  = get_transient( $transient_key );
 
         if ( false !== $cached_tasks ) {
-            return ProtectedAttachmentService::prepareTasks( $cached_tasks );
+            return $this->decorateWorkspaceTasksForViewer( $cached_tasks );
         }
 
         $tasks = $this->repository->findForUserAcrossBoards( $user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit, $offset );
-
-        foreach ( $tasks as $task ) {
-            $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
-        }
-
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
-        return ProtectedAttachmentService::prepareTasks( $tasks );
+        return $this->decorateWorkspaceTasksForViewer( $tasks );
     }
 
     public function getPotentialParentTasks( $board_name, $current_task_id = 0 ) {
@@ -140,12 +135,6 @@ final class TaskService {
         return $tasks;
     }
 
-    private function getUserCacheVersion( $user_id ) {
-        $version = get_transient( 'pandat69_v_user_' . $user_id );
-
-        return false === $version ? 1 : (int) $version;
-    }
-
     private function decorateTaskForViewer( $canonical_task ) {
         $task = clone $canonical_task;
         $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
@@ -154,5 +143,29 @@ final class TaskService {
         $task->description = $task->description ?? '';
 
         return ProtectedAttachmentService::prepareTask( $task );
+    }
+
+    private function decorateWorkspaceTasksForViewer( $canonical_tasks ) {
+        $tasks = $this->cloneTasks( $canonical_tasks );
+        $display_names = array();
+
+        foreach ( $tasks as $task ) {
+            if ( ! isset( $display_names[ $task->board_name ] ) ) {
+                $display_names[ $task->board_name ] = $this->board_service->getBoardDisplayName( $task->board_name );
+            }
+
+            $task->board_display_name = $display_names[ $task->board_name ];
+        }
+
+        return ProtectedAttachmentService::prepareTasks( $tasks );
+    }
+
+    private function cloneTasks( $tasks ) {
+        return array_map(
+            static function ( $task ) {
+                return is_object( $task ) ? clone $task : $task;
+            },
+            (array) $tasks
+        );
     }
 }

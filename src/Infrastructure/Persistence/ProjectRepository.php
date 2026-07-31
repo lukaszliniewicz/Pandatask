@@ -191,19 +191,13 @@ final class ProjectRepository {
     public function findById( $project_id ) {
         global $wpdb;
 
-        $prefix            = DatabaseContext::getDbPrefix();
-        $projects_table    = $prefix . 'projects';
-        $assignments_table = $prefix . 'project_assignments';
+        $projects_table = DatabaseContext::getDbPrefix() . 'projects';
 
         $project = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT p.*,
-                 GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' THEN a.user_id END) as assigned_user_ids,
-                 GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN a.user_id END) as supervisor_user_ids
-                 FROM {$projects_table} p
-                 LEFT JOIN {$assignments_table} a ON p.id = a.project_id
-                 WHERE p.id = %d
-                 GROUP BY p.id",
+                "SELECT *
+                 FROM {$projects_table}
+                 WHERE id = %d",
                 $project_id
             )
         );
@@ -212,13 +206,21 @@ final class ProjectRepository {
             return $project;
         }
 
-        $assigned_user_ids          = ! empty( $project->assigned_user_ids ) ? explode( ',', $project->assigned_user_ids ) : array();
-        $project->assigned_users    = $this->hydrateUsers( $assigned_user_ids, false );
-        $project->assigned_user_ids = $assigned_user_ids;
+        $assignment_map = $this->findProjectAssignments( array( (int) $project->id ) );
+        $roles = $assignment_map[ (int) $project->id ] ?? array(
+            'assignee'   => array(),
+            'supervisor' => array(),
+        );
+        $all_user_ids = array_values( array_unique( array_merge( $roles['assignee'], $roles['supervisor'] ) ) );
 
-        $supervisor_user_ids           = ! empty( $project->supervisor_user_ids ) ? explode( ',', $project->supervisor_user_ids ) : array();
-        $project->supervisor_users     = $this->hydrateUsers( $supervisor_user_ids, false );
-        $project->supervisor_user_ids  = $supervisor_user_ids;
+        if ( ! empty( $all_user_ids ) && function_exists( 'cache_users' ) ) {
+            cache_users( $all_user_ids );
+        }
+
+        $project->assigned_user_ids = $roles['assignee'];
+        $project->assigned_users = $this->hydrateUsers( $roles['assignee'], false );
+        $project->supervisor_user_ids = $roles['supervisor'];
+        $project->supervisor_users = $this->hydrateUsers( $roles['supervisor'], false );
 
         return $project;
     }

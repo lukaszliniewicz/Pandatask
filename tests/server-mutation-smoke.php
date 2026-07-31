@@ -7,6 +7,7 @@
  */
 
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
+use Pandatask\Application\Task\TaskMutationService;
 
 if ( ! defined( 'ABSPATH' ) || ! defined( 'PANDAT69_VERSION' ) ) {
     WP_CLI::error( 'WordPress and Pandatask must be loaded.' );
@@ -83,6 +84,50 @@ try {
         'create_category'
     );
     $category_id   = (int) $category_data['category']['id'];
+
+    $direct_invalid_create = ( new TaskMutationService() )->createTask(
+        array(
+            'board_name'        => $board . '_other',
+            'name'              => 'Must not be created',
+            'description'       => '',
+            'status'            => 'pending',
+            'priority'          => 5,
+            'task_type'         => 'task',
+            'category_id'       => $category_id,
+            'assigned_persons'  => array(),
+            'supervisor_persons' => array(),
+            'predecessors'      => array(),
+        )
+    );
+
+    if ( ! is_wp_error( $direct_invalid_create ) || 422 !== (int) ( $direct_invalid_create->get_error_data()['status'] ?? 0 ) ) {
+        throw new RuntimeException( 'The application service allowed a cross-board category outside REST.' );
+    }
+
+    $direct_boolean_task_id = ( new TaskMutationService() )->createTask(
+        array(
+            'board_name'   => $board,
+            'name'         => 'Direct boolean normalization audit',
+            'is_recurring' => 'false',
+        )
+    );
+
+    if (
+        ! is_int( $direct_boolean_task_id )
+        || $direct_boolean_task_id <= 0
+        || 0 !== (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT is_recurring FROM {$prefix}tasks WHERE id = %d",
+                $direct_boolean_task_id
+            )
+        )
+    ) {
+        throw new RuntimeException( 'The application service treated the string "false" as an enabled boolean.' );
+    }
+
+    if ( true !== ( new TaskMutationService() )->deleteTask( $direct_boolean_task_id ) ) {
+        throw new RuntimeException( 'The direct boolean-normalization probe could not be removed.' );
+    }
 
     $project_data = $expect_status(
         $dispatch(
@@ -188,6 +233,50 @@ try {
         throw new RuntimeException( 'A nested subtask did not inherit its parent project.' );
     }
 
+    $page_data = $expect_status(
+        $dispatch(
+            'GET',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'limit'         => 1,
+                'offset'        => 0,
+                'status_filter' => '',
+            )
+        ),
+        200,
+        'exact_pagination'
+    );
+
+    if (
+        1 !== count( $page_data['tasks'] ?? array() )
+        || empty( $page_data['pagination']['has_more'] )
+        || 1 !== (int) ( $page_data['pagination']['next_offset'] ?? 0 )
+    ) {
+        throw new RuntimeException( 'Task pagination did not use an exact look-ahead row.' );
+    }
+
+    $terminal_page_data = $expect_status(
+        $dispatch(
+            'GET',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'limit'         => 1,
+                'offset'        => 2,
+                'status_filter' => '',
+            )
+        ),
+        200,
+        'exact_terminal_page'
+    );
+
+    if (
+        1 !== count( $terminal_page_data['tasks'] ?? array() )
+        || ! empty( $terminal_page_data['pagination']['has_more'] )
+        || null !== ( $terminal_page_data['pagination']['next_offset'] ?? null )
+    ) {
+        throw new RuntimeException( 'An exactly exhausted task page reported a false-positive continuation.' );
+    }
+
     $expect_status(
         $dispatch(
             'PATCH',
@@ -216,7 +305,11 @@ try {
         $dispatch(
             'PATCH',
             '/pandatask/v1/tasks/' . $root_id,
-            array( 'board_name' => $board . '_moved' )
+            array(
+                'board_name'  => $board . '_moved',
+                'category_id' => 0,
+                'project_id'  => 0,
+            )
         ),
         409,
         'reject_parent_board_move'
@@ -278,6 +371,116 @@ try {
     if ( false !== stripos( $updated_task->description, '<script' ) || false === stripos( $updated_task->description, '<strong>Allowed</strong>' ) ) {
         throw new RuntimeException( 'Task update sanitization did not preserve allowed markup and remove scripts.' );
     }
+
+    $expect_status(
+        $dispatch(
+            'PATCH',
+            '/pandatask/v1/tasks/' . $child_id,
+            array( 'name' => 'Audit child task final' )
+        ),
+        200,
+        'second_buffered_task_update'
+    );
+    $wpdb->query(
+        $wpdb->prepare(
+            "UPDATE {$prefix}task_change_buffers
+             SET deliver_after = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 SECOND)
+             WHERE task_id = %d AND actor_id = %d",
+            $child_id,
+            $admin_id
+        )
+    );
+
+    if ( ! ( new TaskMutationService() )->processBufferedChanges( $child_id, $admin_id ) ) {
+        throw new RuntimeException( 'The durable task-history buffer could not be processed.' );
+    }
+
+    $buffered_history = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT new_value
+             FROM {$prefix}task_history
+             WHERE task_id = %d AND field_changed = 'task_updated_multiple'
+             ORDER BY id DESC
+             LIMIT 1",
+            $child_id
+        )
+    );
+    $buffered_changes = json_decode( (string) $buffered_history, true );
+
+    if (
+        ! is_array( $buffered_changes )
+        || 'Audit child task' !== ( $buffered_changes['name']['from'] ?? null )
+        || 'Audit child task final' !== ( $buffered_changes['name']['to'] ?? null )
+    ) {
+        throw new RuntimeException( 'Buffered history did not preserve the first old and final new task name.' );
+    }
+
+    $expect_status(
+        $dispatch(
+            'PATCH',
+            '/pandatask/v1/tasks/' . $child_id,
+            array( 'start_date' => '2099-01-01' )
+        ),
+        200,
+        'schedule_future_successor'
+    );
+    $expect_status(
+        $dispatch(
+            'PATCH',
+            '/pandatask/v1/tasks/' . $root_id,
+            array( 'status' => 'done' )
+        ),
+        200,
+        'complete_predecessor'
+    );
+    $future_successor_status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$prefix}tasks WHERE id = %d", $child_id ) );
+
+    if ( 'pending' !== $future_successor_status ) {
+        throw new RuntimeException( 'Completing a predecessor started a future-dated successor early.' );
+    }
+
+    $expect_status(
+        $dispatch(
+            'POST',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'name'                 => 'Invalid recurring task',
+                'is_recurring'         => true,
+                'recurrence_frequency' => 'weekly',
+            )
+        ),
+        422,
+        'reject_recurring_without_dates'
+    );
+    $recurring_data = $expect_status(
+        $dispatch(
+            'POST',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'name'                 => 'Monthly anchor audit',
+                'start_date'           => '2099-01-31',
+                'deadline'             => '2099-02-02',
+                'is_recurring'         => true,
+                'recurrence_frequency' => 'monthly',
+            )
+        ),
+        201,
+        'create_monthly_recurring_task'
+    );
+    $recurring_id = (int) $recurring_data['task']->id;
+    $recurrence_anchor = (int) $wpdb->get_var( $wpdb->prepare( "SELECT recurrence_anchor_day FROM {$prefix}tasks WHERE id = %d", $recurring_id ) );
+
+    if ( 31 !== $recurrence_anchor ) {
+        throw new RuntimeException( 'Monthly recurrence did not persist its original day-of-month anchor.' );
+    }
+
+    $invalid_delete = ( new TaskMutationService() )->deleteTask( $recurring_id, 'unknown-scope' );
+
+    if ( ! is_wp_error( $invalid_delete ) || 422 !== (int) ( $invalid_delete->get_error_data()['status'] ?? 0 ) ) {
+        throw new RuntimeException( 'The application service accepted an unknown recurring deletion scope.' );
+    }
+
+    $expect_status( $dispatch( 'DELETE', '/pandatask/v1/tasks/' . $recurring_id, array( 'delete_scope' => 'all' ) ), 200, 'delete_recurring_series' );
 
     $comment_data = $expect_status(
         $dispatch(
@@ -412,6 +615,7 @@ try {
         $wpdb->delete( $prefix . 'assignments', array( 'task_id' => $task_id ), array( '%d' ) );
         $wpdb->delete( $prefix . 'comments', array( 'task_id' => $task_id ), array( '%d' ) );
         $wpdb->delete( $prefix . 'task_history', array( 'task_id' => $task_id ), array( '%d' ) );
+        $wpdb->delete( $prefix . 'task_change_buffers', array( 'task_id' => $task_id ), array( '%d' ) );
         $wpdb->delete( $prefix . 'task_relationships', array( 'task_id' => $task_id ), array( '%d' ) );
         $wpdb->delete( $prefix . 'task_relationships', array( 'predecessor_id' => $task_id ), array( '%d' ) );
     }
@@ -449,6 +653,7 @@ try {
             $wpdb->delete( $prefix . 'assignments', array( 'task_id' => $group_task_id ), array( '%d' ) );
             $wpdb->delete( $prefix . 'comments', array( 'task_id' => $group_task_id ), array( '%d' ) );
             $wpdb->delete( $prefix . 'task_history', array( 'task_id' => $group_task_id ), array( '%d' ) );
+            $wpdb->delete( $prefix . 'task_change_buffers', array( 'task_id' => $group_task_id ), array( '%d' ) );
             $wpdb->delete( $prefix . 'task_relationships', array( 'task_id' => $group_task_id ), array( '%d' ) );
             $wpdb->delete( $prefix . 'task_relationships', array( 'predecessor_id' => $group_task_id ), array( '%d' ) );
         }

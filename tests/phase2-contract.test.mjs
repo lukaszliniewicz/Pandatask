@@ -195,21 +195,38 @@ test('Personal workspaces aggregate group projects with a private-only escape ha
 });
 
 test('Subtask projects are authoritative, cascaded, and repaired on upgrade', () => {
-	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');
+	const invariants = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskInvariantService.php'), 'utf8');
 	const mutations = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskMutationService.php'), 'utf8');
 	const lifecycle = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Setup/DatabaseLifecycle.php'), 'utf8');
 
-	assert.match(handler, /applyParentProjectInheritance/);
-	assert.match(handler, /\$data\['project_id'\]\s*=\s*\$parent->project_id/);
+	assert.match(invariants, /\$data\['project_id'\]\s*=\s*\$parent->project_id/);
 	assert.match(mutations, /findDescendantProjectRecords/);
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.13'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.14'/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
 	assert.match(lifecycle, /child\.board_name <> parent\.board_name/);
 	assert.match(lifecycle, /SET child\.parent_task_id = NULL/);
+});
+
+test('Backend workflows persist audit buffers and stage protected media transactionally', () => {
+	const mutations = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskMutationService.php'), 'utf8');
+	const buffers = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskHistoryBufferService.php'), 'utf8');
+	const bufferRepository = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Persistence/TaskChangeBufferRepository.php'), 'utf8');
+	const media = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Media/ProtectedAttachmentService.php'), 'utf8');
+	const lifecycle = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Setup/DatabaseLifecycle.php'), 'utf8');
+
+	assert.match(lifecycle, /task_change_buffers/);
+	assert.match(mutations, /history_buffer_service->buffer/);
+	assert.match(bufferRepository, /FOR UPDATE/);
+	assert.match(buffers, /first.*\['from'\]/s);
+	assert.match(buffers, /last.*\['to'\]/s);
+	assert.match(mutations, /ProtectedAttachmentService::syncTask[\s\S]*DatabaseContext::commit/);
+	assert.match(mutations, /rollbackSync/);
+	assert.match(media, /finalizeSync/);
+	assert.match(media, /obsolete_keys/);
 });
 
 test('Legacy fullscreen compatibility route enforces policy and blocks indexing', () => {
@@ -366,6 +383,8 @@ test('Production deployment keeps rollback active through exact release verifica
 	assert.match(deploy, /sha256sum -c -/);
 	assert.match(deploy, /wp plugin is-active pandatask/);
 	assert.match(deploy, /actual_version=.*wp plugin get pandatask/);
+	assert.match(deploy, /wp db export .*--tables=.*--add-drop-table/);
+	assert.match(deploy, /\$PluginSlug-db-\$Timestamp\.sql/);
 	assert.ok(
 		deploy.lastIndexOf('trap - ERR') <
 			deploy.lastIndexOf('rm -rf $RemotePreviousDirQ')
@@ -375,14 +394,17 @@ test('Production deployment keeps rollback active through exact release verifica
 test('Security-sensitive task edits and public intake have explicit guards', () => {
 	const policy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/TaskAccessPolicy.php'), 'utf8');
 	const handler = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/TaskRouteHandler.php'), 'utf8');
+	const invariants = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskInvariantService.php'), 'utf8');
+	const normalizer = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/Support/TaskInputNormalizer.php'), 'utf8');
 	const publicPolicy = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/PublicBugSubmissionPolicy.php'), 'utf8');
 	const comments = fs.readFileSync(path.join(repoRoot, 'src/Application/Security/CommentAccessPolicy.php'), 'utf8');
 
 	assert.match(policy, /canManageTaskRoles/);
 	assert.match(policy, /canMoveTask/);
 	assert.match(handler, /validateSensitiveTaskUpdate/);
-	assert.match(handler, /board-scoped relationship/);
-	assert.match(handler, /pandatask_minimum_task_date/);
+	assert.match(invariants, /board_is_changing/);
+	assert.match(invariants, /findDependencyGraphForBoard/);
+	assert.match(normalizer, /pandatask_minimum_task_date/);
 	assert.match(publicPolicy, /consumeAnonymousSubmissionBudget/);
 	assert.match(publicPolicy, /REMOTE_ADDR/);
 	assert.match(comments, /canReadTask/);

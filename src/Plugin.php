@@ -68,6 +68,8 @@ final class Plugin {
         wp_clear_scheduled_hook( 'pandat69_check_recurring_tasks' );
         wp_clear_scheduled_hook( 'pandat69_check_deadlines' );
         wp_clear_scheduled_hook( 'pandatask_process_buffered_changes' );
+        wp_clear_scheduled_hook( 'pandatask_recover_change_buffers' );
+        wp_clear_scheduled_hook( 'pandatask_cleanup_idempotency_locks' );
 
         DeadlineNotificationHandler::deactivate();
 

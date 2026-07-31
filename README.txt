@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.17
+Stable tag: 1.0.18
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,14 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.18 =
+
+* Enforce task hierarchy, dependency, board-reference, assignment, schedule, attachment, and recurrence invariants in the application layer for REST, batch, cron, and integration callers.
+* Replace aggregate-heavy task reads with bounded bulk hydration, deterministic ordering, exact look-ahead pagination, and cache-safe per-viewer decoration.
+* Add schema 1.0.14 with verified hot-path indexes, transactional legacy-data repair, durable task-change buffers, catch-up-safe deadline reminders, and recovery jobs.
+* Make protected attachment replacement rollback-safe, preserve monthly recurrence anchors, respect future successor dates, and report scheduled-workflow outcomes.
+* Upgrade PHPStan to 2.2.7 at enforced level 4, expand domain/integrity/mutation coverage, and add a restricted pre-migration production database backup.
 
 = 1.0.17 =
 

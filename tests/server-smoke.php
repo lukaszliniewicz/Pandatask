@@ -126,6 +126,21 @@ if ( empty( $admins ) ) {
         if ( 200 !== $tasks_response->get_status() || null === $result['task_rest']['tasks'] ) {
             $failures[] = 'The largest board task REST request did not return a task collection.';
         }
+
+        $page_request = new WP_REST_Request( 'GET', '/pandatask/v1/boards/' . rawurlencode( $board_name ) . '/tasks' );
+        $page_request->set_query_params( array( 'limit' => 1, 'offset' => 0, 'status_filter' => '' ) );
+        $page_response = rest_do_request( $page_request );
+        $page_data = $page_response->get_data();
+        $result['pagination_probe'] = is_array( $page_data ) ? ( $page_data['pagination'] ?? null ) : null;
+
+        if (
+            200 !== $page_response->get_status()
+            || ! is_array( $result['pagination_probe'] )
+            || 1 !== (int) ( $result['pagination_probe']['returned'] ?? 0 )
+            || ( (int) $result['largest_board']['tasks'] > 1 && empty( $result['pagination_probe']['has_more'] ) )
+        ) {
+            $failures[] = 'Bounded task pagination did not expose an exact look-ahead result.';
+        }
     }
 
     $project_query_start = $wpdb->num_queries;
@@ -172,10 +187,11 @@ if ( $result['hierarchy_invalid_links'] > 0 ) {
 }
 
 $index_requirements = array(
-    'tasks'        => array( 'board_active_status_deadline', 'board_created', 'board_completed' ),
+    'tasks'        => array( 'board_list_deadline', 'board_created', 'board_completed', 'scheduled_start', 'deadline_reminder_queue', 'missed_deadline_queue', 'recurring_rollover', 'project_active_tasks' ),
     'assignments'  => array( 'user_task_role' ),
-    'comments'     => array( 'task_created' ),
-    'task_history' => array( 'task_field' ),
+    'comments'     => array( 'task_created_id' ),
+    'task_history' => array( 'task_field', 'task_changed' ),
+    'task_change_buffers' => array( 'task_actor_delivery', 'delivery_queue' ),
 );
 $result['indexes'] = array();
 
@@ -225,8 +241,18 @@ if ( ! empty( $missing_assets ) ) {
     $failures[] = 'Missing packaged assets: ' . implode( ', ', $missing_assets );
 }
 
-if ( '1.0.17' !== $result['plugin_version'] || '1.0.13' !== $result['db_version'] ) {
-    $failures[] = 'Expected plugin version 1.0.17 with database schema 1.0.13.';
+$task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
+$result['schema_columns'] = array(
+    'deadline_reminder_sent_for' => in_array( 'deadline_reminder_sent_for', $task_columns, true ),
+    'recurrence_anchor_day'      => in_array( 'recurrence_anchor_day', $task_columns, true ),
+);
+
+if ( in_array( false, $result['schema_columns'], true ) ) {
+    $failures[] = 'A required task schema column is missing.';
+}
+
+if ( '1.0.18' !== $result['plugin_version'] || '1.0.14' !== $result['db_version'] ) {
+    $failures[] = 'Expected plugin version 1.0.18 with database schema 1.0.14.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

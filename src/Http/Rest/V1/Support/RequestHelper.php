@@ -18,14 +18,14 @@ final class RequestHelper {
 
     public static function parseIdList( $input ) {
         if ( is_array( $input ) ) {
-            return array_map( 'absint', $input );
+            $values = $input;
+        } elseif ( is_string( $input ) && '' !== $input ) {
+            $values = explode( ',', $input );
+        } else {
+            return array();
         }
 
-        if ( is_string( $input ) && '' !== $input ) {
-            return array_map( 'absint', explode( ',', $input ) );
-        }
-
-        return array();
+        return array_values( array_unique( array_filter( array_map( 'absint', $values ) ) ) );
     }
 
     public static function renderTask( $task ) {

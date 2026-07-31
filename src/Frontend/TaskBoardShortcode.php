@@ -69,17 +69,4 @@ class TaskBoardShortcode {
     private function enqueue_assets() {
         AssetRegistrar::enqueueFrontendAssetHandles();
     }
-    
-    /**
-     * Get a human-readable display name for the board
-     *
-     * @param string $board_name The internal board name
-     * @param int $group_id The group ID if available
-     * @return string The display name for the board
-     */
-    private function get_board_display_name($board_name, $group_id = 0) {
-        $board_service = new \Pandatask\Application\Board\BoardService();
-
-        return $board_service->getBoardDisplayName($board_name, $group_id);
-    }
 }

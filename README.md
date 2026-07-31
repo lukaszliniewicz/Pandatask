@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.17
+**Version:** 1.0.18
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -357,10 +357,12 @@ Cache versioning uses WordPress transients suffixed with incrementing integers, 
 
 | Hook | Schedule | Purpose |
 |---|---|---|
-| `pandat69_daily_task_start_check` | Daily | Sets `in-progress` for tasks whose `start_date` is today |
+| `pandat69_daily_task_start_check` | Daily | Starts due, unblocked pending tasks |
 | `pandat69_check_recurring_tasks` | Daily | Rolls over completed/past-due recurring tasks to next occurrence |
 | `pandat69_check_deadlines` | Daily | Sends approaching-deadline and missed-deadline notifications |
 | `pandatask_process_buffered_changes` | Single event (5 min delay) | Flushes aggregated change history and sends digest email |
+| `pandatask_recover_change_buffers` | Hourly | Recovers due history buffers if a single event was missed |
+| `pandatask_cleanup_idempotency_locks` | Hourly | Removes stale mutation-idempotency locks |
 
 ---
 
@@ -377,6 +379,14 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.18
+
+- Enforce hierarchy, dependency, reference, assignment, scheduling, attachment, and recurrence rules in one application-layer boundary shared by REST, batch, cron, and integrations.
+- Replace aggregate-heavy task reads with bounded bulk hydration, deterministic ordering, exact look-ahead pagination, and viewer-neutral canonical caching.
+- Add schema 1.0.14 with verified hot-path indexes, transactional legacy-data repair, durable change buffers, catch-up deadline reminders, and recovery jobs.
+- Make protected attachment replacement rollback-safe, preserve monthly recurrence anchors, respect future successor dates, and expose scheduled-workflow outcomes.
+- Upgrade PHPStan to 2.2.7 at enforced level 4, broaden domain/integrity/mutation tests, and back up PandaTask production tables before schema migration.
 
 ### 1.0.17
 

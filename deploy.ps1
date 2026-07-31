@@ -113,6 +113,8 @@ try {
     $RemoteStagingDir = "$RemotePluginParent/.$PluginSlug.deploy-new-$Timestamp"
     $RemotePreviousDir = "$RemotePluginParent/.$PluginSlug.previous-$Timestamp"
     $RemoteBackupPath = "$($RemoteBackupDir.TrimEnd('/'))/$PluginSlug-$Timestamp.tgz"
+    $RemoteDatabaseBackupSql = "$($RemoteBackupDir.TrimEnd('/'))/$PluginSlug-db-$Timestamp.sql"
+    $RemoteDatabaseBackupPath = "$RemoteDatabaseBackupSql.gz"
 
     Write-Host '3. Uploading package to production...' -ForegroundColor Cyan
     scp $PackagePath "${HostName}:$RemotePackagePath"
@@ -127,6 +129,8 @@ try {
     $RemotePackagePathQ = Get-ShQuoted $RemotePackagePath
     $RemoteBackupDirQ = Get-ShQuoted $RemoteBackupDir
     $RemoteBackupPathQ = Get-ShQuoted $RemoteBackupPath
+    $RemoteDatabaseBackupSqlQ = Get-ShQuoted $RemoteDatabaseBackupSql
+    $RemoteDatabaseBackupPathQ = Get-ShQuoted $RemoteDatabaseBackupPath
     $RemoteOwnerQ = Get-ShQuoted $RemoteOwner
     $RemoteWordPressDirQ = Get-ShQuoted $RemoteWordPressDir
     $ExpectedVersionQ = Get-ShQuoted $ExpectedVersion
@@ -167,6 +171,12 @@ if [ -f $RemoteStagingDirQ/composer.json ] && command -v composer >/dev/null 2>&
     cd $RemoteStagingDirQ
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 fi
+db_prefix=`$(sudo -u iarf -- wp db prefix --path=$RemoteWordPressDirQ)
+db_tables="`${db_prefix}pandat69_tasks,`${db_prefix}pandat69_projects,`${db_prefix}pandat69_project_assignments,`${db_prefix}pandat69_categories,`${db_prefix}pandat69_assignments,`${db_prefix}pandat69_comments,`${db_prefix}pandat69_task_history,`${db_prefix}pandat69_task_relationships"
+sudo -u iarf -- wp db export $RemoteDatabaseBackupSqlQ --tables="`$db_tables" --add-drop-table --path=$RemoteWordPressDirQ
+gzip -f $RemoteDatabaseBackupSqlQ
+test -s $RemoteDatabaseBackupPathQ
+chmod 600 $RemoteDatabaseBackupPathQ
 if [ -d $RemotePluginDirQ ]; then
     tar -czf $RemoteBackupPathQ -C $RemotePluginDirQ .
     mv $RemotePluginDirQ $RemotePreviousDirQ
@@ -225,7 +235,8 @@ printf 'Pandatask production version: %s\n' "`$actual_version"
         throw "Production verification failed (exit code $LASTEXITCODE)"
     }
 
-    Write-Host "Production deployment completed. Backup: ${HostName}:$RemoteBackupPath" -ForegroundColor Green
+    Write-Host "Production deployment completed. Plugin backup: ${HostName}:$RemoteBackupPath" -ForegroundColor Green
+    Write-Host "Database backup: ${HostName}:$RemoteDatabaseBackupPath" -ForegroundColor Green
 } finally {
     if ((Test-Path $PackagePath) -and $KeepPackage) {
         Write-Host "Package retained at $PackagePath" -ForegroundColor Yellow

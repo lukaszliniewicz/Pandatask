@@ -1,12 +1,10 @@
 parameters:
-    level: 3
+    level: 4
     paths:
         - src
     excludePaths:
         analyse:
             - src/Integration/BuddyPress
-    ignoreErrors:
-        - '#Access to an undefined property object::\$#'
     scanFiles:
         - stubs/runtime-stubs.php
         - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php

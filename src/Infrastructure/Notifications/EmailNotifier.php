@@ -1,6 +1,7 @@
 <?php
 namespace Pandatask\Infrastructure\Notifications;
 
+use DateTimeImmutable;
 use Exception;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -39,7 +40,7 @@ class EmailNotifier {
         
         foreach ($new_user_ids as $user_id) {
             $user = get_userdata($user_id);
-            if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+            if (!$user || !$user->user_email) {
                 continue;
             }
             
@@ -121,7 +122,7 @@ class EmailNotifier {
         $site_name = get_bloginfo('name');
         $mentioner = get_userdata($mentioner_id);
         
-        if (!$mentioner || !is_a($mentioner, 'WP_User')) {
+        if (!$mentioner) {
             $mentioner_name = __('A user', 'pandatask');
         } else {
             $mentioner_name = $mentioner->display_name;
@@ -154,7 +155,7 @@ class EmailNotifier {
         
         foreach ($mentioned_user_ids as $user_id) {
             $user = get_userdata($user_id);
-            if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+            if (!$user || !$user->user_email) {
                 continue;
             }
             
@@ -208,14 +209,14 @@ class EmailNotifier {
      * @param int $user_id The user ID to notify (assignee or supervisor).
      * @return bool Whether the email was sent successfully.
      */
-    public static function send_missed_deadline_notification($task_id, $user_id) {
-        $task = self::get_task($task_id);
+    public static function send_missed_deadline_notification($task_id, $user_id, $task = null) {
+        $task = $task ?: self::get_task($task_id);
         if (!$task || !$task->deadline) {
             return false;
         }
 
         $user = get_userdata($user_id);
-        if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+        if (!$user || !$user->user_email) {
             return false;
         }
 
@@ -310,7 +311,7 @@ class EmailNotifier {
         $site_name = get_bloginfo('name');
         $commenter = get_userdata($comment_user_id);
         
-        if (!$commenter || !is_a($commenter, 'WP_User')) {
+        if (!$commenter) {
             // translators: Fallback name if the user who commented cannot be found.
             $commenter_name = __('A user', 'pandatask');
         } else {
@@ -334,7 +335,7 @@ class EmailNotifier {
             }
             
             $user = get_userdata($user_id);
-            if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+            if (!$user || !$user->user_email) {
                 continue;
             }
             
@@ -443,21 +444,25 @@ class EmailNotifier {
      * @param int $user_id The user ID to notify
      * @return bool Whether the email was sent
      */
-    public static function send_deadline_notification($task_id, $user_id) {
+    public static function send_deadline_notification($task_id, $user_id, $task = null) {
         // Get task details
-        $task = self::get_task($task_id);
+        $task = $task ?: self::get_task($task_id);
         if (!$task || !$task->deadline) {
             return false;
         }
 
         $user = get_userdata($user_id);
-        if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+        if (!$user || !$user->user_email) {
             return false;
         }
 
         $admin_email = get_option('admin_email');
         $site_name = get_bloginfo('name');
-        $days_remaining = max(1, floor((strtotime($task->deadline) - time()) / DAY_IN_SECONDS));
+        $today = new DateTimeImmutable( 'today', wp_timezone() );
+        $deadline_date = DateTimeImmutable::createFromFormat( '!Y-m-d', $task->deadline, wp_timezone() );
+        $days_remaining = $deadline_date
+            ? max( 1, (int) $today->diff( $deadline_date )->format( '%a' ) )
+            : 1;
 
         // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name, $task_id);
@@ -621,7 +626,7 @@ class EmailNotifier {
 
         foreach ($recipient_user_ids as $user_id) {
             $user = get_userdata($user_id);
-            if (!$user || !is_a($user, 'WP_User') || !$user->user_email) {
+            if (!$user || !$user->user_email) {
                 continue;
             }
             /* translators: %s: User display name */

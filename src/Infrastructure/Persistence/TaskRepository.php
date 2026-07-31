@@ -2,6 +2,8 @@
 
 namespace Pandatask\Infrastructure\Persistence;
 
+use Pandatask\Domain\Task\TaskGraph;
+
 final class TaskRepository {
 
     private $hydrated_users = array();
@@ -34,17 +36,11 @@ final class TaskRepository {
         $categories_table  = $prefix . 'categories';
         $projects_table    = $prefix . 'projects';
         $sql_select        = "SELECT t.*, c.name as category_name, p.name as project_name,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.ID END) as assigned_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.display_name END SEPARATOR ', ') as assigned_user_names,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.ID END) as supervisor_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.display_name END SEPARATOR ', ') as supervisor_user_names,
              parent.name as parent_task_name,
              parent.status as parent_task_status
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
-             LEFT JOIN {$assignments_table} a ON t.id = a.task_id
-             LEFT JOIN {$users_table} u ON a.user_id = u.ID
              LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id";
         $sql_where         = ' WHERE t.board_name = %s AND t.archived = %d';
         $params            = array( $board_name, $archived );
@@ -65,7 +61,17 @@ final class TaskRepository {
 
         if ( ! empty( $search ) ) {
             $search_term = '%' . $wpdb->esc_like( $search ) . '%';
-            $sql_where  .= ' AND (t.name LIKE %s OR t.description LIKE %s OR u.display_name LIKE %s)';
+            $sql_where  .= " AND (
+                t.name LIKE %s
+                OR t.description LIKE %s
+                OR EXISTS (
+                    SELECT 1
+                    FROM {$assignments_table} search_assignment
+                    INNER JOIN {$users_table} search_user ON search_user.ID = search_assignment.user_id
+                    WHERE search_assignment.task_id = t.id
+                      AND search_user.display_name LIKE %s
+                )
+            )";
             $params[]    = $search_term;
             $params[]    = $search_term;
             $params[]    = $search_term;
@@ -98,26 +104,32 @@ final class TaskRepository {
             $params[]   = $end_date;
         }
 
-        $sql_group_order      = ' GROUP BY t.id';
+        $sql_group_order      = '';
         $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'assigned_user_names', 'category_name', 'created_at' );
 
         if ( in_array( $sort_by, $allowed_sort_columns, true ) ) {
             $order = 'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC';
 
             if ( 'assigned_user_names' === $sort_by ) {
-                $sql_group_order .= " ORDER BY assigned_user_names {$order}";
+                $sql_group_order .= " ORDER BY (
+                    SELECT MIN(sort_user.display_name)
+                    FROM {$assignments_table} sort_assignment
+                    INNER JOIN {$users_table} sort_user ON sort_user.ID = sort_assignment.user_id
+                    WHERE sort_assignment.task_id = t.id
+                      AND (sort_assignment.role = 'assignee' OR sort_assignment.role IS NULL)
+                ) {$order}, t.id {$order}";
             } elseif ( 'category_name' === $sort_by ) {
-                $sql_group_order .= " ORDER BY c.name {$order}";
+                $sql_group_order .= " ORDER BY c.name {$order}, t.id {$order}";
             } else {
-                $sql_group_order .= " ORDER BY t.{$sort_by} {$order}";
+                $sql_group_order .= " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
             }
         } else {
-            $sql_group_order .= ' ORDER BY t.name ASC';
+            $sql_group_order .= ' ORDER BY t.name ASC, t.id ASC';
         }
 
         if ( $limit > 0 ) {
             $sql_group_order .= ' LIMIT %d OFFSET %d';
-            $params[]         = min( 500, max( 1, (int) $limit ) );
+            $params[]         = min( 501, max( 1, (int) $limit ) );
             $params[]         = max( 0, (int) $offset );
         }
 
@@ -133,30 +145,27 @@ final class TaskRepository {
 
         $prefix            = DatabaseContext::getDbPrefix();
         $tasks_table       = $prefix . 'tasks';
-        $assignments_table = $prefix . 'assignments';
-        $users_table       = $wpdb->users;
         $categories_table  = $prefix . 'categories';
         $projects_table    = $prefix . 'projects';
         $history_table     = $prefix . 'task_history';
+        $users_table       = $wpdb->users;
         $sql               = $wpdb->prepare(
             "SELECT t.*, c.name as category_name, p.name as project_name,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.ID END) as assigned_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN u.display_name END SEPARATOR ', ') as assigned_user_names,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.ID END) as supervisor_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN u.display_name END SEPARATOR ', ') as supervisor_user_names,
              parent.name as parent_task_name,
              creator.display_name as creator_name,
              creator.ID as creator_id
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
-             LEFT JOIN {$assignments_table} a ON t.id = a.task_id
-             LEFT JOIN {$users_table} u ON a.user_id = u.ID
              LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
-             LEFT JOIN {$history_table} h ON h.task_id = t.id AND h.field_changed = 'task_created'
+             LEFT JOIN {$history_table} h ON h.id = (
+                 SELECT MIN(creator_history.id)
+                 FROM {$history_table} creator_history
+                 WHERE creator_history.task_id = t.id
+                   AND creator_history.field_changed = 'task_created'
+             )
              LEFT JOIN {$users_table} creator ON h.user_id = creator.ID
-             WHERE t.id = %d
-             GROUP BY t.id",
+             WHERE t.id = %d",
             $task_id
         );
         $task              = $wpdb->get_row( $sql );
@@ -165,12 +174,8 @@ final class TaskRepository {
             return $task;
         }
 
-        $task->category_name = $task->category_name ?? null;
-        $task->creator_id    = isset( $task->creator_id ) ? (int) $task->creator_id : 0;
-        $task->predecessors = $this->findPredecessors( $task->id, $tasks_table );
-        $task->predecessor_ids = array_map( 'intval', wp_list_pluck( $task->predecessors, 'id' ) );
-        $task->is_blocked = $this->isBlocked( $task->id );
-        $this->hydrateUsers( $task );
+        $task->creator_id = isset( $task->creator_id ) ? (int) $task->creator_id : 0;
+        $this->hydrateTaskCollection( array( $task ), $tasks_table );
 
         return $task;
     }
@@ -252,14 +257,16 @@ final class TaskRepository {
         $task = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT t.id, t.board_name,
-                    GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'assignee' OR a.role IS NULL THEN a.user_id END) AS assigned_user_ids,
-                    GROUP_CONCAT(DISTINCT CASE WHEN a.role = 'supervisor' THEN a.user_id END) AS supervisor_user_ids,
-                    MIN(CASE WHEN h.field_changed = 'task_created' THEN h.user_id END) AS creator_id
+                    (
+                        SELECT creator_history.user_id
+                        FROM {$history_table} creator_history
+                        WHERE creator_history.task_id = t.id
+                          AND creator_history.field_changed = 'task_created'
+                        ORDER BY creator_history.id ASC
+                        LIMIT 1
+                    ) AS creator_id
                  FROM {$tasks_table} t
-                 LEFT JOIN {$assignments_table} a ON a.task_id = t.id
-                 LEFT JOIN {$history_table} h ON h.task_id = t.id AND h.field_changed = 'task_created'
-                 WHERE t.id = %d
-                 GROUP BY t.id, t.board_name",
+                 WHERE t.id = %d",
                 $task_id
             )
         );
@@ -268,8 +275,26 @@ final class TaskRepository {
             return null;
         }
 
-        $task->assigned_user_ids = ! empty( $task->assigned_user_ids ) ? array_map( 'intval', explode( ',', $task->assigned_user_ids ) ) : array();
-        $task->supervisor_user_ids = ! empty( $task->supervisor_user_ids ) ? array_map( 'intval', explode( ',', $task->supervisor_user_ids ) ) : array();
+        $assignment_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT user_id, role
+                 FROM {$assignments_table}
+                 WHERE task_id = %d
+                 ORDER BY user_id ASC",
+                $task_id
+            )
+        );
+        $task->assigned_user_ids = array();
+        $task->supervisor_user_ids = array();
+
+        foreach ( $assignment_rows as $assignment ) {
+            if ( 'supervisor' === $assignment->role ) {
+                $task->supervisor_user_ids[] = (int) $assignment->user_id;
+            } else {
+                $task->assigned_user_ids[] = (int) $assignment->user_id;
+            }
+        }
+
         $task->creator_id = (int) $task->creator_id;
 
         return $task;
@@ -305,64 +330,178 @@ final class TaskRepository {
         return $count > 0;
     }
 
-    public function wouldCreateParentCycle( $task_id, $parent_task_id ) {
+    public function wouldCreateParentCycle( $task_id, $parent_task_id, $board_name = '' ) {
+        if ( ! $board_name ) {
+            $parent = $this->findHierarchyRecordById( $parent_task_id );
+            $board_name = $parent ? $parent->board_name : '';
+        }
+
+        if ( ! $board_name ) {
+            return false;
+        }
+
+        return TaskGraph::wouldCreateCycle(
+            $this->findParentGraphForBoard( $board_name ),
+            (int) $task_id,
+            (int) $parent_task_id
+        );
+    }
+
+    public function wouldCreateDependencyCycle( $task_id, $predecessor_id, $board_name = '', $proposed_predecessors = null ) {
+        if ( ! $board_name ) {
+            $predecessor = $this->findHierarchyRecordById( $predecessor_id );
+            $board_name = $predecessor ? $predecessor->board_name : '';
+        }
+
+        if ( ! $board_name ) {
+            return false;
+        }
+
+        $graph = $this->findDependencyGraphForBoard( $board_name );
+
+        if ( is_array( $proposed_predecessors ) ) {
+            $graph[ (int) $task_id ] = array_values( array_unique( array_map( 'intval', $proposed_predecessors ) ) );
+        }
+
+        return TaskGraph::wouldCreateCycle(
+            $graph,
+            (int) $task_id,
+            (int) $predecessor_id
+        );
+    }
+
+    public function findParentGraphForBoard( $board_name ) {
         global $wpdb;
 
         $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
-        $visited = array();
-        $current_id = (int) $parent_task_id;
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, parent_task_id
+                 FROM {$tasks_table}
+                 WHERE board_name = %s
+                   AND parent_task_id IS NOT NULL",
+                $board_name
+            )
+        );
+        $graph = array();
 
-        while ( $current_id > 0 && ! isset( $visited[ $current_id ] ) ) {
-            if ( $current_id === (int) $task_id ) {
-                return true;
-            }
-
-            $visited[ $current_id ] = true;
-            $current_id = (int) $wpdb->get_var(
-                $wpdb->prepare( "SELECT parent_task_id FROM {$tasks_table} WHERE id = %d", $current_id )
-            );
+        foreach ( $rows as $row ) {
+            $graph[ (int) $row->id ][] = (int) $row->parent_task_id;
         }
 
-        return false;
+        return $graph;
     }
 
-    public function wouldCreateDependencyCycle( $task_id, $predecessor_id ) {
+    public function findDependencyGraphForBoard( $board_name ) {
         global $wpdb;
 
-        $relationships_table = DatabaseContext::getDbPrefix() . 'task_relationships';
-        $target_id = (int) $task_id;
-        $frontier = array( (int) $predecessor_id );
-        $visited = array();
+        $prefix              = DatabaseContext::getDbPrefix();
+        $tasks_table         = $prefix . 'tasks';
+        $relationships_table = $prefix . 'task_relationships';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT relationship.task_id, relationship.predecessor_id
+                 FROM {$relationships_table} relationship
+                 INNER JOIN {$tasks_table} task ON task.id = relationship.task_id
+                 INNER JOIN {$tasks_table} predecessor ON predecessor.id = relationship.predecessor_id
+                 WHERE task.board_name = %s
+                   AND predecessor.board_name = task.board_name",
+                $board_name
+            )
+        );
+        $graph = array();
 
-        while ( ! empty( $frontier ) ) {
-            $current_id = (int) array_pop( $frontier );
-
-            if ( $current_id === $target_id ) {
-                return true;
-            }
-
-            if ( $current_id <= 0 || isset( $visited[ $current_id ] ) ) {
-                continue;
-            }
-
-            $visited[ $current_id ] = true;
-            $next_ids = $wpdb->get_col(
-                $wpdb->prepare(
-                    "SELECT predecessor_id FROM {$relationships_table} WHERE task_id = %d",
-                    $current_id
-                )
-            );
-
-            foreach ( $next_ids as $next_id ) {
-                $next_id = (int) $next_id;
-
-                if ( ! isset( $visited[ $next_id ] ) ) {
-                    $frontier[] = $next_id;
-                }
-            }
+        foreach ( $rows as $row ) {
+            $graph[ (int) $row->task_id ][] = (int) $row->predecessor_id;
         }
 
-        return false;
+        return $graph;
+    }
+
+    public function findBoardTaskRecordsByIds( $board_name, $task_ids ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $task_ids ) ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return array();
+        }
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $placeholders = implode( ', ', array_fill( 0, count( $task_ids ), '%d' ) );
+        $params = array_merge( array( $board_name ), $task_ids );
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, board_name, status, archived, project_id, parent_task_id
+                 FROM {$tasks_table}
+                 WHERE board_name = %s
+                   AND id IN ({$placeholders})",
+                ...$params
+            )
+        );
+        $records = array();
+
+        foreach ( $rows as $row ) {
+            $row->id = (int) $row->id;
+            $row->archived = (int) $row->archived;
+            $row->project_id = $row->project_id ? (int) $row->project_id : null;
+            $row->parent_task_id = $row->parent_task_id ? (int) $row->parent_task_id : null;
+            $records[ $row->id ] = $row;
+        }
+
+        return $records;
+    }
+
+    public function findIncompletePredecessorIds( $predecessor_ids ) {
+        global $wpdb;
+
+        $predecessor_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $predecessor_ids ) ) ) );
+
+        if ( empty( $predecessor_ids ) ) {
+            return array();
+        }
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+        $placeholders = implode( ', ', array_fill( 0, count( $predecessor_ids ), '%d' ) );
+        $results = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id
+                 FROM {$tasks_table}
+                 WHERE id IN ({$placeholders})
+                   AND archived = 0
+                   AND status <> 'done'",
+                ...$predecessor_ids
+            )
+        );
+
+        return array_values( array_map( 'intval', $results ) );
+    }
+
+    public function findParticipantUserIdsForBoard( $board_name ) {
+        global $wpdb;
+
+        $prefix            = DatabaseContext::getDbPrefix();
+        $tasks_table       = $prefix . 'tasks';
+        $assignments_table = $prefix . 'assignments';
+        $history_table     = $prefix . 'task_history';
+        $results = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT assignment.user_id
+                 FROM {$assignments_table} assignment
+                 INNER JOIN {$tasks_table} task ON task.id = assignment.task_id
+                 WHERE task.board_name = %s
+                 UNION
+                 SELECT history_entry.user_id
+                 FROM {$history_table} history_entry
+                 INNER JOIN {$tasks_table} task ON task.id = history_entry.task_id
+                 WHERE task.board_name = %s
+                   AND history_entry.field_changed = 'task_created'",
+                $board_name,
+                $board_name
+            )
+        );
+
+        return array_values( array_unique( array_filter( array_map( 'absint', $results ) ) ) );
     }
 
     public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0 ) {
@@ -371,27 +510,41 @@ final class TaskRepository {
         $prefix            = DatabaseContext::getDbPrefix();
         $tasks_table       = $prefix . 'tasks';
         $assignments_table = $prefix . 'assignments';
-        $users_table       = $wpdb->users;
         $categories_table  = $prefix . 'categories';
         $projects_table    = $prefix . 'projects';
+        $history_table     = $prefix . 'task_history';
         $sql               = $wpdb->prepare(
-            "SELECT DISTINCT t.*, c.name as category_name, p.name as project_name,
-             GROUP_CONCAT(DISTINCT CASE WHEN a_all.role = 'assignee' THEN u.ID END) as assigned_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a_all.role = 'assignee' THEN u.display_name END SEPARATOR ', ') as assigned_user_names,
-             GROUP_CONCAT(DISTINCT CASE WHEN a_all.role = 'supervisor' THEN u.ID END) as supervisor_user_ids,
-             GROUP_CONCAT(DISTINCT CASE WHEN a_all.role = 'supervisor' THEN u.display_name END SEPARATOR ', ') as supervisor_user_names,
+            "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
              parent.status as parent_task_status,
-             creator_h.user_id as creator_id
+             (
+                 SELECT creator_history.user_id
+                 FROM {$history_table} creator_history
+                 WHERE creator_history.task_id = t.id
+                   AND creator_history.field_changed = 'task_created'
+                 ORDER BY creator_history.id ASC
+                 LIMIT 1
+             ) as creator_id
              FROM {$tasks_table} t
-             LEFT JOIN {$assignments_table} a_user ON t.id = a_user.task_id AND a_user.user_id = %d
-             LEFT JOIN {$categories_table} c ON t.category_id = c.id
-             LEFT JOIN {$projects_table} p ON t.project_id = p.id
-             LEFT JOIN {$assignments_table} a_all ON t.id = a_all.task_id
-             LEFT JOIN {$users_table} u ON a_all.user_id = u.ID
+             LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
+             LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
              LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
-             LEFT JOIN {$prefix}task_history creator_h ON t.id = creator_h.task_id AND creator_h.field_changed = 'task_created'
-             WHERE (a_user.user_id IS NOT NULL OR creator_h.user_id = %d) AND t.archived = %d",
+             WHERE (
+                 EXISTS (
+                     SELECT 1
+                     FROM {$assignments_table} user_assignment
+                     WHERE user_assignment.task_id = t.id
+                       AND user_assignment.user_id = %d
+                 )
+                 OR EXISTS (
+                     SELECT 1
+                     FROM {$history_table} user_history
+                     WHERE user_history.task_id = t.id
+                       AND user_history.field_changed = 'task_created'
+                       AND user_history.user_id = %d
+                 )
+             )
+             AND t.archived = %d",
             $user_id,
             $user_id,
             $archived
@@ -428,18 +581,17 @@ final class TaskRepository {
             }
         }
 
-        $sql               .= ' GROUP BY t.id';
         $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'created_at' );
 
         if ( in_array( $sort_by, $allowed_sort_columns, true ) ) {
             $order = 'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC';
-            $sql  .= " ORDER BY t.{$sort_by} {$order}";
+            $sql  .= " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
         } else {
-            $sql .= ' ORDER BY t.name ASC';
+            $sql .= ' ORDER BY t.name ASC, t.id ASC';
         }
 
         if ( $limit > 0 ) {
-            $sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', min( 500, max( 1, (int) $limit ) ), max( 0, (int) $offset ) );
+            $sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', min( 501, max( 1, (int) $limit ) ), max( 0, (int) $offset ) );
         }
 
         $results = $wpdb->get_results( $sql );
@@ -470,19 +622,27 @@ final class TaskRepository {
             return $tasks;
         }
 
+        $children_by_parent = array();
+
+        foreach ( $tasks as $task ) {
+            $parent_id = (int) $task->parent_task_id;
+
+            if ( $parent_id > 0 ) {
+                $children_by_parent[ $parent_id ][] = (int) $task->id;
+            }
+        }
+
         $excluded_ids = array( (int) $current_task_id => true );
-        $changed = true;
+        $queue = array( (int) $current_task_id );
 
-        while ( $changed ) {
-            $changed = false;
-
-            foreach ( $tasks as $task ) {
-                $parent_id = (int) $task->parent_task_id;
-
-                if ( $parent_id > 0 && isset( $excluded_ids[ $parent_id ] ) && ! isset( $excluded_ids[ (int) $task->id ] ) ) {
-                    $excluded_ids[ (int) $task->id ] = true;
-                    $changed = true;
+        for ( $index = 0; $index < count( $queue ); $index++ ) {
+            foreach ( $children_by_parent[ $queue[ $index ] ] ?? array() as $child_id ) {
+                if ( isset( $excluded_ids[ $child_id ] ) ) {
+                    continue;
                 }
+
+                $excluded_ids[ $child_id ] = true;
+                $queue[] = $child_id;
             }
         }
 
@@ -499,13 +659,21 @@ final class TaskRepository {
         }
 
         $task_ids = array_values( array_filter( array_map( 'absint', wp_list_pluck( $tasks, 'id' ) ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return;
+        }
+
         $task_ids_sql = implode( ',', $task_ids );
-        $rel_table = DatabaseContext::getDbPrefix() . 'task_relationships';
+        $prefix = DatabaseContext::getDbPrefix();
+        $rel_table = $prefix . 'task_relationships';
+        $assignments_table = $prefix . 'assignments';
         $relationship_rows = $wpdb->get_results(
             "SELECT r.task_id, t.id, t.name, t.status, t.archived
              FROM {$rel_table} r
              INNER JOIN {$tasks_table} t ON r.predecessor_id = t.id
-             WHERE r.task_id IN ({$task_ids_sql})"
+             WHERE r.task_id IN ({$task_ids_sql})
+             ORDER BY r.task_id ASC, r.id ASC"
         );
         $relationships_by_task = array();
 
@@ -513,12 +681,21 @@ final class TaskRepository {
             $relationships_by_task[ (int) $relationship->task_id ][] = $relationship;
         }
 
+        $assignment_rows = $wpdb->get_results(
+            "SELECT task_id, user_id, role
+             FROM {$assignments_table}
+             WHERE task_id IN ({$task_ids_sql})
+             ORDER BY task_id ASC, role ASC, user_id ASC"
+        );
+        $assignments_by_task = array();
         $all_user_ids = array();
 
-        foreach ( $tasks as $task ) {
-            foreach ( array( $task->assigned_user_ids ?? '', $task->supervisor_user_ids ?? '' ) as $csv ) {
-                $all_user_ids = array_merge( $all_user_ids, array_map( 'absint', array_filter( explode( ',', (string) $csv ) ) ) );
-            }
+        foreach ( $assignment_rows as $assignment ) {
+            $task_id = (int) $assignment->task_id;
+            $user_id = (int) $assignment->user_id;
+            $role = 'supervisor' === $assignment->role ? 'supervisor' : 'assignee';
+            $assignments_by_task[ $task_id ][ $role ][] = $user_id;
+            $all_user_ids[] = $user_id;
         }
 
         $all_user_ids = array_values( array_unique( array_filter( $all_user_ids ) ) );
@@ -549,47 +726,28 @@ final class TaskRepository {
                 }
             }
 
-            $this->hydrateUsers( $task );
+            $task_assignments = $assignments_by_task[ (int) $task->id ] ?? array();
+            $this->hydrateUsers(
+                $task,
+                $task_assignments['assignee'] ?? array(),
+                $task_assignments['supervisor'] ?? array()
+            );
         }
 
         $this->hydrated_users = array();
     }
 
-    private function findPredecessors( $task_id, $tasks_table ) {
-        global $wpdb;
-
-        $rel_table = DatabaseContext::getDbPrefix() . 'task_relationships';
-
-        return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT t.id, t.name, t.status
-                 FROM {$rel_table} r
-                 JOIN {$tasks_table} t ON r.predecessor_id = t.id
-                 WHERE r.task_id = %d",
-                $task_id
-            )
-        ) ?: array();
+    private function hydrateUsers( $task, $assigned_user_ids = array(), $supervisor_user_ids = array() ) {
+        list( $task->assigned_users, $task->assigned_user_ids ) = $this->buildHydratedUsers( $assigned_user_ids );
+        list( $task->supervisor_users, $task->supervisor_user_ids ) = $this->buildHydratedUsers( $supervisor_user_ids );
     }
 
-    private function hydrateUsers( $task ) {
-        list( $task->assigned_users, $task->assigned_user_ids )     = $this->buildHydratedUsers( $task->assigned_user_ids ?? '' );
-        list( $task->supervisor_users, $task->supervisor_user_ids ) = $this->buildHydratedUsers( $task->supervisor_user_ids ?? '' );
-
-        unset( $task->assigned_user_names, $task->supervisor_user_names );
-    }
-
-    private function buildHydratedUsers( $user_ids_csv ) {
-        $raw_user_ids    = ! empty( $user_ids_csv ) ? array_filter( explode( ',', $user_ids_csv ) ) : array();
+    private function buildHydratedUsers( $user_ids ) {
+        $raw_user_ids    = array_values( array_unique( array_filter( array_map( 'absint', (array) $user_ids ) ) ) );
         $users           = array();
         $final_user_ids  = array();
 
-        foreach ( $raw_user_ids as $user_id_str ) {
-            $user_id = absint( $user_id_str );
-
-            if ( $user_id <= 0 ) {
-                continue;
-            }
-
+        foreach ( $raw_user_ids as $user_id ) {
             if ( isset( $this->hydrated_users[ $user_id ] ) ) {
                 $users[]          = $this->hydrated_users[ $user_id ];
                 $final_user_ids[] = (string) $user_id;

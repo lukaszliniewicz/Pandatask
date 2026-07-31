@@ -137,6 +137,14 @@ final class TaskCommandRepository {
         return false !== $wpdb->delete( $history_table, array( 'task_id' => $task_id ), array( '%d' ) );
     }
 
+    public function deleteTaskChangeBuffers( $task_id ) {
+        global $wpdb;
+
+        $buffers_table = DatabaseContext::getDbPrefix() . 'task_change_buffers';
+
+        return false !== $wpdb->delete( $buffers_table, array( 'task_id' => $task_id ), array( '%d' ) );
+    }
+
     public function deleteTaskRelationships( $task_id ) {
         global $wpdb;
 
@@ -263,6 +271,7 @@ final class TaskCommandRepository {
             $wpdb->prepare(
                 "SELECT * FROM {$tasks_table}
                  WHERE is_recurring = 1
+                 AND archived = 0
                  AND deadline IS NOT NULL
                  AND (status = 'done' OR deadline < %s)
                  AND (recurrence_ends_on IS NULL OR recurrence_ends_on >= %s)",

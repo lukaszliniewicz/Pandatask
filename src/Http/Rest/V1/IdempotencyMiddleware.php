@@ -125,7 +125,7 @@ final class IdempotencyMiddleware {
     }
 
     private static function isEligibleRequest( $request ) {
-        if ( ! $request instanceof WP_REST_Request ) {
+        if ( ! $request instanceof WP_REST_Request || ! is_user_logged_in() ) {
             return false;
         }
 
@@ -160,15 +160,14 @@ final class IdempotencyMiddleware {
             'expires'     => time() + self::LOCK_TTL_SECONDS,
         );
 
-        if ( add_option( $lock_key, $lock, '', false ) ) {
+        if ( self::addLockOption( $lock_key, $lock ) ) {
             return true;
         }
 
         $existing = get_option( $lock_key );
 
         if ( ! is_array( $existing ) || (int) ( $existing['expires'] ?? 0 ) < time() ) {
-            delete_option( $lock_key );
-            if ( add_option( $lock_key, $lock, '', false ) ) {
+            if ( self::replaceLockOption( $lock_key, $existing, $lock ) ) {
                 return true;
             }
             $existing = get_option( $lock_key );
@@ -187,6 +186,36 @@ final class IdempotencyMiddleware {
             __( 'An identical request with this idempotency key is still processing. Retry shortly.', 'pandatask' ),
             array( 'status' => 409 )
         );
+    }
+
+    private static function addLockOption( $lock_key, array $lock ) {
+        return (bool) add_option( $lock_key, $lock, '', false );
+    }
+
+    /**
+     * Atomically replace only the stale value that was actually observed.
+     */
+    private static function replaceLockOption( $lock_key, $existing, array $lock ) {
+        global $wpdb;
+
+        $updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$wpdb->options}
+                 SET option_value = %s
+                 WHERE option_name = %s AND option_value = %s",
+                maybe_serialize( $lock ),
+                $lock_key,
+                maybe_serialize( $existing )
+            )
+        );
+
+        if ( 1 !== (int) $updated ) {
+            return false;
+        }
+
+        wp_cache_delete( $lock_key, 'options' );
+
+        return true;
     }
 
     private static function fingerprint( $request ) {
@@ -212,5 +241,39 @@ final class IdempotencyMiddleware {
         }
 
         return $value;
+    }
+
+    /**
+     * Remove locks left behind by fatal errors or terminated PHP workers.
+     */
+    public static function cleanupExpiredLocks( $limit = 500 ) {
+        global $wpdb;
+
+        $limit = max( 1, min( 2000, (int) $limit ) );
+        $pattern = $wpdb->esc_like( 'pandatask_idem_lock_' ) . '%';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name, option_value
+                 FROM {$wpdb->options}
+                 WHERE option_name LIKE %s
+                 ORDER BY option_id ASC
+                 LIMIT %d",
+                $pattern,
+                $limit
+            )
+        );
+        $removed = 0;
+
+        foreach ( $rows as $row ) {
+            $value = maybe_unserialize( $row->option_value );
+
+            if ( ! is_array( $value ) || (int) ( $value['expires'] ?? 0 ) < time() ) {
+                if ( delete_option( $row->option_name ) ) {
+                    $removed++;
+                }
+            }
+        }
+
+        return $removed;
     }
 }
