@@ -1,6 +1,6 @@
 <?php
 /**
- * Dev-server smoke test for a deployed Pandatask build.
+ * Read-only server smoke test for a deployed Pandatask build.
  *
  * Run with: wp eval-file /path/to/server-smoke.php --path=/path/to/wordpress
  */
@@ -197,11 +197,11 @@ foreach ( $index_requirements as $table_suffix => $required_indexes ) {
 $plugin_dir      = untrailingslashit( PANDAT69_PLUGIN_DIR );
 $required_assets = array(
     'build/main.js',
-    'build/215.js',
+    'build/156.js',
+    'build/208.js',
     'build/226.js',
-    'build/477.js',
-    'build/499.js',
     'build/638.js',
+    'build/651.js',
     'build/785.js',
     'build/940.js',
     'assets/css/floating-bug-reporter.css',

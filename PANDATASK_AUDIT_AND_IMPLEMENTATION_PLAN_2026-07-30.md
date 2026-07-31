@@ -304,7 +304,13 @@ The quality workflow now:
 8. restores the backup automatically if a post-swap check fails;
 9. deletes the backup only after verification.
 
-Production deployment was intentionally not broadened as part of a dev-only release request. It should adopt the same staging/rollback model before the next production release.
+The production deployer now applies the same transaction boundary and adds a
+durable timestamped backup. It derives the expected version and SHA-256 values
+from the local release, validates every staged PHP file, keeps the immediately
+restorable previous directory until exact PHP/JS/CSS hashes, plugin activity,
+and WordPress-reported version all pass, and restores automatically on any
+transactional failure. A contract test and a mocked package/remote-script run
+guard this behavior.
 
 ## Implementation plan and status
 
@@ -449,6 +455,7 @@ for negligible user-facing gain.
 | 14 | WordPress Scripts 34, bestzip 3, and TypeScript 7 migrations | Complete |
 | 15 | Repeatable accessibility CI gate | Complete |
 | 16 | Full 1.0.16 regression, package inspection, dev deployment, and live QA | Complete |
+| 17 | Production rollback/hash hardening, deployment, and smoke verification | Complete: `8b0beef` and production 1.0.16 |
 
 ## 1.0.16 final verification and deployment
 
@@ -459,7 +466,7 @@ The final root `npm run check` passed against the exact release source:
 | TypeScript 7 frontend check | Pass |
 | WordPress ESLint and Stylelint | Pass |
 | React Doctor accessibility gate | Zero findings across 119 files |
-| Architecture/phase contracts | 16/16 pass |
+| Architecture/phase contracts | 17/17 pass |
 | Gantt model tests | 9/9 pass |
 | Task-form model tests | 5/5 pass |
 | PHP security policy suite | Pass |
@@ -513,6 +520,42 @@ Authenticated live QA covered:
 The only visible broken media during group QA was the host-owned group avatar
 above the PandaTask mount; it is outside this plugin's DOM and release scope.
 
+## 1.0.16 production deployment outcome
+
+Production was upgraded from PandaTask 1.0.14 to 1.0.16 on WordPress 7.0.2 at:
+
+`/home/iarf/htdocs/iarf.net/wp-content/plugins/pandatask`
+
+The deployment used the hardened transaction from commit `8b0beef`. It built
+from the clean `main` worktree, validated and packaged runtime files, retained
+the prior directory until all checks passed, flushed the WordPress object
+cache, and preserved a recoverable 1.0.14 archive at:
+
+`/home/iarf/deploy-backups/pandatask-20260731030159.tgz`
+
+The production plugin is active, owned by `iarf:iarf`, and reports 1.0.16.
+Production and local runtime hashes match exactly:
+
+- `pandatask.php`: `203b8776552d3f1d658092cbb6491b58aab056809a91e72135f0657d4296d27b`
+- `build/main.js`: `8d6aa6bf90777ab709873b377b4ed545ac88a047507279ffe9cad7a1a097f157`
+- `build/main.css`: `cac7da91c3af64de6b8d1b3d38f485e4cbb364a4c61b6c44bef3a4b6ecc8dab9`
+
+The read-only production server smoke passed:
+
+- plugin 1.0.16 and database schema 1.0.13;
+- non-administrator batch access rejected with HTTP 403;
+- scripts removed and shortcodes kept inert in rendered task content;
+- largest board `group_10`: 143 repository rows in 54 queries / 111.6 ms;
+- authenticated task REST request returned HTTP 200;
+- zero invalid hierarchy links;
+- all required task, assignment, comment, and history indexes present;
+- all current lazy chunks and bug-reporter assets present.
+
+The public homepage, WordPress REST index, versioned main JavaScript, and
+versioned main CSS returned HTTP 200. JavaScript and CSS response sizes were
+213,389 and 94,592 bytes respectively, exactly matching the local assets. No
+temporary staging, previous-release, upload, or smoke-test files remained.
+
 ## Prioritized follow-up backlog
 
 ### Next release
@@ -530,7 +573,7 @@ above the PandaTask mount; it is outside this plugin's DOM and release scope.
 
 ### Toolchain and release engineering
 
-1. Apply atomic staging/rollback to production deployment.
+1. Add a documented restore drill and retention policy for durable production backups.
 2. Add automated deployment artifact manifests/checksums and provenance.
 3. Reassess React 19 only when the supported WordPress runtime externalizes a compatible major.
 4. Reassess WordPress Scripts transitive development advisories on each major/minor toolchain release.
@@ -550,7 +593,9 @@ above the PandaTask mount; it is outside this plugin's DOM and release scope.
 | Full-view lifecycle and focus return | Pass |
 | Browser console and horizontal overflow | Clean across exercised surfaces |
 | Temporary deployment/browser artifacts | Removed/finalized |
+| Production rollback transaction and durable backup | Pass |
+| Production plugin activity, hashes, server smoke, and HTTP assets | Pass |
 
-PandaTask 1.0.16 is accepted for the IARF dev environment. Production remains
-out of scope until its deployment path receives the same atomic
-staging/rollback protection.
+PandaTask 1.0.16 is accepted for both the IARF dev and production
+environments. The 1.0.14 production backup is intentionally retained until
+the release has completed its normal observation window.
