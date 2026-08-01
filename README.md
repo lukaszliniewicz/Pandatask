@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.18
+**Version:** 1.0.19
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -39,12 +39,13 @@ Renders a bug-tracker view showing only tasks of type `bug` for the given board,
 
 ## Views
 
-The board offers four task display modes, switchable from the header:
+The board offers five task display modes, switchable from the header:
 
-- **Compact** – Flat list with expandable subtrees, drag-and-drop reparenting, kebab-menu actions, grouped by source board for user boards.
-- **List** – Traditional table-style rows with inline status dropdown, show/hide description, archive/unarchive.
+- **Compact** – Dense rows with expandable subtrees, drag-and-drop reparenting, kebab-menu actions, and default-on project grouping nested below source-board headings in user workspaces.
+- **List** – Traditional rows with inline status controls, description and archive actions, using the same optional project grouping as Compact view.
 - **Kanban** – Three columns (Pending, In Progress, Done). Tasks can be dragged between columns or dropped onto another task to make it a child.
 - **Calendar** – Month grid showing tasks on their deadline date, with navigation.
+- **Gantt** – Dependency-aware timeline with hierarchy roll-ups, zoom controls, an unscheduled tray, and an optional full-viewport workspace.
 
 There are also five tabs in the main navigation:
 
@@ -379,6 +380,12 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.19
+
+- Group Compact and List tasks by project by default, with an accessible flat/grouped toggle and project-name sorting; keep source-board headings in personal workspaces.
+- Refine navigation, button sizing, calendar task contrast and mobile date labels, project filter reset behavior, report controls, and collapsible report sections.
+- Move task ID, status and truncated project context into the detail-modal heading and add a keyboard-accessible full-viewport Gantt mode.
 
 ### 1.0.18
 

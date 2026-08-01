@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.18
+Stable tag: 1.0.19
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.19 =
+
+* Group Compact and List tasks by project by default, with an accessible flat/grouped toggle and project-name sorting; preserve source-board headings in personal workspaces.
+* Refine navigation, buttons, calendar contrast and mobile dates, project-selection reset behavior, report controls and collapsible report sections.
+* Move task context into the detail-modal heading and add a keyboard-accessible full-viewport Gantt mode.
 
 = 1.0.18 =
 

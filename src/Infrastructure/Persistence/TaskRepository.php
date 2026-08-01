@@ -105,7 +105,7 @@ final class TaskRepository {
         }
 
         $sql_group_order      = '';
-        $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'assigned_user_names', 'category_name', 'created_at' );
+        $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'assigned_user_names', 'category_name', 'project_name', 'created_at' );
 
         if ( in_array( $sort_by, $allowed_sort_columns, true ) ) {
             $order = 'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC';
@@ -120,6 +120,8 @@ final class TaskRepository {
                 ) {$order}, t.id {$order}";
             } elseif ( 'category_name' === $sort_by ) {
                 $sql_group_order .= " ORDER BY c.name {$order}, t.id {$order}";
+            } elseif ( 'project_name' === $sort_by ) {
+                $sql_group_order .= " ORDER BY (p.name IS NULL OR p.name = '') ASC, p.name {$order}, t.name ASC, t.id ASC";
             } else {
                 $sql_group_order .= " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
             }
@@ -581,11 +583,15 @@ final class TaskRepository {
             }
         }
 
-        $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'created_at' );
+        $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'project_name', 'created_at' );
 
         if ( in_array( $sort_by, $allowed_sort_columns, true ) ) {
             $order = 'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC';
-            $sql  .= " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
+            if ( 'project_name' === $sort_by ) {
+                $sql .= " ORDER BY (p.name IS NULL OR p.name = '') ASC, p.name {$order}, t.name ASC, t.id ASC";
+            } else {
+                $sql .= " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
+            }
         } else {
             $sql .= ' ORDER BY t.name ASC, t.id ASC';
         }

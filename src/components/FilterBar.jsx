@@ -5,6 +5,7 @@ import Icon from './Icon';
 
 const SORT_OPTIONS = [
     { value: 'name_asc', label: 'Name (A-Z)' },
+    { value: 'project_name_asc', label: 'Project (A-Z)' },
     { value: 'priority_desc', label: 'Priority (High)' },
     { value: 'deadline_asc', label: 'Deadline (Soon)' },
     { value: 'created_at_desc', label: 'Newest First' },
@@ -70,7 +71,17 @@ const Dropdown = ({ icon, title, value, options, onChange }) => {
     );
 };
 
-const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSubtaskToggle, onToggleSubtasks, allSubtasksExpanded }) => {
+const FilterBar = ({
+    filters,
+    onFilterChange,
+    hideProjectSelect = false,
+    showSubtaskToggle,
+    onToggleSubtasks,
+    allSubtasksExpanded,
+    showProjectGrouping,
+    groupByProject,
+    onToggleProjectGrouping,
+}) => {
     const { boardName } = useConfig();
     const isUserBoard = boardName?.startsWith('user_');
     const { data: projects } = useProjects(undefined, {
@@ -124,6 +135,21 @@ const FilterBar = ({ filters, onFilterChange, hideProjectSelect = false, showSub
                         {projects?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                     </>
+                )}
+
+                {showProjectGrouping && (
+                    <div className="pandat69-icon-filter">
+                        <button
+                            type="button"
+                            className={`pandat69-icon-button ${groupByProject ? 'active' : ''}`}
+                            onClick={onToggleProjectGrouping}
+                            title={groupByProject ? 'Show a flat task list' : 'Group tasks by project'}
+                            aria-label={groupByProject ? 'Disable project grouping' : 'Group tasks by project'}
+                            aria-pressed={groupByProject}
+                        >
+                            <Icon name="layers" />
+                        </button>
+                    </div>
                 )}
 
                 {showSubtaskToggle && (

@@ -99,6 +99,63 @@ dialog.pandat69-react-modal::backdrop {
 	}
 }
 
+.pandat69-modal-heading {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 9px 12px;
+	min-width: 0;
+	padding-right: 42px;
+}
+
+.pandat69-task-modal-meta {
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+	gap: 7px;
+	color: $secondary-color;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.pandat69-task-modal-status-dot {
+	flex: 0 0 10px;
+	width: 10px;
+	height: 10px;
+	border: 2px solid $white;
+	border-radius: 50%;
+	background: $warning-color;
+	box-shadow: 0 0 0 1px rgba(56, 77, 104, 0.22);
+
+	&.status-in-progress {
+		background: $primary-color;
+	}
+
+	&.status-done {
+		background: $success-color;
+	}
+}
+
+.pandat69-task-modal-id {
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: #edf1f4;
+	color: #667484;
+	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.pandat69-task-modal-project {
+	display: block;
+	max-width: min(28ch, 38vw);
+	padding: 2px 8px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: #f1f5f8;
+	color: #50677d;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .pandat69-modal-close {
 	position: absolute;
 	top: 15px;
@@ -192,6 +249,15 @@ body.pandat69-modal-open {
 	.pandat69-modal-container {
 		width: 95%;
 		max-height: 95vh;
+	}
+
+	.pandat69-modal-heading {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.pandat69-task-modal-project {
+		max-width: min(46ch, 70vw);
 	}
 }
 

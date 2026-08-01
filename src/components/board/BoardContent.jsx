@@ -22,6 +22,8 @@ const BoardContent = ({ controller }) => (
                     currentView={controller.currentView}
                     allSubtasksExpanded={controller.allSubtasksExpanded}
                     onToggleSubtasks={controller.toggleAllSubtasks}
+                    groupByProject={controller.groupByProject}
+                    onToggleProjectGrouping={controller.toggleProjectGrouping}
                     tasks={controller.data}
                     isLoading={controller.isLoading}
                     isError={controller.isError}

@@ -54,6 +54,67 @@ button.pandat69-button-danger {
 	}
 }
 
+/*
+ * The container's host-theme reset intentionally has element specificity.
+ * Restore the complete text-button contract above that boundary.
+ */
+:is(.pandat69-container, .pandat69-react-modal, .pandat69-bug-tracker-container) button.pandat69-button {
+	min-height: 36px;
+	padding: 8px 14px;
+	border: 1px solid $primary-color;
+	border-radius: 6px;
+	background: $white;
+	box-shadow: 0 1px 2px rgba(23, 43, 69, 0.08);
+	color: $primary-color;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.25;
+	text-decoration: none;
+	transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+
+	&:hover,
+	&:focus-visible {
+		border-color: $primary-color;
+		background: $primary-color;
+		box-shadow: 0 3px 8px rgba(23, 43, 69, 0.16);
+		color: $white;
+		transform: translateY(-1px);
+	}
+
+	&:active {
+		box-shadow: 0 1px 3px rgba(23, 43, 69, 0.14);
+		transform: translateY(0);
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.58;
+		transform: none;
+	}
+
+	&.pandat69-button-danger {
+		border-color: $danger-color;
+		color: $danger-color;
+
+		&:hover,
+		&:focus-visible {
+			background: $danger-color;
+			color: $white;
+		}
+	}
+}
+
+:is(.pandat69-container, .pandat69-react-modal) button:is(.pandat69-submit-task-btn, .pandat69-save-project-btn, .pandat69-add-category-btn, .pandat69-add-comment-btn, .pandat69-generate-report-btn) {
+	background: $primary-color;
+	color: $white;
+
+	&:hover,
+	&:focus-visible {
+		background: #2d4058;
+	}
+}
+
 /* Form Elements */
 .pandat69-input,
 .pandat69-select,

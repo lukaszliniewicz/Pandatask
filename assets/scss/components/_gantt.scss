@@ -5,6 +5,44 @@
 	color: $primary-color;
 }
 
+body.pandat69-gantt-viewport-open {
+	overflow: hidden !important;
+	overscroll-behavior: none;
+}
+
+.pandat69-gantt-view.is-viewport-expanded {
+	position: fixed;
+	inset: 0;
+	z-index: calc(var(--pandatask-viewport-z, 2147483000) + 100);
+	display: flex;
+	flex-direction: column;
+	width: 100vw;
+	height: 100vh;
+	height: 100dvh;
+	margin: 0;
+	padding: 16px;
+	overflow: hidden;
+	background: #f7f9fb;
+
+	.pandat69-gantt-toolbar,
+	.pandat69-gantt-summary,
+	.pandat69-gantt-legend {
+		flex: 0 0 auto;
+	}
+
+	.pandat69-gantt-scroll {
+		flex: 1 1 auto;
+		min-height: 0;
+		max-height: none;
+	}
+
+	.pandat69-gantt-unscheduled {
+		flex: 0 1 auto;
+		max-height: 26vh;
+		overflow: auto;
+	}
+}
+
 .pandat69-gantt-toolbar {
 	display: flex;
 	align-items: center;
@@ -607,6 +645,10 @@
 	}
 }
 
+.pandat69-container button.pandat69-gantt-expand-view {
+	padding: 0 9px;
+}
+
 .pandat69-container .pandat69-gantt-zoom button,
 #content .pandat69-container .pandat69-gantt-zoom button {
 	padding: 0 8px;
@@ -694,6 +736,16 @@
 		border: 1px solid $border-color;
 		border-radius: 0 0 $border-radius $border-radius;
 		background: $white;
+	}
+
+	.pandat69-gantt-view.is-viewport-expanded {
+		padding: 10px;
+
+		.pandat69-gantt-mobile-list {
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow: auto;
+		}
 	}
 
 	.pandat69-gantt-mobile-card {

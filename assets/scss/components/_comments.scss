@@ -171,7 +171,7 @@
 }
 
 /* Interactive Status Dot */
-.pandat69-container button.pandat69-status-dot-interactive {
+:is(.pandat69-container, .pandat69-react-modal) button.pandat69-status-dot-interactive {
 	appearance: none;
 	display: block;
 	width: 14px;

@@ -145,30 +145,38 @@ const ProjectSidebar = ({
                             {section.label && (
                                 <li className="pandat69-sidebar-section-heading">{section.label}</li>
                             )}
-                            {section.projects.map(project => (
-                                <li key={project.id}>
-                                    <button
-                                        type="button"
-                                        className={`pandat69-sidebar-item ${selectedProjectId == project.id ? 'active' : ''}`}
-                                        onClick={() => { onSelectProject(project.id); if(isMobile) onClose(); }}
-                                        aria-pressed={selectedProjectId == project.id}
-                                    >
-                                        <Icon name="folder" />
-                                        <span className="pandat69-sidebar-item-content">
-                                            <span className="pandat69-sidebar-label">{project.name}</span>
-                                            {(isOpen || isMobile) && !isUserBoard && project.board_scope === 'group' && (
-                                                <span className="pandat69-sidebar-project-source">{project.board_display_name}</span>
+                            {section.projects.map(project => {
+                                const isSelected = String(selectedProjectId) === String(project.id);
+
+                                return (
+                                    <li key={project.id}>
+                                        <button
+                                            type="button"
+                                            className={`pandat69-sidebar-item ${isSelected ? 'active' : ''}`}
+                                            onClick={() => {
+                                                onSelectProject(isSelected ? 'all' : project.id);
+                                                if(isMobile) onClose();
+                                            }}
+                                            aria-pressed={isSelected}
+                                            title={isSelected ? 'Show all project tasks' : `Show ${project.name}`}
+                                        >
+                                            <Icon name="folder" />
+                                            <span className="pandat69-sidebar-item-content">
+                                                <span className="pandat69-sidebar-label">{project.name}</span>
+                                                {(isOpen || isMobile) && !isUserBoard && project.board_scope === 'group' && (
+                                                    <span className="pandat69-sidebar-project-source">{project.board_display_name}</span>
+                                                )}
+                                                {(isOpen || isMobile) && project.deadline && (
+                                                    <span className="pandat69-sidebar-project-deadline">Due: {project.deadline}</span>
+                                                )}
+                                            </span>
+                                            {(isOpen || isMobile) && project.tasks && project.tasks.length > 0 && (
+                                                <span className="pandat69-sidebar-count">{project.tasks.length}</span>
                                             )}
-                                            {(isOpen || isMobile) && project.deadline && (
-                                                <span className="pandat69-sidebar-project-deadline">Due: {project.deadline}</span>
-                                            )}
-                                        </span>
-                                        {(isOpen || isMobile) && project.tasks && project.tasks.length > 0 && (
-                                            <span className="pandat69-sidebar-count">{project.tasks.length}</span>
-                                        )}
-                                    </button>
-                                </li>
-                            ))}
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </React.Fragment>
                     ))}
                 </ul>

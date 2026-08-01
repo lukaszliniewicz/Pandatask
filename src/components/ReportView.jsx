@@ -9,9 +9,35 @@ const formatReportDate = (value) => {
     return parseUtcDateTime(value).toLocaleString();
 };
 
-const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
-    <div className="pandat69-report-section">
-        <h4>{title}</h4>
+const CollapsibleReportSection = ({ title, children, defaultExpanded = false }) => {
+    const [expanded, setExpanded] = useState(defaultExpanded);
+    const contentId = useId();
+
+    return (
+        <section className={`pandat69-report-section ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
+            <h4>
+                <button
+                    type="button"
+                    className="pandat69-report-section-toggle"
+                    onClick={() => setExpanded((open) => !open)}
+                    aria-expanded={expanded}
+                    aria-controls={contentId}
+                >
+                    <span>{title}</span>
+                    <Icon name={expanded ? 'chevron-down' : 'chevron-right'} />
+                </button>
+            </h4>
+            {expanded && (
+                <div id={contentId} className="pandat69-report-section-content">
+                    {children}
+                </div>
+            )}
+        </section>
+    );
+};
+
+const ReportSection = ({ title, items, icon, metaPrefix, showOverdue, defaultExpanded }) => (
+    <CollapsibleReportSection title={title} defaultExpanded={defaultExpanded}>
         {items.length > 0 ? (
             <ul className="pandat69-report-list">
                 {items.map(task => (
@@ -30,9 +56,9 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue }) => (
                 ))}
             </ul>
         ) : (
-            <p>No items found.</p>
+            <p className="pandat69-report-empty">No items found.</p>
         )}
-    </div>
+    </CollapsibleReportSection>
 );
 
 const ReportView = () => {
@@ -76,7 +102,7 @@ const ReportView = () => {
                 </div>
                 
                 {period === 'custom' && (
-                    <div className="pandat69-report-custom-dates" style={{ display: 'flex', gap: '10px' }}>
+                    <div className="pandat69-report-custom-dates">
                         <div className="pandat69-report-field">
                             <label htmlFor={`${fieldPrefix}-start`}>From:</label>
                             <input 
@@ -100,13 +126,14 @@ const ReportView = () => {
                     </div>
                 )}
                 
-                <div className="pandat69-report-field">
+                <div className="pandat69-report-actions">
                     <button 
                         type="button"
-                        className="pandat69-button" 
+                        className="pandat69-button pandat69-generate-report-btn"
                         onClick={handleGenerate}
                         disabled={!isCustomValid || isLoading}
                     >
+                        <Icon name="bar-chart" />
                         {isLoading ? 'Generating...' : 'Generate Report'}
                     </button>
                 </div>
@@ -117,12 +144,11 @@ const ReportView = () => {
                 
                 {!isLoading && data && (
                     <>
-                        <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="circle-plus" metaPrefix="Added" />
+                        <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="circle-plus" metaPrefix="Added" defaultExpanded />
                         <ReportSection title={`Tasks Completed (${data.tasks_completed.length})`} items={data.tasks_completed} icon="circle-check" metaPrefix="Completed" />
                         <ReportSection title={`Missed Deadlines (${data.missed_deadlines.length})`} items={data.missed_deadlines} icon="calendar" metaPrefix="Deadline" showOverdue={true} />
                         
-                        <div className="pandat69-report-section">
-                            <h4>Current Open Tasks Per Person</h4>
+                        <CollapsibleReportSection title="Current Open Tasks Per Person">
                             {data.tasks_per_person.length > 0 ? (
                                 <ul className="pandat69-report-list">
                                     {data.tasks_per_person.map((person) => (
@@ -130,9 +156,9 @@ const ReportView = () => {
                                     ))}
                                 </ul>
                             ) : (
-                                <p>No users have open tasks on this board.</p>
+                                <p className="pandat69-report-empty">No users have open tasks on this board.</p>
                             )}
-                        </div>
+                        </CollapsibleReportSection>
                     </>
                 )}
             </div>

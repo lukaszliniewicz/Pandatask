@@ -214,7 +214,7 @@ $plugin_dir      = untrailingslashit( PANDAT69_PLUGIN_DIR );
 $required_assets = array(
     'build/main.js',
     'build/156.js',
-    'build/208.js',
+    'build/725.js',
     'build/226.js',
     'build/638.js',
     'build/651.js',
@@ -251,8 +251,8 @@ if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( '1.0.18' !== $result['plugin_version'] || '1.0.14' !== $result['db_version'] ) {
-    $failures[] = 'Expected plugin version 1.0.18 with database schema 1.0.14.';
+if ( '1.0.19' !== $result['plugin_version'] || '1.0.14' !== $result['db_version'] ) {
+    $failures[] = 'Expected plugin version 1.0.19 with database schema 1.0.14.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

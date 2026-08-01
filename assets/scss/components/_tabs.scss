@@ -6,7 +6,7 @@
 
 .pandat69-desktop-nav {
 	margin-bottom: 20px;
-	border-bottom: 1px solid #e0e5eb;
+	border-bottom: 0;
 
 	@media (max-width: 768px) {
 		display: none;
@@ -69,6 +69,28 @@
 		color: #384d68;
 		border-bottom-color: #384d68;
 		font-weight: 600;
+	}
+}
+
+.pandat69-container button.pandat69-tab-item {
+	padding: 10px 0;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: #5d6b7b;
+	font-weight: 500;
+	line-height: 1.35;
+
+	&:hover,
+	&:focus-visible {
+		background: transparent;
+		color: #384d68;
+	}
+
+	&.active {
+		border-bottom-color: #384d68;
+		color: #384d68;
+		font-weight: 650;
 	}
 }
 

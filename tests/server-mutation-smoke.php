@@ -233,6 +233,47 @@ try {
         throw new RuntimeException( 'A nested subtask did not inherit its parent project.' );
     }
 
+    $destination_task_data = $expect_status(
+        $dispatch(
+            'POST',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'name'       => 'Audit destination task',
+                'project_id' => $second_project_id,
+            )
+        ),
+        201,
+        'create_destination_task'
+    );
+    $destination_task_id   = (int) $destination_task_data['task']->id;
+
+    $project_sort_data = $expect_status(
+        $dispatch(
+            'GET',
+            '/pandatask/v1/boards/' . $board . '/tasks',
+            array(
+                'sort'          => 'project_name_asc',
+                'status_filter' => '',
+            )
+        ),
+        200,
+        'sort_tasks_by_project'
+    );
+    $sorted_project_names = array_values(
+        array_unique(
+            array_map(
+                static function ( $task ) {
+                    return (string) ( $task->project_name ?? '' );
+                },
+                $project_sort_data['tasks'] ?? array()
+            )
+        )
+    );
+
+    if ( array( 'Audit destination project', 'Audit project' ) !== $sorted_project_names ) {
+        throw new RuntimeException( 'Project-name task sorting did not return deterministic project groups.' );
+    }
+
     $page_data = $expect_status(
         $dispatch(
             'GET',
@@ -261,7 +302,7 @@ try {
             '/pandatask/v1/boards/' . $board . '/tasks',
             array(
                 'limit'         => 1,
-                'offset'        => 2,
+                'offset'        => 3,
                 'status_filter' => '',
             )
         ),
@@ -507,6 +548,7 @@ try {
         'update_comment'
     );
     $expect_status( $dispatch( 'DELETE', '/pandatask/v1/comments/' . $comment_id ), 200, 'delete_comment' );
+    $expect_status( $dispatch( 'DELETE', '/pandatask/v1/tasks/' . $destination_task_id ), 200, 'delete_destination_task' );
     $expect_status( $dispatch( 'DELETE', '/pandatask/v1/tasks/' . $grandchild_id ), 200, 'delete_grandchild_task' );
     $expect_status( $dispatch( 'DELETE', '/pandatask/v1/tasks/' . $child_id ), 200, 'delete_child_task' );
     $expect_status( $dispatch( 'DELETE', '/pandatask/v1/tasks/' . $root_id ), 200, 'delete_root_task' );

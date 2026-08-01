@@ -22,6 +22,9 @@ const OverviewView = ({ onTaskAction }) => {
     const displayString = period === 'week' 
         ? `${formatDisplayDate(currentWeekStart)} - ${formatDisplayDate(currentWeekEnd)}`
         : currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const compactDisplayString = period === 'week'
+        ? `${currentWeekStart.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${currentWeekEnd.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`
+        : currentDate.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 
     const handlePrev = () => {
         const newDate = new Date(currentDate);
@@ -89,7 +92,10 @@ const OverviewView = ({ onTaskAction }) => {
 
             <div className="pandat69-date-selector">
                 <button type="button" className="pandat69-button" onClick={handlePrev}><Icon name="chevron-left" /> Previous</button>
-                <span className="pandat69-current-week-display" style={{ fontWeight: 'bold' }}>{displayString}</span>
+                <span className="pandat69-current-week-display" title={displayString}>
+                    <span className="pandat69-date-range-full">{displayString}</span>
+                    <span className="pandat69-date-range-compact">{compactDisplayString}</span>
+                </span>
                 <button type="button" className="pandat69-button" onClick={handleNext}>Next <Icon name="chevron-right" /></button>
             </div>
 

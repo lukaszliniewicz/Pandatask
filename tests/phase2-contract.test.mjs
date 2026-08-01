@@ -409,3 +409,24 @@ test('Security-sensitive task edits and public intake have explicit guards', () 
 	assert.match(publicPolicy, /REMOTE_ADDR/);
 	assert.match(comments, /canReadTask/);
 });
+
+test('Annotated task views expose project grouping and progressive disclosure controls', () => {
+	const filterBar = fs.readFileSync(path.join(repoRoot, 'src/components/FilterBar.jsx'), 'utf8');
+	const workspace = fs.readFileSync(path.join(repoRoot, 'src/components/TaskWorkspace.jsx'), 'utf8');
+	const controller = fs.readFileSync(path.join(repoRoot, 'src/hooks/useBoardController.js'), 'utf8');
+	const sidebar = fs.readFileSync(path.join(repoRoot, 'src/components/ProjectSidebar.jsx'), 'utf8');
+	const report = fs.readFileSync(path.join(repoRoot, 'src/components/ReportView.jsx'), 'utf8');
+	const gantt = fs.readFileSync(path.join(repoRoot, 'src/components/GanttView.jsx'), 'utf8');
+	const modalLayer = fs.readFileSync(path.join(repoRoot, 'src/components/board/BoardDialogLayer.jsx'), 'utf8');
+
+	assert.match(filterBar, /project_name_asc/);
+	assert.match(filterBar, /aria-label=\{groupByProject \? 'Disable project grouping'/);
+	assert.match(workspace, /\[ 'compact', 'list' \]\.includes\( currentView \)/);
+	assert.match(controller, /useState\( true \)/);
+	assert.match(sidebar, /onSelectProject\(isSelected \? 'all' : project\.id\)/);
+	assert.match(report, /aria-expanded=\{expanded\}/);
+	assert.match(report, /pandat69-generate-report-btn/);
+	assert.match(gantt, /data-pandatask-gantt-viewport/);
+	assert.match(gantt, /pandat69-gantt-viewport-open/);
+	assert.match(modalLayer, /TaskDetailModalMeta/);
+});

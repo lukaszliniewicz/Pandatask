@@ -7,7 +7,7 @@ import TaskDetailMetadata from './task-detail/TaskDetailMetadata';
 import TaskDetailSubtasks from './task-detail/TaskDetailSubtasks';
 import TaskHistory from './task-detail/TaskHistory';
 
-const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
+const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHeader = false }) => {
     const { data: task, isLoading, isError } = useTaskDetails(taskId);
 
     if (isLoading) return <div className="pandat69-loading" role="status">Loading details...</div>;
@@ -23,7 +23,12 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate }) => {
 
     return (
         <article className="pandat69-task-detail-view">
-            <TaskDetailHeader task={task} onNavigate={handleNavigate} onEdit={onEdit} />
+            <TaskDetailHeader
+                task={task}
+                onNavigate={handleNavigate}
+                onEdit={onEdit}
+                contextInModalHeader={contextInModalHeader}
+            />
             <TaskDetailMetadata task={task} />
             <TaskDetailSubtasks task={task} onAddSubtask={onAddSubtask} onNavigate={handleNavigate} />
             <TaskDetailDescription task={task} />

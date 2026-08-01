@@ -1,7 +1,15 @@
 import React from 'react';
+import { useConfig } from '../context/ConfigContext';
+import {
+    buildTaskListHierarchy,
+    countTaskTree,
+    groupTaskRoots,
+} from '../taskListModel.mjs';
 import TaskItem from './TaskItem';
 
-const TaskList = ({ tasks, onTaskAction }) => {
+const TaskList = ({ tasks, onTaskAction, groupByProject = true }) => {
+    const { boardName, currentUser } = useConfig();
+
     if (!tasks || tasks.length === 0) {
         return (
             <div className="pandat69-task-list-container">
@@ -12,20 +20,11 @@ const TaskList = ({ tasks, onTaskAction }) => {
         );
     }
 
-    // Organize tasks (Parent/Child)
-    // We create a map to easily find parents
-    const taskMap = {};
-    tasks.forEach(task => {
-        taskMap[task.id] = { ...task, children: [] };
-    });
-
-    const rootTasks = [];
-    tasks.forEach(task => {
-        if (task.parent_task_id && taskMap[task.parent_task_id]) {
-            taskMap[task.parent_task_id].children.push(taskMap[task.id]);
-        } else {
-            rootTasks.push(taskMap[task.id]);
-        }
+    const rootTasks = buildTaskListHierarchy(tasks);
+    const groups = groupTaskRoots(rootTasks, {
+        isUserBoard: boardName?.startsWith('user_'),
+        currentUserId: currentUser?.id,
+        groupByProject,
     });
 
     const renderTaskTree = (task) => (
@@ -38,7 +37,28 @@ const TaskList = ({ tasks, onTaskAction }) => {
     return (
         <div className="pandat69-task-list-container">
             <ul className="pandat69-task-list">
-                {rootTasks.map(renderTaskTree)}
+                {groups.map((context) => (
+                    <React.Fragment key={context.key}>
+                        {context.label && (
+                            <li className="pandat69-task-context-heading">
+                                {context.label}
+                            </li>
+                        )}
+                        {context.projects.map((project) => (
+                            <React.Fragment key={`${context.key}-${project.key}`}>
+                                {project.label && (
+                                    <li className="pandat69-task-project-heading">
+                                        <span>{project.label}</span>
+                                        <span className="pandat69-task-group-count">
+                                            {countTaskTree(project.tasks)}
+                                        </span>
+                                    </li>
+                                )}
+                                {project.tasks.map(renderTaskTree)}
+                            </React.Fragment>
+                        ))}
+                    </React.Fragment>
+                ))}
             </ul>
         </div>
     );

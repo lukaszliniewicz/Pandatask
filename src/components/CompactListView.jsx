@@ -3,9 +3,14 @@ import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, Touch
 import CompactTaskItem from './CompactTaskItem';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { useConfig } from '../context/ConfigContext';
+import {
+    buildTaskListHierarchy,
+    countTaskTree,
+    groupTaskRoots,
+} from '../taskListModel.mjs';
 import { wouldCreateTaskCycle } from '../utils';
 
-const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
+const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded, groupByProject = true }) => {
     const { updateTask } = useTaskMutations();
     const { boardName, currentUser } = useConfig();
     const safeTasks = useMemo(() => tasks || [], [tasks]);
@@ -43,20 +48,18 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
         useSensor(KeyboardSensor)
     );
 
-    // Build Hierarchy
-    const hierarchyRoots = useMemo(() => {
-        const hierarchy = [];
-        const taskMap = new Map(safeTasks.map(t => [t.id, { ...t, children: [] }]));
-        
-        safeTasks.forEach(task => {
-            if (task.parent_task_id && taskMap.has(task.parent_task_id)) {
-                taskMap.get(task.parent_task_id).children.push(taskMap.get(task.id));
-            } else {
-                hierarchy.push(taskMap.get(task.id));
-            }
-        });
-        return hierarchy;
-    }, [safeTasks]);
+    const hierarchyRoots = useMemo(
+        () => buildTaskListHierarchy(safeTasks),
+        [safeTasks]
+    );
+    const groupedContexts = useMemo(
+        () => groupTaskRoots(hierarchyRoots, {
+            isUserBoard,
+            currentUserId: currentUser?.id,
+            groupByProject,
+        }),
+        [currentUser?.id, groupByProject, hierarchyRoots, isUserBoard]
+    );
 
     // Flatten visible list based on expansion
     const flatten = (items, depth = 0) => {
@@ -83,69 +86,41 @@ const CompactListView = ({ tasks, onTaskAction, allSubtasksExpanded }) => {
             );
         }
 
-        if (isUserBoard) {
-            const grouped = {};
-            const ADDED_BY_ME_KEY = "Added by me";
-
-            hierarchyRoots.forEach(root => {
-                let groupName;
-                const currentUserId = currentUser ? parseInt(currentUser.id, 10) : 0;
-                const isAssigned = root.assigned_user_ids?.some(
-                    (userId) => Number(userId) === currentUserId
-                );
-                const isCreator = root.creator_id === currentUserId;
-
-                if (isAssigned) {
-                    groupName = root.board_display_name || 'My Tasks';
-                } else if (isCreator) {
-                    groupName = ADDED_BY_ME_KEY;
-                } else {
-                    groupName = root.board_display_name || 'Other';
-                }
-
-                if (!grouped[groupName]) grouped[groupName] = [];
-                grouped[groupName].push(root);
-            });
-
-            const sortedKeys = Object.keys(grouped).sort((a, b) => {
-                if (a === ADDED_BY_ME_KEY) return 1;
-                if (b === ADDED_BY_ME_KEY) return -1;
-                return a.localeCompare(b);
-            });
-
-            return sortedKeys.map(groupName => {
-                const flatGroup = flatten(grouped[groupName]);
-                return (
-                    <React.Fragment key={groupName}>
-                        <li className="pandat69-compact-group-heading">{groupName}</li>
-                        {flatGroup.map(task => (
-                            <CompactTaskItem 
-                                key={task.id} 
-                                task={task} 
-                                depth={task.depth}
-                                hasChildren={task.hasChildren}
-                                isExpanded={task.isExpanded}
-                                onToggleExpand={() => toggleExpand(task.id)}
-                                onAction={onTaskAction} 
-                            />
-                        ))}
-                    </React.Fragment>
-                );
-            });
-        } else {
-            const flatList = flatten(hierarchyRoots);
-            return flatList.map(task => (
-                <CompactTaskItem 
-                    key={task.id} 
-                    task={task} 
-                    depth={task.depth}
-                    hasChildren={task.hasChildren}
-                    isExpanded={task.isExpanded}
-                    onToggleExpand={() => toggleExpand(task.id)}
-                    onAction={onTaskAction} 
-                />
-            ));
-        }
+        return groupedContexts.map((context) => (
+            <React.Fragment key={context.key}>
+                {context.label && (
+                    <li className="pandat69-task-context-heading">
+                        {context.label}
+                    </li>
+                )}
+                {context.projects.map((project) => {
+                    const flatGroup = flatten(project.tasks);
+                    return (
+                        <React.Fragment key={`${context.key}-${project.key}`}>
+                            {project.label && (
+                                <li className="pandat69-task-project-heading">
+                                    <span>{project.label}</span>
+                                    <span className="pandat69-task-group-count">
+                                        {countTaskTree(project.tasks)}
+                                    </span>
+                                </li>
+                            )}
+                            {flatGroup.map(task => (
+                                <CompactTaskItem
+                                    key={task.id}
+                                    task={task}
+                                    depth={task.depth}
+                                    hasChildren={task.hasChildren}
+                                    isExpanded={task.isExpanded}
+                                    onToggleExpand={() => toggleExpand(task.id)}
+                                    onAction={onTaskAction}
+                                />
+                            ))}
+                        </React.Fragment>
+                    );
+                })}
+            </React.Fragment>
+        ));
     };
 
     const handleDragEnd = (event) => {

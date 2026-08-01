@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import CategoryManager from '../CategoryManager';
 import Modal from '../Modal';
 import RecurringDeleteModal from '../RecurringDeleteModal';
+import TaskDetailModalMeta from '../task-detail/TaskDetailModalMeta';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 const ProjectForm = lazyWithRetry(() => import('../ProjectForm'));
@@ -39,6 +40,7 @@ const BoardDialogLayer = ({ controller }) => {
                 isOpen={controller.isDetailModalOpen}
                 onClose={controller.closeDialogs}
                 title="Task Details"
+                headerMeta={<TaskDetailModalMeta taskId={controller.selectedTaskId} />}
             >
                 {controller.selectedTaskId && (
                     <Suspense fallback={<LoadingDialog />}>
@@ -50,6 +52,7 @@ const BoardDialogLayer = ({ controller }) => {
                             }}
                             onAddSubtask={controller.addSubtask}
                             onNavigate={controller.navigateTask}
+                            contextInModalHeader
                         />
                     </Suspense>
                 )}

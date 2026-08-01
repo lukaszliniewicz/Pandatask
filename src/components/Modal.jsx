@@ -12,7 +12,7 @@ const focusableSelector = [
     '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, headerMeta = null, children }) => {
     const dialogRef = useRef(null);
     const returnFocusRef = useRef(null);
     const onCloseRef = useRef(onClose);
@@ -70,7 +70,10 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             >
                 <div className="pandat69-modal-content">
                     <div className="pandat69-modal-header">
-                        <h3 id={titleId}>{title}</h3>
+                        <div className="pandat69-modal-heading">
+                            <h3 id={titleId}>{title}</h3>
+                            {headerMeta}
+                        </div>
                         <button 
                             type="button" 
                             className="pandat69-modal-close" 

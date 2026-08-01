@@ -11,7 +11,10 @@ const GanttToolbar = ({
     onZoomChange,
     showCompleted,
     todayIsVisible,
-    zoom
+    zoom,
+    isViewportExpanded,
+    onViewportToggle,
+    viewportToggleRef
 }) => (
     <div className="pandat69-gantt-toolbar">
         <div className="pandat69-gantt-toolbar-group pandat69-gantt-navigation">
@@ -47,6 +50,17 @@ const GanttToolbar = ({
         </div>
 
         <div className="pandat69-gantt-toolbar-group pandat69-gantt-options">
+            <button
+                type="button"
+                ref={viewportToggleRef}
+                className="pandat69-gantt-toolbar-button pandat69-gantt-expand-view"
+                onClick={onViewportToggle}
+                aria-label={isViewportExpanded ? 'Exit full viewport Gantt' : 'Expand Gantt to full viewport'}
+                aria-pressed={isViewportExpanded}
+                title={isViewportExpanded ? 'Exit full viewport' : 'Expand to full viewport'}
+            >
+                <Icon name={isViewportExpanded ? 'minimize' : 'maximize'} />
+            </button>
             <button type="button" className="pandat69-gantt-toolbar-button is-text" onClick={onCollapseToggle}>
                 {collapsedIds.size ? 'Expand all' : 'Collapse all'}
             </button>

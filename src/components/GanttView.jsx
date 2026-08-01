@@ -15,10 +15,42 @@ const GanttView = ({ tasks, onTaskAction }) => {
     const [zoom, setZoom] = useState('month');
     const [showCompleted, setShowCompleted] = useState(false);
     const [collapsedIds, setCollapsedIds] = useState(new Set());
+    const [isViewportExpanded, setIsViewportExpanded] = useState(false);
+    const rootRef = useRef(null);
+    const expandToggleRef = useRef(null);
+    const shouldRestoreExpandFocus = useRef(false);
     const scrollRef = useRef(null);
     const didInitialScroll = useRef(false);
     const dependencyMarkerId = `pandat69-gantt-arrow-${useId().replace(/[^a-z0-9_-]/gi, '')}`;
     const view = useGanttViewModel(tasks, showCompleted, collapsedIds, zoom);
+
+    useEffect(() => {
+        if (!isViewportExpanded) return undefined;
+
+        document.body.classList.add('pandat69-gantt-viewport-open');
+        const handleKeyDown = (event) => {
+            if (event.key !== 'Escape' || document.querySelector('.pandat69-react-modal[open]')) return;
+            event.preventDefault();
+            setIsViewportExpanded(false);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.body.classList.remove('pandat69-gantt-viewport-open');
+        };
+    }, [isViewportExpanded]);
+
+    useEffect(() => {
+        if (isViewportExpanded) {
+            shouldRestoreExpandFocus.current = true;
+            return;
+        }
+        if (shouldRestoreExpandFocus.current) {
+            shouldRestoreExpandFocus.current = false;
+            expandToggleRef.current?.focus();
+        }
+    }, [isViewportExpanded]);
 
     useEffect(() => {
         if (
@@ -88,7 +120,11 @@ const GanttView = ({ tasks, onTaskAction }) => {
     };
 
     return (
-        <div className="pandat69-gantt-view">
+        <div
+            ref={rootRef}
+            className={`pandat69-gantt-view ${isViewportExpanded ? 'is-viewport-expanded' : ''}`}
+            data-pandatask-gantt-viewport={isViewportExpanded ? 'active' : 'inline'}
+        >
             <GanttToolbar
                 collapsedIds={collapsedIds}
                 onCollapseToggle={toggleAllRows}
@@ -99,6 +135,9 @@ const GanttView = ({ tasks, onTaskAction }) => {
                 showCompleted={showCompleted}
                 todayIsVisible={view.timelineWindow.todayIsVisible}
                 zoom={zoom}
+                isViewportExpanded={isViewportExpanded}
+                onViewportToggle={() => setIsViewportExpanded((expanded) => !expanded)}
+                viewportToggleRef={expandToggleRef}
             />
             <GanttSummary
                 conflictCount={view.conflictCount}

@@ -35,6 +35,7 @@ export const useBoardController = () => {
 	const isUserBoard = boardName?.startsWith( 'user_' );
 	const [ filters, setFilters ] = useState( INITIAL_FILTERS );
 	const [ allSubtasksExpanded, setAllSubtasksExpanded ] = useState( false );
+	const [ groupByProject, setGroupByProject ] = useState( true );
 	const [ isSidebarOpen, setIsSidebarOpen ] = useState(
 		() => window.innerWidth >= 1080
 	);
@@ -187,6 +188,7 @@ export const useBoardController = () => {
 		containerRef,
 		dialog,
 		filters,
+		groupByProject,
 		handleTaskAction,
 		isContainerNarrow,
 		isSidebarOpen,
@@ -202,6 +204,8 @@ export const useBoardController = () => {
 		setIsSidebarOpen,
 		toggleAllSubtasks: () =>
 			setAllSubtasksExpanded( ( expanded ) => ! expanded ),
+		toggleProjectGrouping: () =>
+			setGroupByProject( ( grouped ) => ! grouped ),
 		toggleSidebar: () => setIsSidebarOpen( ( open ) => ! open ),
 	};
 };

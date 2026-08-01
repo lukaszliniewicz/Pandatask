@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 
 const gzipAsync = promisify( gzip );
 const budgets = [
-	{ path: 'build/main.js', maximum: 260 * 1024 },
-	{ path: 'build/main.css', maximum: 100 * 1024 },
+	{ path: 'build/main.js', maximum: 260 * 1024, maximumGzip: 70 * 1024 },
+	{ path: 'build/main.css', maximum: 106 * 1024, maximumGzip: 18 * 1024 },
 ];
 
 let failed = false;
@@ -20,10 +20,13 @@ for ( const budget of budgets ) {
 	const rawKiB = ( metadata.size / 1024 ).toFixed( 1 );
 	const gzipKiB = ( compressed.length / 1024 ).toFixed( 1 );
 	const maximumKiB = ( budget.maximum / 1024 ).toFixed( 0 );
-	const withinBudget = metadata.size <= budget.maximum;
+	const maximumGzipKiB = ( budget.maximumGzip / 1024 ).toFixed( 0 );
+	const withinBudget =
+		metadata.size <= budget.maximum &&
+		compressed.length <= budget.maximumGzip;
 
 	process.stdout.write(
-		`${ withinBudget ? 'PASS' : 'FAIL' } ${ budget.path }: ${ rawKiB } KiB raw, ${ gzipKiB } KiB gzip (budget ${ maximumKiB } KiB raw)\n`
+		`${ withinBudget ? 'PASS' : 'FAIL' } ${ budget.path }: ${ rawKiB } KiB raw, ${ gzipKiB } KiB gzip (budgets ${ maximumKiB } KiB raw / ${ maximumGzipKiB } KiB gzip)\n`
 	);
 	failed ||= ! withinBudget;
 }

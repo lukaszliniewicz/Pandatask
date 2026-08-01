@@ -12,6 +12,52 @@
 	margin: 0;
 }
 
+.pandat69-task-context-heading,
+.pandat69-task-project-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	list-style: none;
+}
+
+.pandat69-task-context-heading {
+	margin: 22px 0 8px;
+	padding: 9px 12px;
+	border-left: 3px solid $primary-color;
+	border-radius: 4px;
+	background: #edf2f6;
+	color: $primary-color;
+	font-size: 12px;
+	font-weight: 750;
+	letter-spacing: 0.045em;
+	text-transform: uppercase;
+
+	&:first-child {
+		margin-top: 0;
+	}
+}
+
+.pandat69-task-project-heading {
+	margin: 15px 0 8px;
+	padding: 7px 10px;
+	border-bottom: 1px solid #dce3e9;
+	background: #f8fafb;
+	color: #53677b;
+	font-size: 12px;
+	font-weight: 650;
+}
+
+.pandat69-task-group-count {
+	min-width: 22px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: #e3e9ee;
+	color: #607184;
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+}
+
 .pandat69-task-item {
 	background-color: $white;
 	border: 1px solid $border-color;
@@ -342,6 +388,21 @@
 	border-radius: 4px;
 	background: #fff;
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.pandat69-compact-list > .pandat69-task-context-heading {
+	margin: 0;
+	padding: 11px 14px;
+	border-left: 0;
+	border-bottom: 1px solid #d8e0e7;
+	border-radius: 0;
+}
+
+.pandat69-compact-list > .pandat69-task-project-heading {
+	margin: 0;
+	padding: 8px 14px;
+	border-bottom: 1px solid #e5eaef;
+	background: #f8fafb;
 }
 
 .pandat69-compact-item {

@@ -17,6 +17,8 @@ const TaskWorkspace = ( {
 	currentView,
 	allSubtasksExpanded,
 	onToggleSubtasks,
+	groupByProject,
+	onToggleProjectGrouping,
 	tasks,
 	isLoading,
 	isError,
@@ -29,8 +31,11 @@ const TaskWorkspace = ( {
 			onFilterChange={ onFilterChange }
 			hideProjectSelect
 			showSubtaskToggle={ currentView === 'compact' }
+			showProjectGrouping={ [ 'compact', 'list' ].includes( currentView ) }
 			allSubtasksExpanded={ allSubtasksExpanded }
 			onToggleSubtasks={ onToggleSubtasks }
+			groupByProject={ groupByProject }
+			onToggleProjectGrouping={ onToggleProjectGrouping }
 		/>
 
 		{ isLoading && <div className="pandat69-loading">Loading…</div> }
@@ -46,11 +51,12 @@ const TaskWorkspace = ( {
 				tasks={ tasks }
 				onTaskAction={ onTaskAction }
 				allSubtasksExpanded={ allSubtasksExpanded }
+				groupByProject={ groupByProject }
 			/>
 		) }
 
 		{ ! isLoading && ! isError && currentView === 'list' && (
-			<TaskList tasks={ tasks } onTaskAction={ onTaskAction } />
+			<TaskList tasks={ tasks } onTaskAction={ onTaskAction } groupByProject={ groupByProject } />
 		) }
 
 		{ ! isLoading && ! isError && currentView === 'kanban' && (
