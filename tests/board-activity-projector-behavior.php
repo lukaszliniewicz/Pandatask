@@ -45,6 +45,10 @@ function bp_activity_delete( $args ) { global $activity_store; unset( $activity_
 function bp_activity_add( $args ) {
     global $activity_store, $next_activity_id;
     $id = $next_activity_id++;
+    if ( isset( $args['recorded_time'] ) ) {
+        $args['date_recorded'] = $args['recorded_time'];
+        unset( $args['recorded_time'] );
+    }
     $activity_store[ $id ] = (object) array_merge( array( 'id' => $id ), $args );
     return $id;
 }

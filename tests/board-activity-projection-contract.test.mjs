@@ -29,6 +29,8 @@ test('Pandatask owns one BuddyPress task-board activity per group rather than on
   assert.match(projector, /'component'\s*=>\s*'groups'/);
   assert.match(projector, /'item_id'\s*=>\s*\$group_id/);
   assert.match(projector, /'secondary_item_id'\s*=>\s*0/);
+  assert.match(projector, /'recorded_time'\s*=>\s*\$promote \? \$now : \$recorded_at/);
+  assert.doesNotMatch(projector, /'date_recorded'\s*=>/);
   assert.match(projector, /WHERE component = 'groups'[\s\S]*type = %s[\s\S]*item_id = %d/);
   assert.doesNotMatch(projector, /secondary_item_id = %d/);
 });

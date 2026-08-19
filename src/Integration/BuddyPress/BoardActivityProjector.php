@@ -302,7 +302,7 @@ final class BoardActivityProjector {
                     'item_id'           => $group_id,
                     'secondary_item_id' => 0,
                     'hide_sitewide'     => $this->hideSitewide( $board_name, $group_id ),
-                    'date_recorded'     => $promote ? $now : $recorded_at,
+                    'recorded_time'     => $promote ? $now : $recorded_at,
                 )
             );
 
