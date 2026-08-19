@@ -58,7 +58,7 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
             $group = groups_get_group($group_id);
             if (!$group) return;
     
-            $group_link = bp_get_group_permalink($group);
+            $group_link = BuddyPressSupport::groupUrl($group);
             $current_user_id = get_current_user_id();
             
             $is_member = groups_is_user_member($current_user_id, $group_id);
@@ -211,7 +211,7 @@ class GroupBugTrackerExtension extends \BP_Group_Extension {
         bp_core_add_message(__('Bug Tracker settings saved successfully.', 'pandatask'));
         
         $group = groups_get_current_group();
-        $redirect_url = trailingslashit(bp_get_group_permalink($group) . 'admin/' . $this->slug);
+        $redirect_url = trailingslashit(BuddyPressSupport::groupUrl($group) . 'admin/' . $this->slug);
         bp_core_redirect($redirect_url);
     }
 }

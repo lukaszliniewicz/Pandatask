@@ -14,12 +14,14 @@ final class TaskBoardUrlResolver {
             if ( preg_match( '/^group_(\d+)$/', $board_name, $matches ) ) {
                 $group_id = intval( $matches[1] );
 
-                if ( $group_id > 0 && function_exists( 'bp_get_group_permalink' ) && function_exists( 'groups_get_group' ) ) {
+                if ( $group_id > 0 && function_exists( 'groups_get_group' ) ) {
                     $group = groups_get_group( $group_id );
 
                     if ( $group && ! empty( $group->slug ) ) {
-                        $group_url = bp_get_group_permalink( $group );
-                        $base_url  = trailingslashit( $group_url ) . 'tasks';
+                        $group_url = \Pandatask\Integration\BuddyPress\BuddyPressSupport::groupUrl( $group );
+                        if ( $group_url ) {
+                            $base_url = trailingslashit( $group_url ) . 'tasks';
+                        }
                     }
                 }
             }

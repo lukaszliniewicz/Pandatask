@@ -270,9 +270,7 @@ final class TaskActivityProjector {
             $group = groups_get_group( $group_id );
             if ( $group ) {
                 $group_name = (string) ( $group->name ?? $group_name );
-                if ( function_exists( 'bp_get_group_permalink' ) ) {
-                    $group_url = (string) bp_get_group_permalink( $group );
-                }
+                $group_url = BuddyPressSupport::groupUrl( $group );
             }
         }
 

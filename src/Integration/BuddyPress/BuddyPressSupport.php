@@ -20,6 +20,22 @@ final class BuddyPressSupport {
         return '0' !== (string) groups_get_groupmeta( $group_id, $meta_key, true );
     }
 
+    public static function groupUrl( $group ) {
+        if ( ! $group ) {
+            return '';
+        }
+
+        if ( function_exists( 'bp_get_group_url' ) ) {
+            return (string) bp_get_group_url( $group );
+        }
+
+        if ( function_exists( 'bp_get_group_permalink' ) ) {
+            return (string) bp_get_group_permalink( $group );
+        }
+
+        return '';
+    }
+
     public static function sanitizeGroupAssignee( $group_id, $user_id ) {
         $user_id = absint( $user_id );
 

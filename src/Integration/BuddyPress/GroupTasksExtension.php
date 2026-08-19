@@ -69,7 +69,7 @@ class GroupTasksExtension extends \BP_Group_Extension {
             $group = groups_get_group($group_id);
             if (!$group) return; // Bail if group not found
     
-            $group_link = bp_get_group_permalink($group);
+            $group_link = BuddyPressSupport::groupUrl($group);
             $current_user_id = get_current_user_id();
             
             // Use direct function calls with explicit parameters instead of context-dependent functions
@@ -258,7 +258,7 @@ class GroupTasksExtension extends \BP_Group_Extension {
         }
 
         $group = groups_get_current_group();
-        $redirect_url = trailingslashit(bp_get_group_permalink($group) . 'admin/' . $this->slug);
+        $redirect_url = trailingslashit(BuddyPressSupport::groupUrl($group) . 'admin/' . $this->slug);
         bp_core_redirect($redirect_url);
     }
 }

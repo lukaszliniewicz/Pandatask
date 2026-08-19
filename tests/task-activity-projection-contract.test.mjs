@@ -9,6 +9,8 @@ const read = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8'
 
 const mutation = read('src/Application/Task/TaskMutationService.php');
 const registrar = read('src/Integration/BuddyPress/BuddyPressRegistrar.php');
+const support = read('src/Integration/BuddyPress/BuddyPressSupport.php');
+const resolver = read('src/Infrastructure/Notifications/TaskBoardUrlResolver.php');
 const projector = read('src/Integration/BuddyPress/TaskActivityProjector.php');
 
 test('task lifecycle hooks are post-commit extension points isolated from persistence', () => {
@@ -73,6 +75,9 @@ test('plain BuddyPress fallback remains readable and Network enhancement stays o
   assert.match(projector, /class=\"pandatask-activity-card\"/);
   assert.match(projector, /data-pandatask-task-id/);
   assert.match(projector, /TaskBoardUrlResolver::resolve/);
+  assert.match(support, /function groupUrl[\s\S]*bp_get_group_url[\s\S]*bp_get_group_permalink/);
+  assert.match(resolver, /BuddyPressSupport::groupUrl/);
+  assert.match(projector, /BuddyPressSupport::groupUrl/);
   assert.match(projector, /View task/);
   assert.doesNotMatch(projector, /iarf_|IARF_/);
   assert.match(projector, /pandatask_task_activity_projected/);

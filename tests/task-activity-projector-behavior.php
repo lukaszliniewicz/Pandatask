@@ -21,7 +21,8 @@ function bp_is_active( $component ) { return 'groups' === $component; }
 function buddypress() { return (object) array( 'activity' => (object) array( 'table_name' => 'wp_bp_activity' ) ); }
 function groups_get_groupmeta( $group_id, $key, $single = true ) { return '1'; }
 function groups_get_group( $group_id ) { return (object) array( 'id' => (int) $group_id, 'slug' => 'group-' . (int) $group_id, 'name' => 'Group ' . (int) $group_id, 'status' => 'public' ); }
-function bp_get_group_permalink( $group ) { return 'https://example.test/groups/' . $group->slug . '/'; }
+function bp_get_group_url( $group ) { return 'https://example.test/groups/' . $group->slug . '/'; }
+function bp_get_group_permalink( $group ) { return 'https://legacy.example.test/groups/' . $group->slug . '/'; }
 function get_transient( $key ) { global $transients; return array_key_exists( $key, $transients ) ? $transients[ $key ] : false; }
 function set_transient( $key, $value, $ttl ) { global $transients; $transients[ $key ] = $value; return true; }
 function add_query_arg( $key, $value, $url ) { return $url . ( false === strpos( $url, '?' ) ? '?' : '&' ) . rawurlencode( $key ) . '=' . rawurlencode( $value ); }
