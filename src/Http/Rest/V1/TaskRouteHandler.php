@@ -3,6 +3,7 @@
 namespace Pandatask\Http\Rest\V1;
 
 use Exception;
+use Pandatask\Application\Board\BoardActivityService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\PublicBugSubmissionPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
@@ -27,13 +28,26 @@ final class TaskRouteHandler {
 
     private $input_normalizer;
 
-    public function __construct( $task_service = null, $history_service = null, $board_access_policy = null, $public_bug_submission_policy = null, $task_access_policy = null, $input_normalizer = null ) {
+    private $board_activity_service;
+
+    public function __construct( $task_service = null, $history_service = null, $board_access_policy = null, $public_bug_submission_policy = null, $task_access_policy = null, $input_normalizer = null, $board_activity_service = null ) {
         $this->task_service    = $task_service ?: new TaskService();
         $this->history_service = $history_service ?: new HistoryService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
         $this->public_bug_submission_policy = $public_bug_submission_policy ?: new PublicBugSubmissionPolicy();
         $this->task_access_policy = $task_access_policy ?: new TaskAccessPolicy( $this->task_service, $this->board_access_policy );
         $this->input_normalizer = $input_normalizer ?: new TaskInputNormalizer();
+        $this->board_activity_service = $board_activity_service ?: new BoardActivityService();
+    }
+
+    public function get_board_activity( $request ) {
+        $board_name = sanitize_key( (string) $request['board_name'] );
+        $limit = isset( $request['limit'] ) ? max( 1, min( 100, (int) $request['limit'] ) ) : 20;
+
+        return new WP_REST_Response(
+            $this->board_activity_service->getBoardActivity( $board_name, $limit ),
+            200
+        );
     }
 
     public function get_potential_parent_tasks( $request ) {

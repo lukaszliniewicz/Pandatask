@@ -159,6 +159,21 @@ class GroupTasksExtension extends \BP_Group_Extension {
         <p class="description">
             <?php esc_html_e('Adds a "Tasks" tab to the group for managing projects and tasks.', 'pandatask'); ?>
         </p>
+
+        <label for="pandat69_task_activity_enabled" class="bp-label">
+             <input type="checkbox" name="pandat69_task_activity_enabled" id="pandat69_task_activity_enabled" value="1" checked="checked">
+             <?php esc_html_e('Show a living task-board widget in the group activity feed', 'pandatask'); ?>
+        </label>
+        <p class="description">
+            <?php esc_html_e('The widget is updated as tasks change and is promoted for important lifecycle events without creating a new feed item for every task.', 'pandatask'); ?>
+        </p>
+
+        <label for="pandat69_task_activity_preview_count" class="bp-label"><?php esc_html_e('Recent events shown in the widget', 'pandatask'); ?></label>
+        <select name="pandat69_task_activity_preview_count" id="pandat69_task_activity_preview_count">
+            <option value="3" selected><?php esc_html_e('3 events', 'pandatask'); ?></option>
+            <option value="5"><?php esc_html_e('5 events', 'pandatask'); ?></option>
+            <option value="8"><?php esc_html_e('8 events', 'pandatask'); ?></option>
+        </select>
         <?php
         // Nonce for security
         wp_nonce_field( 'groups_create_save_' . $this->slug );
@@ -178,7 +193,20 @@ class GroupTasksExtension extends \BP_Group_Extension {
         if (!$group_id) return; // Bail if group ID is not found
 
         $enabled = isset($_POST['pandat69_tasks_enabled']) ? '1' : '0';
+        $activity_enabled = isset($_POST['pandat69_task_activity_enabled']) ? '1' : '0';
+        $preview_count = isset($_POST['pandat69_task_activity_preview_count']) ? absint($_POST['pandat69_task_activity_preview_count']) : 3;
+        if ( ! in_array( $preview_count, array( 3, 5, 8 ), true ) ) {
+            $preview_count = 3;
+        }
+
         groups_update_groupmeta($group_id, 'pandat69_tasks_enabled', $enabled);
+        groups_update_groupmeta($group_id, 'pandat69_task_activity_enabled', $activity_enabled);
+        groups_update_groupmeta($group_id, 'pandat69_task_activity_preview_count', $preview_count);
+        do_action( 'pandatask_group_task_settings_updated', $group_id, array(
+            'tasks_enabled' => '1' === $enabled,
+            'feed_widget_enabled' => '1' === $activity_enabled,
+            'preview_count' => $preview_count,
+        ) );
     }
     
     /**
@@ -199,8 +227,12 @@ class GroupTasksExtension extends \BP_Group_Extension {
             $group_id = bp_get_current_group_id();
         }
         
-        // Check if tasks are enabled ('1' means enabled, other values or unset mean disabled)
         $enabled = BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_tasks_enabled' );
+        $activity_enabled = BuddyPressSupport::groupFeatureEnabled( $group_id, 'pandat69_task_activity_enabled' );
+        $preview_count = (int) groups_get_groupmeta( $group_id, 'pandat69_task_activity_preview_count', true );
+        if ( ! in_array( $preview_count, array( 3, 5, 8 ), true ) ) {
+            $preview_count = 3;
+        }
         ?>
         <h4><?php esc_html_e('Task Board Settings', 'pandatask'); ?></h4>
         
@@ -211,6 +243,24 @@ class GroupTasksExtension extends \BP_Group_Extension {
         <p class="description">
             <?php esc_html_e('When enabled, a "Tasks" tab will be available for group members.', 'pandatask'); ?>
         </p>
+
+        <hr>
+        <h4><?php esc_html_e('Activity Feed', 'pandatask'); ?></h4>
+        <label for="pandat69_task_activity_enabled" class="bp-label">
+             <input type="checkbox" name="pandat69_task_activity_enabled" id="pandat69_task_activity_enabled" value="1" <?php checked($activity_enabled); ?>>
+             <?php esc_html_e('Show a living task-board widget in the group activity feed', 'pandatask'); ?>
+        </label>
+        <p class="description">
+            <?php esc_html_e('One widget represents the whole task board. Important task events move it to the top; smaller edits refresh it without creating extra feed items.', 'pandatask'); ?>
+        </p>
+
+        <label for="pandat69_task_activity_preview_count" class="bp-label"><?php esc_html_e('Recent events shown in the widget', 'pandatask'); ?></label>
+        <select name="pandat69_task_activity_preview_count" id="pandat69_task_activity_preview_count">
+            <option value="3" <?php selected($preview_count, 3); ?>><?php esc_html_e('3 events', 'pandatask'); ?></option>
+            <option value="5" <?php selected($preview_count, 5); ?>><?php esc_html_e('5 events', 'pandatask'); ?></option>
+            <option value="8" <?php selected($preview_count, 8); ?>><?php esc_html_e('8 events', 'pandatask'); ?></option>
+        </select>
+
         <p class="description">
             <?php esc_html_e('Note: You might need to refresh the page after saving to see the Tasks tab appear or disappear in the navigation.', 'pandatask'); ?>
         </p>
@@ -249,7 +299,24 @@ class GroupTasksExtension extends \BP_Group_Extension {
         if (!$group_id) return; // Bail if group ID not found
 
         $enabled = isset($_POST['pandat69_tasks_enabled']) ? '1' : '0';
-        $updated = groups_update_groupmeta($group_id, 'pandat69_tasks_enabled', $enabled);
+        $activity_enabled = isset($_POST['pandat69_task_activity_enabled']) ? '1' : '0';
+        $preview_count = isset($_POST['pandat69_task_activity_preview_count']) ? absint($_POST['pandat69_task_activity_preview_count']) : 3;
+        if ( ! in_array( $preview_count, array( 3, 5, 8 ), true ) ) {
+            $preview_count = 3;
+        }
+
+        groups_update_groupmeta($group_id, 'pandat69_tasks_enabled', $enabled);
+        groups_update_groupmeta($group_id, 'pandat69_task_activity_enabled', $activity_enabled);
+        groups_update_groupmeta($group_id, 'pandat69_task_activity_preview_count', $preview_count);
+        $updated = (string) groups_get_groupmeta($group_id, 'pandat69_tasks_enabled', true) === $enabled
+            && (string) groups_get_groupmeta($group_id, 'pandat69_task_activity_enabled', true) === $activity_enabled
+            && (int) groups_get_groupmeta($group_id, 'pandat69_task_activity_preview_count', true) === $preview_count;
+
+        do_action( 'pandatask_group_task_settings_updated', $group_id, array(
+            'tasks_enabled' => '1' === $enabled,
+            'feed_widget_enabled' => '1' === $activity_enabled,
+            'preview_count' => $preview_count,
+        ) );
         
         if ($updated) {
             bp_core_add_message(__('Task settings saved successfully.', 'pandatask'));

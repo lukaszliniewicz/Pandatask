@@ -6,7 +6,8 @@
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
-    "test": "npm run test:phase2 && npm run test:gantt && npm run test:project-tasks && npm run test:task-list && npm run test:task-form && npm run test:security && npm run test:backend-domain",
+    "test": "npm run test:phase2 && npm run test:gantt && npm run test:project-tasks && npm run test:task-list && npm run test:task-form && npm run test:board-activity && npm run test:security && npm run test:backend-domain",
+    "test:board-activity": "node --test tests/board-activity-projection-contract.test.mjs && php tests/board-activity-projector-behavior.php",
     "test:phase2": "node --test tests/phase2-contract.test.mjs",
     "test:gantt": "node --test tests/gantt-model.test.mjs",
     "test:project-tasks": "node --test tests/project-task-model.test.mjs",

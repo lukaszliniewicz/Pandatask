@@ -195,6 +195,30 @@ final class RouteRegistrar {
 
         register_rest_route(
             $this->namespace,
+            '/boards/(?P<board_name>[\w-]+)/activity',
+            array(
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => array( $this->task_route_handler, 'get_board_activity' ),
+                'permission_callback' => array( $this->permission_checker, 'check_board_read_permission' ),
+                'args'                => array(
+                    'board_name' => array(
+                        'required' => true,
+                        'type'     => 'string',
+                    ),
+                    'limit' => array(
+                        'description'       => __( 'Maximum recent board events returned.', 'pandatask' ),
+                        'type'              => 'integer',
+                        'default'           => 20,
+                        'minimum'           => 1,
+                        'maximum'           => 100,
+                        'sanitize_callback' => 'absint',
+                    ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
             '/boards/(?P<board_name>[\w-]+)/tasks',
             array(
                 array(

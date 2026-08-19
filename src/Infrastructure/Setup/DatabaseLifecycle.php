@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.14';
+    private const DB_VERSION = '1.0.15';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -31,6 +31,7 @@ final class DatabaseLifecycle {
         $table_project_assignments = $prefix . 'project_assignments';
         $table_task_history        = $prefix . 'task_history';
         $table_change_buffers      = $prefix . 'task_change_buffers';
+        $table_board_events        = $prefix . 'board_events';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -205,6 +206,27 @@ final class DatabaseLifecycle {
         ) $charset_collate;";
         dbDelta( $sql_change_buffers );
 
+        $sql_board_events = "CREATE TABLE $table_board_events (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            board_name VARCHAR(100) NOT NULL,
+            task_id BIGINT(20) UNSIGNED NOT NULL,
+            actor_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            event_type VARCHAR(32) NOT NULL,
+            task_name VARCHAR(255) NOT NULL,
+            task_status VARCHAR(20) NULL,
+            event_data LONGTEXT NULL,
+            promote TINYINT(1) NOT NULL DEFAULT 0,
+            source_activity_id BIGINT(20) UNSIGNED NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY source_activity (source_activity_id),
+            KEY board_created (board_name, created_at, id),
+            KEY task_id (task_id),
+            KEY actor_id (actor_id),
+            KEY event_type (event_type)
+        ) $charset_collate;";
+        dbDelta( $sql_board_events );
+
         return true;
     }
 
@@ -234,6 +256,7 @@ final class DatabaseLifecycle {
             $prefix . 'task_history',
             $prefix . 'task_relationships',
             $prefix . 'task_change_buffers',
+            $prefix . 'board_events',
         );
 
         foreach ( $required_tables as $table ) {
@@ -263,6 +286,7 @@ final class DatabaseLifecycle {
             $prefix . 'comments' => array( 'task_created_id' ),
             $prefix . 'task_history' => array( 'task_changed' ),
             $prefix . 'task_change_buffers' => array( 'task_actor_delivery', 'delivery_queue' ),
+            $prefix . 'board_events' => array( 'source_activity', 'board_created', 'task_id', 'actor_id', 'event_type' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {

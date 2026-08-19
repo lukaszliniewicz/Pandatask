@@ -8,15 +8,15 @@ final class BuddyPressRegistrar {
 
     private $board_service;
 
-    private $task_activity_projector;
+    private $board_activity_projector;
 
-    public function __construct( $board_service = null, $task_activity_projector = null ) {
+    public function __construct( $board_service = null, $board_activity_projector = null ) {
         $this->board_service = $board_service ?: new BoardService();
-        $this->task_activity_projector = $task_activity_projector ?: new TaskActivityProjector();
+        $this->board_activity_projector = $board_activity_projector ?: new BoardActivityProjector();
     }
 
     public function register() {
-        $this->task_activity_projector->register();
+        $this->board_activity_projector->register();
         add_action( 'plugins_loaded', array( $this, 'loadIntegrations' ), 20 );
         add_action( 'bp_loaded', array( $this, 'registerCacheHooks' ) );
     }
