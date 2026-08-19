@@ -189,6 +189,9 @@ final class TaskMutationService {
         $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons, array( $creator_id ) ) );
         $this->cache_invalidator->invalidateTask( $task_id, $task_data['board_name'], $all_affected_users );
 
+        $created_task = $this->task_repository->findById( $task_id );
+        $this->dispatchLifecycleEvent( 'pandatask_task_created', $task_id, $created_task, $creator_id );
+
         return $task_id;
     }
 
@@ -625,6 +628,17 @@ final class TaskMutationService {
             $this->cache_invalidator->invalidateBoard( $next_board_name, array( 'tasks', 'projects', 'parent_tasks', 'reports' ), $all_affected_users );
         }
 
+        $updated_task = $this->task_repository->findById( $task_id );
+        $this->dispatchLifecycleEvent(
+            'pandatask_task_changed',
+            $task_id,
+            $current_task,
+            $updated_task,
+            $changes_for_buffer,
+            $actor_id,
+            $change_comment
+        );
+
         return true;
     }
 
@@ -742,6 +756,8 @@ final class TaskMutationService {
         );
 
         $this->cache_invalidator->invalidateTask( $task_id, $task_to_delete->board_name, $all_affected_users );
+
+        $this->dispatchLifecycleEvent( 'pandatask_task_deleted', $task_id, $task_to_delete, get_current_user_id() );
 
         return true;
     }
@@ -941,6 +957,21 @@ final class TaskMutationService {
         }
 
         return $changes;
+    }
+
+    /**
+     * Lifecycle hooks are extension points that run only after persistence has
+     * committed. A failing integration must not turn a committed task mutation
+     * into an apparent API failure.
+     */
+    private function dispatchLifecycleEvent( $hook, ...$args ) {
+        try {
+            do_action( $hook, ...$args );
+        } catch ( Throwable $exception ) {
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( sprintf( 'Pandatask lifecycle hook %s failed: %s', $hook, $exception->getMessage() ) );
+            }
+        }
     }
 
     /**
