@@ -15,9 +15,17 @@ const activityType = z.enum([
 ]);
 const residualHandling = z.enum(['refine_residual', 'additional']);
 const workAllocation = z.object({
-  task_id: positiveId.describe('Task receiving this portion of the work entry.'),
-  seconds: z.number().int().positive().describe('Seconds allocated to this task.'),
-  residual_handling: residualHandling.optional().describe('Required when the task already has unitemised residual time: refine it or count this as additional work.'),
+  task_id: positiveId.optional().describe('Task receiving this portion of the work entry.'),
+  board_name: z.string().min(1).max(191).regex(/^[\w-]+$/).optional().describe('Board receiving this portion of standalone/ad-hoc work without inventing a task.'),
+  seconds: z.number().int().positive().describe('Seconds allocated to this target.'),
+  residual_handling: residualHandling.optional().describe('For task allocations only, required when the task already has unitemised residual time: refine it or count this as additional work.'),
+}).superRefine((value, context) => {
+  if (Boolean(value.task_id) === Boolean(value.board_name)) {
+    context.addIssue({ code: 'custom', message: 'Provide exactly one of task_id or board_name.' });
+  }
+  if (value.board_name && value.residual_handling) {
+    context.addIssue({ code: 'custom', path: ['residual_handling'], message: 'residual_handling applies only to task allocations.' });
+  }
 });
 const workLogInput = z.object({
   title: z.string().min(1).max(255),
@@ -26,23 +34,37 @@ const workLogInput = z.object({
   work_date: isoDate,
   duration_seconds: z.number().int().positive(),
   capacity: z.enum(['paid', 'volunteer', 'other']).optional(),
-  task_id: positiveId.optional().describe('Convenience shorthand: allocate the full duration to one task. Do not combine with allocations.'),
-  allocations: z.array(workAllocation).max(50).optional().describe('Optional split allocations. Their sum may be less than the entry duration; the remainder stays unallocated.'),
+  task_id: positiveId.optional().describe('Convenience shorthand: allocate the full duration to one task. Do not combine with board_name or allocations.'),
+  board_name: z.string().min(1).max(191).regex(/^[\w-]+$/).optional().describe('Convenience shorthand: allocate the full duration to one board without a task. Do not combine with task_id or allocations.'),
+  allocations: z.array(workAllocation).max(50).optional().describe('Optional split task/board allocations. Their sum may be less than the entry duration; the remainder stays unallocated.'),
   dry_run: dryRunField,
   idempotency_key: idempotencyKey,
 }).superRefine((value, context) => {
-  if (value.task_id && value.allocations?.length) {
-    context.addIssue({ code: 'custom', path: ['allocations'], message: 'Use task_id or allocations, not both.' });
+  const shorthandCount = Number(Boolean(value.task_id)) + Number(Boolean(value.board_name));
+  if (shorthandCount > 1 || (shorthandCount > 0 && value.allocations?.length)) {
+    context.addIssue({ code: 'custom', path: ['allocations'], message: 'Use one shorthand target (task_id or board_name) or allocations, not both.' });
   }
   const allocations = value.allocations ?? [];
-  const ids = allocations.map((allocation) => allocation.task_id);
-  if (new Set(ids).size !== ids.length) {
-    context.addIssue({ code: 'custom', path: ['allocations'], message: 'A task can appear only once in a work entry.' });
+  const targetKeys = allocations.map((allocation) => allocation.task_id ? `task:${allocation.task_id}` : `board:${allocation.board_name}`);
+  if (new Set(targetKeys).size !== targetKeys.length) {
+    context.addIssue({ code: 'custom', path: ['allocations'], message: 'A task or board can appear only once in a work entry.' });
   }
   const allocated = allocations.reduce((sum, allocation) => sum + allocation.seconds, 0);
   if (allocated > value.duration_seconds) {
     context.addIssue({ code: 'custom', path: ['allocations'], message: 'Allocated seconds cannot exceed duration_seconds.' });
   }
+});
+
+const taskTimeLogInput = z.object({
+  task_id: positiveId.describe('Task receiving the incremental time entry.'),
+  duration_seconds: z.number().int().positive().describe('Additional time worked, in seconds. Repeated calls accumulate through separate work entries.'),
+  activity_type: activityType,
+  work_date: isoDate.optional().describe('Work date in YYYY-MM-DD form. Defaults to the WordPress site-local current date.'),
+  title: z.string().min(1).max(255).optional().describe('Optional work-entry title. Defaults to the activity label.'),
+  notes: z.string().optional(),
+  capacity: z.enum(['paid', 'volunteer', 'other']).optional(),
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
 });
 
 function register(
@@ -122,9 +144,36 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
 
   register(
     server,
+    'task_time_log',
+    'Log time to task',
+    'Adds incremental time to the authenticated user’s current task occurrence without completing the task or resolving cumulative actual time. Use this while a task is pending or in progress; each call creates a normal factual work entry, and task completion can later reconcile the final cumulative actual.',
+    taskTimeLogInput,
+    write,
+    async (input, extra) => client.mutate({
+      method: 'POST',
+      path: '/users/me/work-entries',
+      body: {
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.notes ? { notes: input.notes } : {}),
+        activity_type: input.activity_type,
+        ...(input.work_date ? { work_date: input.work_date } : {}),
+        duration_seconds: input.duration_seconds,
+        ...(input.capacity ? { capacity: input.capacity } : {}),
+        allocations: [{
+          task_id: Number(input.task_id),
+          seconds: Number(input.duration_seconds),
+        }],
+      },
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
     'work_log',
     'Log work',
-    'Creates one factual work entry. A task allocation is optional; standalone work is valid. activity_type describes how the work was done, not its project/category subject.',
+    'Creates one factual work entry. Task and board allocations are optional, may be split, and may leave an explicitly unallocated remainder. activity_type describes how the work was done, not its project/category subject.',
     workLogInput,
     write,
     async (input, extra) => {
@@ -135,7 +184,9 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
         ? explicitAllocations
         : input.task_id
           ? [{ task_id: input.task_id, seconds: input.duration_seconds }]
-          : [];
+          : input.board_name
+            ? [{ board_name: input.board_name, seconds: input.duration_seconds }]
+            : [];
       return client.mutate({
         method: 'POST',
         path: '/users/me/work-entries',
@@ -182,7 +233,7 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
     server,
     'work_report',
     'Get my work report',
-    'Returns personal work totals without double-counting split allocations, including allocated and unallocated time and activity breakdown.',
+    'Returns personal work totals without double-counting split allocations, including task-linked, board-only, unallocated and residual subsets plus activity/task/board/project/category/capacity breakdowns.',
     z.object({ start_date: isoDate.optional(), end_date: isoDate.optional() }),
     readOnly,
     async (input, extra) => client.request({

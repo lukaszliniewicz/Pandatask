@@ -1,6 +1,7 @@
 import React, { useId, useState } from 'react';
 import { useReports } from '../hooks/useReports';
-import { useBoardWorkReport } from '../hooks/useWorkLog';
+import { useBoardWorkReport, useWorkReport } from '../hooks/useWorkLog';
+import { useConfig } from '../context/ConfigContext';
 import { parseUtcDateTime } from '../utils';
 import Icon from './Icon';
 
@@ -69,7 +70,23 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue, defaultExp
     </CollapsibleReportSection>
 );
 
+const WorkBreakdownList = ({ rows = [], empty = 'No recorded work in this dimension.' }) => (
+    rows.length > 0 ? (
+        <ul className="pandat69-report-list">
+            {rows.map((row, index) => (
+                <li key={`${row.id || row.name || row.activity_type || row.kind || 'other'}-${index}`}>
+                    <strong>{row.name || row.activity_type || (row.kind === 'residual' ? 'Unitemised' : 'Other') || 'Unspecified'}:</strong>{' '}
+                    {formatDuration(row.duration_seconds)}
+                    {row.capacity ? ` · ${row.capacity}` : ''}
+                </li>
+            ))}
+        </ul>
+    ) : <p className="pandat69-report-empty">{empty}</p>
+);
+
 const ReportView = () => {
+    const { boardName } = useConfig();
+    const isUserBoard = boardName?.startsWith('user_');
     const [period, setPeriod] = useState('this_week');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const fieldPrefix = useId();
@@ -83,7 +100,9 @@ const ReportView = () => {
     const isCustomValid = period !== 'custom' || (customRange.start && customRange.end);
     
     const { data, isLoading, isError, error, refetch } = useReports(filters);
-    const { data: workReport } = useBoardWorkReport(filters);
+    const { data: personalWorkReport } = useWorkReport(filters, { enabled: isUserBoard });
+    const { data: boardWorkReport } = useBoardWorkReport(filters, { enabled: !isUserBoard });
+    const workReport = isUserBoard ? personalWorkReport : boardWorkReport;
 
     const handleGenerate = () => {
         if (isCustomValid) refetch();
@@ -160,21 +179,32 @@ const ReportView = () => {
                         {workReport && (
                             <CollapsibleReportSection title={`Work recorded (${formatDuration(workReport.total_seconds)})`}>
                                 <p className="pandat69-report-item-meta">
-                                    Allocated work in this report period. Completed assignee-occurrences still awaiting a time resolution: <strong>{workReport.unresolved_occurrences || 0}</strong>.
+                                    {isUserBoard
+                                        ? 'Personal work is counted once by work-entry duration. Allocations classify that total; residual/unitemised time is informational and is not added again.'
+                                        : 'This board report includes only work explicitly allocated to this board. Genuinely unallocated personal work is outside this scope.'}
                                 </p>
-                                {workReport.breakdown?.length > 0 ? (
-                                    <ul className="pandat69-report-list">
-                                        {workReport.breakdown.map((row, index) => (
-                                            <li key={`${row.activity_type || row.kind || 'other'}-${row.capacity || 'none'}-${index}`}>
-                                                <strong>{row.activity_type || (row.kind === 'residual' ? 'Unitemised' : 'Other')}:</strong> {formatDuration(row.duration_seconds)}
-                                                {row.capacity ? ` · ${row.capacity}` : ''}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : <p className="pandat69-report-empty">No work allocated to this board in the selected period.</p>}
+                                <div className="pandat69-work-summary-grid">
+                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.total_seconds)}</strong><span>{isUserBoard ? 'Total recorded' : 'Board allocated'}</span></div>
+                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.task_linked_seconds)}</strong><span>Task-linked</span></div>
+                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.board_only_seconds)}</strong><span>Board-only / ad-hoc</span></div>
+                                    {isUserBoard && <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.unallocated_seconds)}</strong><span>Unallocated personal</span></div>}
+                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.residual_seconds)}</strong><span>Unitemised residual</span></div>
+                                    <div className="pandat69-work-summary-card"><strong>{workReport.unresolved_occurrences || 0}</strong><span>Completed · time unresolved</span></div>
+                                </div>
+                                <h4>By activity</h4>
+                                <WorkBreakdownList rows={workReport.activity_breakdown || workReport.breakdown || []} />
+                                <h4>By task</h4>
+                                <WorkBreakdownList rows={workReport.task_breakdown || []} empty="No task-linked work in this period." />
+                                {isUserBoard && <><h4>By board</h4><WorkBreakdownList rows={workReport.board_breakdown || []} empty="No allocated board work in this period." /></>}
+                                <h4>By project</h4>
+                                <WorkBreakdownList rows={workReport.project_breakdown || []} empty="No project-attributed task work in this period." />
+                                <h4>By category</h4>
+                                <WorkBreakdownList rows={workReport.category_breakdown || []} empty="No category-attributed task work in this period." />
+                                <h4>By capacity</h4>
+                                <WorkBreakdownList rows={workReport.capacity_breakdown || []} />
                             </CollapsibleReportSection>
                         )}
-                        
+
                         <CollapsibleReportSection title="Current Open Tasks Per Person">
                             {data.tasks_per_person.length > 0 ? (
                                 <ul className="pandat69-report-list">

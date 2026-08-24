@@ -8,6 +8,13 @@ import {
     validateAllocationDrafts,
     workAllocationTargetLabel,
 } from '../src/workLogModel.mjs';
+import { getBoardTabs, isBoardTabAvailable } from '../src/boardTabs.mjs';
+
+test('personal work-log tab availability comes from the canonical board tab model', () => {
+    assert.equal(isBoardTabAvailable('work', true), true);
+    assert.equal(isBoardTabAvailable('work', false), false);
+    assert.deepEqual(getBoardTabs(true).filter((tab) => tab.id === 'work').map((tab) => tab.label), ['Work Log']);
+});
 
 test('split allocations preserve one entry duration and expose unallocated remainder', () => {
     const allocations = [
@@ -62,6 +69,25 @@ test('residual handling is preserved in the allocation payload', () => {
     ]), [
         { task_id: 10, seconds: 900, residual_handling: 'refine_residual' },
     ]);
+});
+
+test('work allocation model supports board-only and mixed task/board allocations', () => {
+    const allocations = [
+        { targetType: 'task', taskId: 10, minutes: 30, residualHandling: '' },
+        { targetType: 'board', boardName: 'group_10', minutes: 45, residualHandling: '' },
+    ];
+    assert.equal(validateAllocationDrafts(5400, allocations), '');
+    assert.deepEqual(buildAllocationPayload(allocations), [
+        { task_id: 10, seconds: 1800 },
+        { board_name: 'group_10', seconds: 2700 },
+    ]);
+    assert.match(
+        validateAllocationDrafts(5400, [
+            { targetType: 'board', boardName: 'group_10', minutes: 30 },
+            { targetType: 'board', boardName: 'group_10', minutes: 30 },
+        ]),
+        /only once/i
+    );
 });
 
 test('suggestion adjustment keeps provider board time as the task-allocation remainder', () => {

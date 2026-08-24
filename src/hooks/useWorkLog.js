@@ -44,7 +44,7 @@ export const useWorkSuggestions = ( filters = {} ) => {
 	} );
 };
 
-export const useWorkReport = ( filters = {} ) => {
+export const useWorkReport = ( filters = {}, options = {} ) => {
 	const { apiClient } = useConfig();
 	return useQuery( {
 		queryKey: queryKeys.work.report( filters ),
@@ -53,10 +53,11 @@ export const useWorkReport = ( filters = {} ) => {
 				params: filters,
 				signal,
 			} ),
+		enabled: options.enabled !== false,
 	} );
 };
 
-export const useBoardWorkReport = ( filters = {} ) => {
+export const useBoardWorkReport = ( filters = {}, options = {} ) => {
 	const { apiClient, boardName } = useConfig();
 	const isUserBoard = boardName?.startsWith( 'user_' );
 	return useQuery( {
@@ -66,7 +67,8 @@ export const useBoardWorkReport = ( filters = {} ) => {
 				params: filters,
 				signal,
 			} ),
-		enabled: Boolean( boardName ) && ! isUserBoard,
+		enabled:
+			Boolean( boardName ) && ! isUserBoard && options.enabled !== false,
 	} );
 };
 

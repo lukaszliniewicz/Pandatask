@@ -124,7 +124,11 @@ const TaskTimeCard = ( { task } ) => {
 					className="pandat69-button"
 					onClick={ () => setLogging( ( value ) => ! value ) }
 				>
-					{ logging ? 'Close logger' : 'Log work' }
+					{ logging
+						? 'Close logger'
+						: task.status === 'done'
+							? 'Log additional work'
+							: 'Add time' }
 				</button>
 			</div>
 			{ isLoading ? (
@@ -173,6 +177,12 @@ const TaskTimeCard = ( { task } ) => {
 						</span>
 					) }
 				</div>
+			) }
+			{ task.status !== 'done' && (
+				<p className="pandat69-field-hint">
+					Add time as you work. These entries accumulate on the current task occurrence;
+					the final cumulative actual is reconciled when the task is completed.
+				</p>
 			) }
 			{ needsResolution && (
 				<TimeResolutionForm taskId={ task.id } specificSeconds={ specific } />

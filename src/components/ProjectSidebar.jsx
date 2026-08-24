@@ -3,14 +3,8 @@ import { createPortal } from 'react-dom';
 import { useProjects } from '../hooks/useProjects';
 import { useConfig } from '../context/ConfigContext';
 import Icon from './Icon';
+import { getBoardTabs } from '../boardTabs.mjs';
 
-const TABS = [
-    { id: 'tasks', label: 'All Tasks', icon: 'list-todo' },
-    { id: 'projects', label: 'Projects', icon: 'folder' },
-    { id: 'overview', label: 'Overview', icon: 'bar-chart' },
-    { id: 'archive', label: 'Archive', icon: 'archive' },
-    { id: 'report', label: 'Report', icon: 'bar-chart' },
-];
 
 const groupProjects = ( projects, isUserBoard ) => {
     if ( ! isUserBoard ) {
@@ -56,6 +50,7 @@ const ProjectSidebar = ({
     const { data: projects, isLoading } = useProjects(undefined, { privateOnly });
     const { boardName } = useConfig();
     const isUserBoard = boardName?.startsWith( 'user_' );
+    const navigationTabs = getBoardTabs( isUserBoard );
     const projectSections = groupProjects( projects, isUserBoard );
     
     // On mobile, if not open, don't render at all
@@ -93,7 +88,7 @@ const ProjectSidebar = ({
                     {isMobile && (
                         <>
                             <li className="pandat69-compact-group-heading">Navigation</li>
-                            {TABS.map(tab => (
+                            {navigationTabs.map(tab => (
                                 <li key={tab.id}>
                                     <button
                                         type="button"

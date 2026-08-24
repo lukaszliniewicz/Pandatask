@@ -28,11 +28,11 @@ const normalizeTaskId = ( taskId ) => {
 };
 
 export const useBoardController = () => {
-	const navigation = useBoardNavigation();
-	const { containerRef, isContainerNarrow } = useContainerMode();
-	const fullscreen = useBoardFullscreen();
 	const { boardName, text } = useConfig();
 	const isUserBoard = boardName?.startsWith( 'user_' );
+	const navigation = useBoardNavigation( isUserBoard );
+	const { containerRef, isContainerNarrow } = useContainerMode();
+	const fullscreen = useBoardFullscreen();
 	const [ filters, setFilters ] = useState( INITIAL_FILTERS );
 	const [ allSubtasksExpanded, setAllSubtasksExpanded ] = useState( false );
 	const [ groupByProject, setGroupByProject ] = useState( true );

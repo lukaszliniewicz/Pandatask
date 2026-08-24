@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.21
+Stable tag: 1.0.22
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,15 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.22 =
+
+* Add incremental task-time logging for active tasks through MCP while preserving final cumulative reconciliation on completion.
+* Make the personal Work Log reachable from desktop, compact navigation, and direct tab URLs.
+* Add task-or-board work allocation and editable factual work entries, including MCP board allocation support.
+* Integrate personal work totals into Reports and distinguish task-linked, board-only, unallocated, residual, unresolved, and dimensional breakdowns without double-counting.
+* Clarify task time controls for active versus completed tasks.
+* Keep incremental task-time logging in the core MCP profile with regression coverage.
 
 = 1.0.21 =
 

@@ -26,21 +26,30 @@ export const validateAllocationDrafts = (
 	if ( ! allocations.length ) {
 		return '';
 	}
-	if ( allocations.some( ( allocation ) => ! allocation.taskId ) ) {
-		return 'Choose a task for each allocation, or remove the empty allocation row.';
+	const targetKeys = [];
+	for ( const allocation of allocations ) {
+		const targetType =
+			allocation.targetType ||
+			( allocation.boardName ? 'board' : 'task' );
+		if ( targetType === 'board' ) {
+			if ( ! String( allocation.boardName || '' ).trim() ) {
+				return 'Choose a board for each board allocation, or remove the empty allocation row.';
+			}
+			targetKeys.push(
+				`board:${ String( allocation.boardName ).trim() }`
+			);
+		} else {
+			if ( ! allocation.taskId ) {
+				return 'Choose a task for each task allocation, or remove the empty allocation row.';
+			}
+			targetKeys.push( `task:${ Number( allocation.taskId ) }` );
+		}
+		if ( minutesToSeconds( allocation.minutes ) <= 0 ) {
+			return 'Each allocation needs a positive duration.';
+		}
 	}
-	if (
-		allocations.some(
-			( allocation ) => minutesToSeconds( allocation.minutes ) <= 0
-		)
-	) {
-		return 'Each allocation needs a positive duration.';
-	}
-	const taskIds = allocations.map( ( allocation ) =>
-		Number( allocation.taskId )
-	);
-	if ( new Set( taskIds ).size !== taskIds.length ) {
-		return 'A task can appear only once in a work entry. Combine its allocated minutes into one row.';
+	if ( new Set( targetKeys ).size !== targetKeys.length ) {
+		return 'A task or board can appear only once in a work entry. Combine its allocated minutes into one row.';
 	}
 	const allocatedSeconds = allocations.reduce(
 		( total, allocation ) => total + minutesToSeconds( allocation.minutes ),
@@ -53,13 +62,20 @@ export const validateAllocationDrafts = (
 };
 
 export const buildAllocationPayload = ( allocations = [] ) =>
-	allocations.map( ( allocation ) => ( {
-		task_id: Number( allocation.taskId ),
-		seconds: minutesToSeconds( allocation.minutes ),
-		...( allocation.residualHandling
-			? { residual_handling: allocation.residualHandling }
-			: {} ),
-	} ) );
+	allocations.map( ( allocation ) => {
+		const targetType =
+			allocation.targetType ||
+			( allocation.boardName ? 'board' : 'task' );
+		return {
+			...( targetType === 'board'
+				? { board_name: String( allocation.boardName || '' ).trim() }
+				: { task_id: Number( allocation.taskId ) } ),
+			seconds: minutesToSeconds( allocation.minutes ),
+			...( targetType === 'task' && allocation.residualHandling
+				? { residual_handling: allocation.residualHandling }
+				: {} ),
+		};
+	} );
 
 export const workAllocationTargetLabel = ( allocation = {} ) => {
 	const taskName = String( allocation.task_name_snapshot || '' ).trim();

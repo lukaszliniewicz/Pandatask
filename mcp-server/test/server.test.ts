@@ -109,6 +109,24 @@ test('work_log supports split allocations without double-counting the entry dura
     { task_id: 11, seconds: 1800 },
   ]);
 
+  const boardPreview = await client.callTool({
+    name: 'work_log',
+    arguments: {
+      title: 'Standalone trustee call',
+      activity_type: 'call',
+      work_date: '2026-08-24',
+      duration_seconds: 1800,
+      board_name: 'group_10',
+      idempotency_key: 'work-board-20260824',
+    },
+  });
+  assert.equal(boardPreview.isError, undefined);
+  const boardEnvelope = boardPreview.structuredContent as Record<string, unknown>;
+  const boardData = boardEnvelope.data as Record<string, unknown>;
+  const boardRequest = boardData.would_execute as Record<string, unknown>;
+  const boardBody = boardRequest.body as Record<string, unknown>;
+  assert.deepEqual(boardBody.allocations, [{ board_name: 'group_10', seconds: 1800 }]);
+
   const overallocated = await client.callTool({
     name: 'work_log',
     arguments: {
@@ -140,6 +158,31 @@ test('work_log supports split allocations without double-counting the entry dura
   assert.equal(duplicate.isError, true);
 });
 
+test('task_time_log adds incremental task time without completing or resolving the task', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
+
+  const preview = await client.callTool({
+    name: 'task_time_log',
+    arguments: {
+      task_id: 12,
+      activity_type: 'development',
+      work_date: '2026-08-24',
+      duration_seconds: 2700,
+      title: 'Implementation',
+      idempotency_key: 'task-time-12-20260824-a',
+    },
+  });
+  assert.equal(preview.isError, undefined);
+  const envelope = preview.structuredContent as Record<string, unknown>;
+  const data = envelope.data as Record<string, unknown>;
+  const request = data.would_execute as Record<string, unknown>;
+  assert.equal(request.method, 'POST');
+  assert.ok(String(request.url || '').endsWith('/users/me/work-entries'));
+  const body = request.body as Record<string, unknown>;
+  assert.equal(body.duration_seconds, 2700);
+  assert.deepEqual(body.allocations, [{ task_id: 12, seconds: 2700 }]);
+});
+
 test('task status tool keeps completion on the time-aware boundary', async (t) => {
   const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
   const tools = await client.listTools();
@@ -160,10 +203,11 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   assert.ok(coreNames.has('project_plan'));
   assert.ok(coreNames.has('task_complete'));
   assert.ok(coreNames.has('task_time_resolve'));
+  assert.ok(coreNames.has('task_time_log'));
   assert.ok(coreNames.has('work_log'));
   assert.ok(coreNames.has('work_list'));
   assert.ok(coreNames.has('work_report'));
-  assert.equal(coreNames.size, 24);
+  assert.equal(coreNames.size, 25);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 

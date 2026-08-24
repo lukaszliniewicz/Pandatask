@@ -6,7 +6,9 @@ final class WorkReportRepository {
 
     public function personalSummary( $user_id, $start_date, $end_date ) {
         global $wpdb;
-        $entries = DatabaseContext::getDbPrefix() . 'work_entries';
+        $prefix = DatabaseContext::getDbPrefix();
+        $entries = $prefix . 'work_entries';
+        $allocations = $prefix . 'work_allocations';
         $rows = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT activity_type, kind, capacity, COUNT(*) AS entry_count, COALESCE(SUM(duration_seconds), 0) AS duration_seconds
@@ -29,6 +31,34 @@ final class WorkReportRepository {
             )
         );
         $allocated = $this->personalAllocatedSeconds( $user_id, $start_date, $end_date );
+        $task_linked = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.task_id_snapshot IS NOT NULL
+                   AND entry.work_date BETWEEN %s AND %s",
+                (int) $user_id,
+                $start_date,
+                $end_date
+            )
+        );
+        $board_only = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.task_id_snapshot IS NULL
+                   AND allocation.board_name_snapshot IS NOT NULL
+                   AND allocation.board_name_snapshot <> ''
+                   AND entry.work_date BETWEEN %s AND %s",
+                (int) $user_id,
+                $start_date,
+                $end_date
+            )
+        );
         $residual = (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COALESCE(SUM(duration_seconds), 0) FROM {$entries}
@@ -38,12 +68,88 @@ final class WorkReportRepository {
                 $end_date
             )
         );
+        $task_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.task_id_snapshot AS id, allocation.task_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.task_id_snapshot IS NOT NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.task_id_snapshot, allocation.task_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                (int) $user_id, $start_date, $end_date
+            )
+        );
+        $board_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.board_name_snapshot AS id, allocation.board_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.board_name_snapshot IS NOT NULL
+                   AND allocation.board_name_snapshot <> ''
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.board_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                (int) $user_id, $start_date, $end_date
+            )
+        );
+        $project_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.project_id_snapshot AS id, allocation.project_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.project_id_snapshot IS NOT NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.project_id_snapshot, allocation.project_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                (int) $user_id, $start_date, $end_date
+            )
+        );
+        $category_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.category_id_snapshot AS id, allocation.category_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.category_id_snapshot IS NOT NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.category_id_snapshot, allocation.category_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                (int) $user_id, $start_date, $end_date
+            )
+        );
+        $capacity_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT capacity AS name, COALESCE(SUM(duration_seconds), 0) AS duration_seconds
+                 FROM {$entries}
+                 WHERE user_id = %d AND deleted_at IS NULL AND work_date BETWEEN %s AND %s
+                 GROUP BY capacity
+                 ORDER BY duration_seconds DESC",
+                (int) $user_id, $start_date, $end_date
+            )
+        );
         return array(
-            'total_seconds'       => $total,
-            'allocated_seconds'   => $allocated,
-            'unallocated_seconds' => max( 0, $total - $allocated ),
-            'residual_seconds'    => $residual,
-            'breakdown'           => $rows,
+            'total_seconds'          => $total,
+            'allocated_seconds'      => $allocated,
+            'task_linked_seconds'    => $task_linked,
+            'task_detailed_seconds'  => max( 0, $task_linked - $residual ),
+            'board_only_seconds'     => $board_only,
+            'unallocated_seconds'    => max( 0, $total - $allocated ),
+            'residual_seconds'       => $residual,
+            'breakdown'              => $rows,
+            'activity_breakdown'     => $rows,
+            'task_breakdown'         => $task_breakdown,
+            'board_breakdown'        => $board_breakdown,
+            'project_breakdown'      => $project_breakdown,
+            'category_breakdown'     => $category_breakdown,
+            'capacity_breakdown'     => $capacity_breakdown,
         );
     }
 
@@ -70,10 +176,112 @@ final class WorkReportRepository {
             )
         );
         $total = 0;
+        $residual = 0;
         foreach ( $rows as $row ) {
-            $total += (int) $row->duration_seconds;
+            $seconds = (int) $row->duration_seconds;
+            $total += $seconds;
+            if ( 'residual' === (string) $row->kind ) {
+                $residual += $seconds;
+            }
         }
-        return array( 'total_seconds' => $total, 'breakdown' => $rows );
+        $task_linked = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.task_id_snapshot IS NOT NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $board_only = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.task_id_snapshot IS NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $task_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.task_id_snapshot AS id, allocation.task_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.task_id_snapshot IS NOT NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.task_id_snapshot, allocation.task_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $project_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.project_id_snapshot AS id, allocation.project_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.project_id_snapshot IS NOT NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.project_id_snapshot, allocation.project_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $category_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT allocation.category_id_snapshot AS id, allocation.category_name_snapshot AS name,
+                        COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.category_id_snapshot IS NOT NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY allocation.category_id_snapshot, allocation.category_name_snapshot
+                 ORDER BY duration_seconds DESC",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $capacity_breakdown = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT entry.capacity AS name, COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s
+                 GROUP BY entry.capacity
+                 ORDER BY duration_seconds DESC",
+                $board_name, $start_date, $end_date
+            )
+        );
+        return array(
+            'total_seconds'          => $total,
+            'allocated_seconds'      => $total,
+            'task_linked_seconds'    => $task_linked,
+            'task_detailed_seconds'  => max( 0, $task_linked - $residual ),
+            'board_only_seconds'     => $board_only,
+            'unallocated_seconds'    => 0,
+            'residual_seconds'       => $residual,
+            'breakdown'              => $rows,
+            'activity_breakdown'     => $rows,
+            'task_breakdown'         => $task_breakdown,
+            'board_breakdown'        => array(),
+            'project_breakdown'      => $project_breakdown,
+            'category_breakdown'     => $category_breakdown,
+            'capacity_breakdown'     => $capacity_breakdown,
+        );
     }
 
     public function unresolvedOccurrencesForUser( $user_id, $limit = 50 ) {

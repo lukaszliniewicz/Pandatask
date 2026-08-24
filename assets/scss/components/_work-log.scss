@@ -139,7 +139,7 @@
 
 .pandat69-work-allocation-row {
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) auto auto;
+    grid-template-columns: auto 1fr auto auto;
     gap: .5rem;
     align-items: start;
     padding: .7rem;
@@ -198,6 +198,7 @@
     gap: .15rem;
     min-width: 0;
 }
+
 
 .pandat69-task-time-card {
     margin: 1rem 0;

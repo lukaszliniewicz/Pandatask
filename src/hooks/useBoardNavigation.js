@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isBoardTabAvailable } from '../boardTabs.mjs';
 
-const VALID_TABS = new Set( [
-	'tasks',
-	'projects',
-	'overview',
-	'archive',
-	'report',
-] );
 const VALID_VIEWS = new Set( [
 	'compact',
 	'list',
@@ -15,14 +9,16 @@ const VALID_VIEWS = new Set( [
 	'gantt',
 ] );
 
-const readLocation = () => {
+const readLocation = ( isUserBoard = false ) => {
 	const params = new URLSearchParams( window.location.search );
 	const tab = params.get( 'pandatask_tab' );
 	const view = params.get( 'pandatask_view' );
 	const taskValue = Number.parseInt( params.get( 'open_task' ) || '', 10 );
 
 	return {
-		currentTab: VALID_TABS.has( tab ) ? tab : 'tasks',
+		currentTab: isBoardTabAvailable( tab || '', isUserBoard )
+			? tab
+			: 'tasks',
 		currentView: VALID_VIEWS.has( view ) ? view : 'compact',
 		selectedTaskId:
 			Number.isInteger( taskValue ) && taskValue > 0 ? taskValue : null,
@@ -47,25 +43,39 @@ const writeLocation = ( values, mode, state = {} ) => {
 	);
 };
 
-export const useBoardNavigation = () => {
-	const [ navigation, setNavigation ] = useState( readLocation );
+export const useBoardNavigation = ( isUserBoard = false ) => {
+	const [ navigation, setNavigation ] = useState( () =>
+		readLocation( isUserBoard )
+	);
 
 	useEffect( () => {
-		const handlePopState = () => setNavigation( readLocation() );
+		const handlePopState = () =>
+			setNavigation( readLocation( isUserBoard ) );
 		window.addEventListener( 'popstate', handlePopState );
 		return () => window.removeEventListener( 'popstate', handlePopState );
-	}, [] );
+	}, [ isUserBoard ] );
 
-	const setCurrentTab = useCallback( ( currentTab ) => {
-		if ( ! VALID_TABS.has( currentTab ) ) {
+	useEffect( () => {
+		if ( isBoardTabAvailable( navigation.currentTab, isUserBoard ) ) {
 			return;
 		}
-		setNavigation( ( current ) => ( { ...current, currentTab } ) );
-		writeLocation(
-			{ pandatask_tab: currentTab === 'tasks' ? null : currentTab },
-			'push'
-		);
-	}, [] );
+		setNavigation( ( current ) => ( { ...current, currentTab: 'tasks' } ) );
+		writeLocation( { pandatask_tab: null }, 'replace' );
+	}, [ isUserBoard, navigation.currentTab ] );
+
+	const setCurrentTab = useCallback(
+		( currentTab ) => {
+			if ( ! isBoardTabAvailable( currentTab, isUserBoard ) ) {
+				return;
+			}
+			setNavigation( ( current ) => ( { ...current, currentTab } ) );
+			writeLocation(
+				{ pandatask_tab: currentTab === 'tasks' ? null : currentTab },
+				'push'
+			);
+		},
+		[ isUserBoard ]
+	);
 
 	const setCurrentView = useCallback( ( currentView ) => {
 		if ( ! VALID_VIEWS.has( currentView ) ) {

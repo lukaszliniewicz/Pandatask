@@ -6,6 +6,7 @@ import {
 } from "../../hooks/useWorkLog";
 import TaskSelect from "../TaskSelect";
 import Icon from "../Icon";
+import { useUserBoards } from "../../hooks/useUserBoards";
 import {
   buildAllocationPayload,
   minutesToSeconds,
@@ -15,15 +16,28 @@ import {
 
 const today = () => new Date().toISOString().slice(0, 10);
 let allocationSequence = 0;
-const newAllocation = (minutes = 30) => ({
+const newAllocation = (minutes = 30, values = {}) => ({
   key: `work-allocation-${++allocationSequence}`,
-  taskId: "",
+  targetType: values.targetType || (values.boardName ? "board" : "task"),
+  taskId: values.taskId || "",
+  boardName: values.boardName || "",
   minutes: Math.max(1, Number(minutes) || 1),
-  residualHandling: "",
+  residualHandling: values.residualHandling || "",
 });
 
+const initialAllocationDrafts = (allocations = []) =>
+  allocations.map((allocation) =>
+    newAllocation(Math.max(1, Math.round(Number(allocation.seconds || 0) / 60)), {
+      targetType: allocation.task_id_snapshot || allocation.task_id ? "task" : "board",
+      taskId: allocation.task_id_snapshot || allocation.task_id || "",
+      boardName: allocation.task_id_snapshot || allocation.task_id ? "" : allocation.board_name_snapshot || allocation.board_name || "",
+    }),
+  );
+
 const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
-  const { data: taskWork } = useTaskWork(allocation.taskId || null);
+  const { data: userBoards = [] } = useUserBoards();
+  const isTaskTarget = (allocation.targetType || "task") === "task";
+  const { data: taskWork } = useTaskWork(isTaskTarget ? allocation.taskId || null : null);
   const resolution = taskWork?.my_time?.resolution;
   const specificSeconds = Number(taskWork?.my_time?.specific_seconds || 0);
   const isResolved = resolution?.state === "resolved";
@@ -36,15 +50,49 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
 
   return (
     <div className="pandat69-work-allocation-row">
-      <div className="pandat69-work-allocation-task">
-        <TaskSelect
-          selectedTaskIds={allocation.taskId}
-          onChange={(taskId) =>
-            onChange({ ...allocation, taskId, residualHandling: "" })
+      <label className="pandat69-work-allocation-type">
+        <span className="pandat69-visually-hidden">Allocation target type</span>
+        <select
+          className="pandat69-select"
+          value={allocation.targetType || "task"}
+          onChange={(event) =>
+            onChange({
+              ...allocation,
+              targetType: event.target.value,
+              taskId: "",
+              boardName: "",
+              residualHandling: "",
+            })
           }
-          mode="single"
-          inputLabel="Search for a task to allocate work to"
-        />
+          aria-label="Allocation target type"
+        >
+          <option value="task">Task</option>
+          <option value="board">Board</option>
+        </select>
+      </label>
+      <div className="pandat69-work-allocation-task">
+        {isTaskTarget ? (
+          <TaskSelect
+            selectedTaskIds={allocation.taskId}
+            onChange={(taskId) =>
+              onChange({ ...allocation, taskId, residualHandling: "" })
+            }
+            mode="single"
+            inputLabel="Search for a task to allocate work to"
+          />
+        ) : (
+          <select
+            className="pandat69-select"
+            value={allocation.boardName || ""}
+            onChange={(event) => onChange({ ...allocation, boardName: event.target.value })}
+            aria-label="Board to allocate work to"
+          >
+            <option value="">Choose a board…</option>
+            {userBoards.map((board) => (
+              <option key={board.id} value={board.id}>{board.name}</option>
+            ))}
+          </select>
+        )}
       </div>
       <label className="pandat69-work-allocation-minutes">
         <span className="pandat69-visually-hidden">Allocated minutes</span>
@@ -70,7 +118,7 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
       >
         <Icon name="trash" size={16} />
       </button>
-      {allocation.taskId && isResolved && (
+      {isTaskTarget && allocation.taskId && isResolved && (
         <div className="pandat69-work-allocation-residual">
           <label>
             {residualSeconds > 0
@@ -104,7 +152,7 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
       )}
     </div>
   );
-};
+};;
 
 const WorkEntryForm = ({
   task = null,
@@ -131,7 +179,9 @@ const WorkEntryForm = ({
   const [title, setTitle] = useState(initialValues?.title || task?.name || "");
   const [notes, setNotes] = useState(initialValues?.notes || "");
   const [capacity, setCapacity] = useState(initialValues?.capacity || "");
-  const [allocations, setAllocations] = useState([]);
+  const [allocations, setAllocations] = useState(() =>
+    initialAllocationDrafts(initialValues?.allocations || []),
+  );
   const [residualHandling, setResidualHandling] = useState("");
   const [error, setError] = useState("");
   const { data: targetWork } = useTaskWork(task?.id || null);

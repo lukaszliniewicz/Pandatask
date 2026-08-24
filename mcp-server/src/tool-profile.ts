@@ -26,6 +26,7 @@ const coreTools = new Set([
   'report_get',
   'task_complete',
   'task_time_resolve',
+  'task_time_log',
   'work_log',
   'work_list',
   'work_report',
