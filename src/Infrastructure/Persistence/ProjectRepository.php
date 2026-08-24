@@ -123,7 +123,6 @@ final class ProjectRepository {
         $prefix          = DatabaseContext::getDbPrefix();
         $tasks_table     = $prefix . 'tasks';
         $assignments     = $prefix . 'assignments';
-        $history         = $prefix . 'task_history';
         $project_ids_sql = implode( ',', array_map( 'absint', $project_ids ) );
         $sql             = "SELECT
                                 t.id,
@@ -147,12 +146,7 @@ final class ProjectRepository {
                         SELECT 1 FROM {$assignments} ta
                         WHERE ta.task_id = t.id AND ta.user_id = %d
                     )
-                    OR EXISTS (
-                        SELECT 1 FROM {$history} th
-                        WHERE th.task_id = t.id
-                        AND th.field_changed = 'task_created'
-                        AND th.user_id = %d
-                    )
+                    OR t.creator_id = %d
                 )",
                 $private_board_name,
                 $workspace_user_id,

@@ -49,6 +49,11 @@ export const createTaskFormDefaults = ( {
 		description: task?.description || defaultValues.description || '',
 		status: task?.status || 'pending',
 		priority: task?.priority || 5,
+		estimated_effort_hours:
+			task?.estimated_effort_seconds !== null &&
+			task?.estimated_effort_seconds !== undefined
+				? Number( task.estimated_effort_seconds ) / 3600
+				: '',
 		schedule_mode: task?.deadline_days_after_start ? 'dynamic' : 'fixed',
 		start_date: task?.start_date || '',
 		deadline: task?.deadline || '',
@@ -94,6 +99,16 @@ export const buildTaskPayload = (
 	{ boardName, isUserBoard, isEdit, task = null, changeComment = '' }
 ) => {
 	const payload = { ...data };
+	payload.estimated_effort_seconds =
+		data.estimated_effort_hours === '' ||
+		data.estimated_effort_hours === null ||
+		data.estimated_effort_hours === undefined
+			? null
+			: Math.round(
+					Math.max( 0, Number( data.estimated_effort_hours ) || 0 ) *
+						3600
+			  );
+	delete payload.estimated_effort_hours;
 	payload.board_name =
 		isUserBoard && data.target_board
 			? data.target_board

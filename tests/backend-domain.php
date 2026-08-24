@@ -1,10 +1,32 @@
 <?php
 
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = null ) { return $text; }
+}
+if ( ! class_exists( 'WP_Error' ) ) {
+    class WP_Error {
+        private $code;
+        private $message;
+        private $data;
+        public function __construct( $code, $message, $data = null ) { $this->code = $code; $this->message = $message; $this->data = $data; }
+        public function get_error_code() { return $this->code; }
+        public function get_error_message() { return $this->message; }
+        public function get_error_data() { return $this->data; }
+    }
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+    function is_wp_error( $value ) { return $value instanceof WP_Error; }
+}
+
 require_once dirname( __DIR__ ) . '/src/Domain/Task/TaskGraph.php';
 require_once dirname( __DIR__ ) . '/src/Domain/Task/RecurrenceCalculator.php';
+require_once dirname( __DIR__ ) . '/src/Domain/Work/ActivityTypes.php';
+require_once dirname( __DIR__ ) . '/src/Domain/Work/TimeReconciler.php';
 
 use Pandatask\Domain\Task\RecurrenceCalculator;
 use Pandatask\Domain\Task\TaskGraph;
+use Pandatask\Domain\Work\ActivityTypes;
+use Pandatask\Domain\Work\TimeReconciler;
 
 $failures = array();
 
@@ -40,6 +62,19 @@ $assert_same( '2024-05-31', $recurrence->onOrAfter( '2024-01-31', '2024-05-01', 
 $assert_same( '2026-08-03', $recurrence->next( '2026-07-31', 'custom_weekly', 1, '1,3,5' ), 'Custom weekday recurrence is incorrect.' );
 $assert_same( '2026-08-14', $recurrence->onOrAfter( '2026-07-31', '2026-08-13', 'custom_weekly', 1, '1,3,5' ), 'Custom weekday catch-up is incorrect.' );
 $assert_same( null, $recurrence->next( '2026-07-31', 'custom_weekly', 1, '' ), 'Invalid custom recurrence should be rejected.' );
+
+$assert_same( true, ActivityTypes::isValid( 'research' ), 'Research activity type should be valid.' );
+$assert_same( false, ActivityTypes::isValid( 'governance' ), 'Organisational subject must not become an activity type.' );
+$reconciler = new TimeReconciler();
+$assert_same(
+    array( 'specific_seconds' => 6300, 'declared_actual_seconds' => 9000, 'residual_seconds' => 2700, 'state' => 'resolved' ),
+    $reconciler->reconcile( 6300, 9000, false ),
+    'Time reconciliation did not preserve the residual.'
+);
+$not_tracked = $reconciler->reconcile( 1800, null, true );
+$assert_same( 'not_tracked', $not_tracked['state'], 'Not tracked was collapsed into zero.' );
+$below_specific = $reconciler->reconcile( 3600, 1800, false );
+$assert_same( true, $below_specific instanceof WP_Error, 'Actual below specific time should be rejected.' );
 
 if ( ! empty( $failures ) ) {
     fwrite( STDERR, implode( PHP_EOL, $failures ) . PHP_EOL );

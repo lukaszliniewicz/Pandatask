@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.19
+Stable tag: 1.0.20
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.20 =
+
+* Add first-class Work Log entries with split task allocations, activity/capacity classification, private notes, and personal cross-board reporting.
+* Add durable task work occurrences and cumulative time resolution so recurring, skipped, reopened, and deleted tasks preserve distinct work history without double-counting residual time.
+* Centralize human task completion through time-aware REST, React, and MCP boundaries; add effort estimates, audit persistence, access policy, schema 1.0.16 migration/backfill, and Work Log UI.
+* Repair personal report scope, recurring MCP semantics, creator persistence, schema/smoke drift, PHPStan stubs, accessibility findings, and production backup coverage for Work Log tables.
 
 = 1.0.19 =
 

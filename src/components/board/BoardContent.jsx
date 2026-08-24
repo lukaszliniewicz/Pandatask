@@ -6,6 +6,7 @@ import TaskWorkspace from '../TaskWorkspace';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 const ReportView = lazyWithRetry(() => import('../ReportView'));
+const WorkLogView = lazyWithRetry(() => import('../WorkLogView'));
 
 const BoardContent = ({ controller }) => (
     <div className="pandat69-tabs">
@@ -43,6 +44,11 @@ const BoardContent = ({ controller }) => (
             )}
             {controller.currentTab === 'overview' && (
                 <OverviewView onTaskAction={controller.handleTaskAction} />
+            )}
+            {controller.currentTab === 'work' && controller.isUserBoard && (
+                <Suspense fallback={<div className="pandat69-loading" role="status">Loading work log…</div>}>
+                    <WorkLogView />
+                </Suspense>
             )}
             {controller.currentTab === 'report' && (
                 <Suspense fallback={<div className="pandat69-loading" role="status">Loading report…</div>}>

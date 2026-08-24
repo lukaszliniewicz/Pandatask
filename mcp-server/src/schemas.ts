@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const boardName = z
   .string()
   .min(1)
-  .max(191)
+  .max(100)
   .regex(/^[\w-]+$/, 'Use a Pandatask board identifier containing only letters, numbers, underscores, or hyphens.')
   .describe('Pandatask board identifier, for example project_alpha, group_42, or user_7.');
 
@@ -58,6 +58,7 @@ export const taskMutableFields = {
   description: z.string().optional().describe('Detailed task description; HTML accepted by Pandatask is sanitized server-side.'),
   status: z.enum(['pending', 'in-progress', 'done']).optional().describe('Task workflow status.'),
   priority: z.number().int().min(1).max(10).optional().describe('Priority from 1 (lowest) to 10 (highest).'),
+  estimated_effort_seconds: z.number().int().nonnegative().optional().describe('Optional expected effort in seconds.'),
   task_type: z.enum(['task', 'bug']).optional().describe('Standard task or bug-tracking item.'),
   bug_url: z.union([z.url(), z.literal('')]).optional().describe('Related bug URL, or empty string to clear it.'),
   start_date: clearableDate.optional().describe('Planned start date.'),
@@ -67,7 +68,7 @@ export const taskMutableFields = {
   project_id: z.number().int().nonnegative().optional().describe('Board project ID; use 0 to remove the project.'),
   parent_task_id: z.number().int().nonnegative().optional().describe('Parent task ID on the same board; use 0 to remove the parent.'),
   predecessors: idList.optional().describe('Predecessor task IDs on the same board.'),
-  is_recurring: z.boolean().optional().describe('Whether this record is a recurring task template.'),
+  is_recurring: z.boolean().optional().describe('Whether this task repeats after its current occurrence.'),
   recurrence_frequency: z
     .enum(['weekly', 'bi-weekly', 'monthly', 'custom_weekly'])
     .optional()

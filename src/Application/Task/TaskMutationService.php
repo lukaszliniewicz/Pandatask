@@ -13,6 +13,8 @@ use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\TaskCommandRepository;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
+use Pandatask\Application\Work\TaskTimeService;
+use Pandatask\Application\Work\WorkOccurrenceLifecycleService;
 use WP_Error;
 
 final class TaskMutationService {
@@ -31,7 +33,11 @@ final class TaskMutationService {
 
     private $cache_invalidator;
 
-    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null ) {
+    private $occurrence_repository;
+
+    private $task_time_service;
+
+    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null ) {
         $this->repository      = $repository ?: new TaskCommandRepository();
         $this->task_repository = $task_repository ?: new TaskRepository();
         $this->history_service = $history_service ?: new HistoryService();
@@ -39,6 +45,8 @@ final class TaskMutationService {
         $this->history_buffer_service = $history_buffer_service ?: new TaskHistoryBufferService( null, $this->history_service, $this->task_repository );
         $this->recurrence_calculator = $recurrence_calculator ?: new RecurrenceCalculator();
         $this->cache_invalidator = $cache_invalidator ?: new TaskCacheInvalidator( $this->task_repository );
+        $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceLifecycleService();
+        $this->task_time_service = $task_time_service ?: new TaskTimeService();
     }
 
     public function createTask( $data ) {
@@ -49,9 +57,12 @@ final class TaskMutationService {
         }
 
         $is_recurring = ! empty( $data['is_recurring'] ) ? 1 : 0;
+        $creator_id  = get_current_user_id();
         $task_data    = array(
             'board_name'               => $data['board_name'],
             'name'                     => $data['name'],
+            'creator_id'               => $creator_id > 0 ? $creator_id : null,
+            'estimated_effort_seconds' => isset( $data['estimated_effort_seconds'] ) && '' !== $data['estimated_effort_seconds'] ? absint( $data['estimated_effort_seconds'] ) : null,
             'description'              => $data['description'],
             'task_type'                => $data['task_type'] ?? 'task',
             'bug_url'                  => isset( $data['bug_url'] ) ? esc_url_raw( $data['bug_url'] ) : null,
@@ -131,6 +142,24 @@ final class TaskMutationService {
                 throw new Exception( 'Failed to insert the task.' );
             }
 
+            $occurrence_task = (object) array_merge(
+                $task_data,
+                array(
+                    'id'            => $task_id,
+                    'project_name'  => null,
+                    'category_name' => null,
+                )
+            );
+            $occurrence_state = 'done' === $task_data['status'] ? 'completed' : 'open';
+            $occurrence_id = $this->occurrence_repository->createForTask( $occurrence_task, 1, $occurrence_state, $creator_id );
+
+            if ( ! $occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $occurrence_id ) ) {
+                throw new Exception( 'Failed to create the task work occurrence.' );
+            }
+            if ( 'done' === $task_data['status'] && $creator_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $creator_id, $creator_id ) ) {
+                throw new Exception( 'Failed to preserve unresolved time for a completed task.' );
+            }
+
             $attachment_sync = ProtectedAttachmentService::syncTask( $task_id );
 
             if ( is_wp_error( $attachment_sync ) ) {
@@ -165,7 +194,6 @@ final class TaskMutationService {
             }
 
             $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
-            $creator_id         = get_current_user_id();
 
             if ( ! $this->history_service->addEntry( $task_id, $creator_id, 'task_created', '', $task_data['name'] ) ) {
                 throw new Exception( 'Failed to create task history.' );
@@ -195,7 +223,7 @@ final class TaskMutationService {
         return $task_id;
     }
 
-    public function updateTask( $task_id, $data, $change_comment = '', $actor_id = null ) {
+    public function updateTask( $task_id, $data, $change_comment = '', $actor_id = null, $completion = null, $lifecycle_operation = '' ) {
         $task_id   = (int) $task_id;
         $actor_id  = is_null( $actor_id ) ? get_current_user_id() : (int) $actor_id;
         $current_task = $this->task_repository->findById( $task_id );
@@ -275,6 +303,7 @@ final class TaskMutationService {
             'board_name',
             'name',
             'description',
+            'estimated_effort_seconds',
             'status',
             'category_id',
             'project_id',
@@ -347,7 +376,7 @@ final class TaskMutationService {
                 } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for' ), true ) ) {
                     $update_data[ $key ] = $value;
                     $format[]            = '%s';
-                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id' ), true ) ) {
+                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id', 'estimated_effort_seconds' ), true ) ) {
                     $update_data[ $key ] = ! empty( $value ) ? absint( $value ) : null;
                     $format[]            = is_null( $update_data[ $key ] ) ? '%s' : '%d';
                 } else {
@@ -527,6 +556,68 @@ final class TaskMutationService {
 
         }
 
+        $current_occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+
+        if ( $is_completing && $current_occurrence ) {
+            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'completed', $actor_id ) ) {
+                throw new Exception( 'The work occurrence could not be completed.' );
+            }
+
+            if ( is_array( $completion ) ) {
+                if ( empty( $completion['skip_personal_resolution'] ) ) {
+                    $completion_user_id = ! empty( $completion['user_id'] ) ? absint( $completion['user_id'] ) : $actor_id;
+                    $resolution = $this->task_time_service->resolveCurrentOccurrence(
+                        $task_id,
+                        $completion_user_id,
+                        $completion['actual_seconds'] ?? null,
+                        ! empty( $completion['not_tracked'] ),
+                        $actor_id
+                    );
+                    if ( is_wp_error( $resolution ) ) {
+                        DatabaseContext::rollback();
+                        ProtectedAttachmentService::rollbackSync( $attachment_sync );
+                        return $resolution;
+                    }
+                }
+            } elseif ( $actor_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $actor_id, $actor_id ) ) {
+                throw new Exception( 'The unresolved task time could not be recorded.' );
+            }
+
+            if ( ! $this->task_time_service->ensureUnresolvedForUsers( $task_id, (array) ( $current_task->assigned_user_ids ?? array() ), $actor_id ) ) {
+                throw new Exception( 'Assignee task-time states could not be preserved.' );
+            }
+        }
+
+        $is_reopening = isset( $update_data['status'] ) && 'done' !== $update_data['status'] && 'done' === $current_task->status;
+        if ( $is_reopening && $current_occurrence && ! in_array( $lifecycle_operation, array( 'rollover', 'skip' ), true ) ) {
+            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'open', $actor_id ) ) {
+                throw new Exception( 'The work occurrence could not be reopened.' );
+            }
+            if ( $actor_id > 0 && ! $this->task_time_service->reviseOnReopen( $task_id, $actor_id, $actor_id ) ) {
+                throw new Exception( 'The reopened task time could not be revised.' );
+            }
+        }
+
+        if ( in_array( $lifecycle_operation, array( 'rollover', 'skip' ), true ) && $current_occurrence ) {
+            $old_state = 'skip' === $lifecycle_operation ? 'skipped' : 'completed';
+            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, $old_state, $actor_id ) ) {
+                throw new Exception( 'The previous work occurrence could not be closed.' );
+            }
+            $next_task = clone $current_task;
+            foreach ( $update_data as $field => $value ) {
+                $next_task->$field = $value;
+            }
+            $next_occurrence_id = $this->occurrence_repository->createForTask(
+                $next_task,
+                $this->occurrence_repository->nextSequence( $task_id ),
+                'open',
+                $actor_id
+            );
+            if ( ! $next_occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $next_occurrence_id ) ) {
+                throw new Exception( 'The next work occurrence could not be created.' );
+            }
+        }
+
         if ( $project_is_changing && ! empty( $descendant_ids ) ) {
             if ( ! $this->repository->updateProjectForTasks( $descendant_ids, $next_project_id ) ) {
                 throw new Exception( 'The descendant project update failed.' );
@@ -642,6 +733,18 @@ final class TaskMutationService {
         return true;
     }
 
+    public function completeTask( $task_id, array $completion, $change_comment = '', $actor_id = null ) {
+        $actor_id = null === $actor_id ? get_current_user_id() : (int) $actor_id;
+        return $this->updateTask(
+            (int) $task_id,
+            array( 'status' => 'done' ),
+            $change_comment,
+            $actor_id,
+            $completion,
+            'complete'
+        );
+    }
+
     public function processBufferedChanges( $task_id, $actor_id ) {
         return $this->history_buffer_service->process( (int) $task_id, (int) $actor_id );
     }
@@ -704,7 +807,9 @@ final class TaskMutationService {
                         __( 'Skipped recurring occurrence scheduled for %s.', 'pandatask' ),
                         $task_to_delete->start_date
                     ),
-                    get_current_user_id()
+                    get_current_user_id(),
+                    null,
+                    'skip'
                 );
 
                 if ( true !== $result ) {
@@ -724,6 +829,9 @@ final class TaskMutationService {
         }
 
         try {
+            if ( ! $this->occurrence_repository->tombstoneTaskOccurrences( $task_id, get_current_user_id() ) ) {
+                throw new Exception( 'The task work occurrences could not be preserved.' );
+            }
             if (
                 ! $this->repository->deleteTaskAssignments( $task_id )
                 || ! $this->repository->deleteTaskComments( $task_id )
@@ -884,7 +992,7 @@ final class TaskMutationService {
                 'recurrence_anchor_day' => (int) ( $task->recurrence_anchor_day ?? 0 ),
             );
 
-            $result = $this->updateTask( $task->id, $update_data, '', 0 );
+            $result = $this->updateTask( $task->id, $update_data, '', 0, null, 'rollover' );
 
             if ( true !== $result ) {
                 $stats['failed']++;
@@ -982,6 +1090,9 @@ final class TaskMutationService {
         $integer_fields = array(
             'category_id',
             'project_id',
+            'creator_id',
+            'estimated_effort_seconds',
+            'current_work_occurrence_id',
             'priority',
             'deadline_days_after_start',
             'notify_deadline',

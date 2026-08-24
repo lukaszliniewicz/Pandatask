@@ -88,12 +88,20 @@ const TaskGeneralFields = ({
                 <select id={`${fieldPrefix}-status`} className="pandat69-select" {...register('status')}>
                     <option value="pending">Pending</option>
                     <option value="in-progress">In Progress</option>
-                    <option value="done">Done</option>
+                    <option value="done" disabled={task?.status !== 'done'}>{task?.status === 'done' ? 'Done' : 'Done — use Complete action'}</option>
                 </select>
             </div>
             <div className="pandat69-form-field pandat69-form-field-half">
                 <label htmlFor={`${fieldPrefix}-priority`}>Priority</label>
                 <input id={`${fieldPrefix}-priority`} type="number" min="1" max="10" className="pandat69-input" {...register('priority')} />
+            </div>
+        </div>
+
+        <div className="pandat69-form-row">
+            <div className="pandat69-form-field pandat69-form-field-half">
+                <label htmlFor={`${fieldPrefix}-estimate`}>Estimated effort (hours)</label>
+                <input id={`${fieldPrefix}-estimate`} type="number" min="0" step="0.25" className="pandat69-input" placeholder="Optional" {...register('estimated_effort_hours', { min: 0 })} />
+                <p className="pandat69-field-hint">Expected effort only; actual time is recorded in the Work Log.</p>
             </div>
         </div>
 

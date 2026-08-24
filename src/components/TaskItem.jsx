@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useTaskMutations } from '../hooks/useTaskMutations';
+import { useTaskStatusTransition } from '../context/CompletionContext';
 import { parseDate } from '../utils';
 import Icon from './Icon';
 
 const TaskItem = ({ task, onAction }) => {
-    const { updateTask } = useTaskMutations();
+    const { setStatus, isPending } = useTaskStatusTransition();
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [showDescription, setShowDescription] = useState(false);
     const dropdownRef = useRef(null);
@@ -22,11 +22,11 @@ const TaskItem = ({ task, onAction }) => {
     }, [showStatusDropdown]);
 
     const handleStatusChange = async (newStatus) => {
-        if (updateTask.isPending) return;
+        if (isPending) return;
         setShowStatusDropdown(false);
         if (task.status !== newStatus) {
             try {
-                await updateTask.mutateAsync({ id: task.id, data: { status: newStatus } });
+                await setStatus(task, newStatus);
             } catch (error) {
                 console.error(error);
                 alert('Failed to update status');
@@ -101,7 +101,7 @@ const TaskItem = ({ task, onAction }) => {
                                         onClick={(e) => { e.stopPropagation(); handleStatusChange(status); }}
                                         role="menuitemradio"
                                         aria-checked={task.status === status}
-                                        disabled={updateTask.isPending}
+                                        disabled={isPending}
                                     >
                                         {status.replace('-', ' ')}
                                     </button>

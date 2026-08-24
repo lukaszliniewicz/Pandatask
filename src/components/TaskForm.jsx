@@ -5,6 +5,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useCategories } from '../hooks/useCategories';
 import { useCategoryMutations } from '../hooks/useCategoryMutations';
 import { useConfig } from '../context/ConfigContext';
+import { useTaskStatusTransition } from '../context/CompletionContext';
 import { useUserBoards } from '../hooks/useUserBoards';
 import {
     buildTaskPayload,
@@ -32,6 +33,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
     const [newCategoryName, setNewCategoryName] = useState('');
     const { data: userBoards } = useUserBoards();
     const { createTask, updateTask } = useTaskMutations();
+    const { setStatus } = useTaskStatusTransition();
     const { createCategory } = useCategoryMutations();
 
     const initialValues = useMemo(
@@ -82,13 +84,22 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
             changeComment
         });
 
+        const shouldComplete = data.status === 'done' && (!isEdit || task.status !== 'done');
+        if (shouldComplete) {
+            payload.status = isEdit ? task.status : 'pending';
+        }
+
         try {
+            let savedTask;
             if (isEdit) {
-                await updateTask.mutateAsync({ id: task.id, data: payload });
+                savedTask = await updateTask.mutateAsync({ id: task.id, data: payload });
             } else {
-                await createTask.mutateAsync(payload);
+                savedTask = await createTask.mutateAsync(payload);
             }
             onClose();
+            if (shouldComplete && savedTask) {
+                await setStatus(savedTask, 'done', { changeComment });
+            }
         } catch (error) {
             console.error('Failed to save task:', error);
             alert('Failed to save task. Please try again.');

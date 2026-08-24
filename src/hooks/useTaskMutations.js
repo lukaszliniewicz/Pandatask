@@ -103,6 +103,37 @@ export const useTaskMutations = () => {
 		},
 	} );
 
+	const completeTask = useMutation( {
+		mutationFn: async ( {
+			id,
+			actualSeconds = null,
+			notTracked = false,
+			noPersonalWork = false,
+			changeComment = '',
+		} ) => {
+			const response = await apiClient.post( `tasks/${ id }/complete`, {
+				actual_seconds: actualSeconds,
+				not_tracked: notTracked,
+				no_personal_work: noPersonalWork,
+				change_comment: changeComment,
+			} );
+			return response.task;
+		},
+		onSettled: ( _, __, { id } ) => {
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.tasks.board( boardName ),
+			} );
+			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.taskWork( id ),
+			} );
+			queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.reports.board( boardName ),
+			} );
+		},
+	} );
+
 	const deleteTask = useMutation( {
 		mutationFn: async ( { id, scope } ) => {
 			const config = scope ? { params: { delete_scope: scope } } : {};
@@ -157,5 +188,5 @@ export const useTaskMutations = () => {
 		},
 	} );
 
-	return { createTask, updateTask, deleteTask };
+	return { createTask, updateTask, completeTask, deleteTask };
 };

@@ -5,6 +5,7 @@ import Layout from './Layout';
 import { createApiClient } from '../api/client';
 import { createPandataskQueryClient } from '../query/createQueryClient';
 import AppErrorBoundary from './AppErrorBoundary';
+import { CompletionProvider } from '../context/CompletionContext';
 
 const TaskBoard = ({ boardName, apiSettings, currentUser, isStandalone = false }) => {
     // Initialize QueryClient
@@ -39,9 +40,11 @@ const TaskBoard = ({ boardName, apiSettings, currentUser, isStandalone = false }
     return (
         <ConfigProvider config={config}>
             <QueryClientProvider client={queryClient}>
-                <AppErrorBoundary key={boardName}>
-                    <Layout />
-                </AppErrorBoundary>
+                <CompletionProvider>
+                    <AppErrorBoundary key={boardName}>
+                        <Layout />
+                    </AppErrorBoundary>
+                </CompletionProvider>
             </QueryClientProvider>
         </ConfigProvider>
     );

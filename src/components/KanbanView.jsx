@@ -1,7 +1,7 @@
 import React from 'react';
 import { DndContext, KeyboardSensor, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import KanbanColumn from './KanbanColumn';
-import { useTaskMutations } from '../hooks/useTaskMutations';
+import { useTaskStatusTransition } from '../context/CompletionContext';
 import { wouldCreateTaskCycle } from '../utils';
 
 const KANBAN_COLUMNS = [
@@ -14,7 +14,7 @@ const VALID_STATUSES = new Set(KANBAN_COLUMNS.map((column) => column.id));
 const KanbanView = ({ tasks, onTaskAction }) => {
     // Tasks might be null/undefined during loading
     const safeTasks = tasks || [];
-    const { updateTask } = useTaskMutations();
+    const { setStatus } = useTaskStatusTransition();
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -50,7 +50,7 @@ const KanbanView = ({ tasks, onTaskAction }) => {
 
         const newStatus = over.id;
         if (VALID_STATUSES.has(newStatus) && activeTask.status !== newStatus) {
-            updateTask.mutate({ id: taskId, data: { status: newStatus } });
+            setStatus(activeTask, newStatus).catch((error) => console.error(error));
         }
     };
 

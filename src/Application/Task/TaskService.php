@@ -39,6 +39,12 @@ final class TaskService {
         return $this->mutation_service->updateTask( $task_id, $data, $change_comment, $actor_id );
     }
 
+    public function completeTask( $task_id, array $completion, $change_comment = '', $actor_id = null ) {
+        $actor_id = null === $actor_id ? get_current_user_id() : (int) $actor_id;
+
+        return $this->mutation_service->completeTask( $task_id, $completion, $change_comment, $actor_id );
+    }
+
     public function deleteTask( $task_id, $delete_scope = null ) {
         return $this->mutation_service->deleteTask( (int) $task_id, $delete_scope );
     }

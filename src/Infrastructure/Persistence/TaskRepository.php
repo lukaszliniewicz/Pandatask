@@ -149,24 +149,16 @@ final class TaskRepository {
         $tasks_table       = $prefix . 'tasks';
         $categories_table  = $prefix . 'categories';
         $projects_table    = $prefix . 'projects';
-        $history_table     = $prefix . 'task_history';
         $users_table       = $wpdb->users;
         $sql               = $wpdb->prepare(
             "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
-             creator.display_name as creator_name,
-             creator.ID as creator_id
+             creator.display_name as creator_name
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
              LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
-             LEFT JOIN {$history_table} h ON h.id = (
-                 SELECT MIN(creator_history.id)
-                 FROM {$history_table} creator_history
-                 WHERE creator_history.task_id = t.id
-                   AND creator_history.field_changed = 'task_created'
-             )
-             LEFT JOIN {$users_table} creator ON h.user_id = creator.ID
+             LEFT JOIN {$users_table} creator ON t.creator_id = creator.ID
              WHERE t.id = %d",
             $task_id
         );
@@ -254,19 +246,9 @@ final class TaskRepository {
         $prefix = DatabaseContext::getDbPrefix();
         $tasks_table = $prefix . 'tasks';
         $assignments_table = $prefix . 'assignments';
-        $history_table = $prefix . 'task_history';
-
         $task = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT t.id, t.board_name,
-                    (
-                        SELECT creator_history.user_id
-                        FROM {$history_table} creator_history
-                        WHERE creator_history.task_id = t.id
-                          AND creator_history.field_changed = 'task_created'
-                        ORDER BY creator_history.id ASC
-                        LIMIT 1
-                    ) AS creator_id
+                "SELECT t.id, t.board_name, t.creator_id
                  FROM {$tasks_table} t
                  WHERE t.id = %d",
                 $task_id
@@ -485,7 +467,6 @@ final class TaskRepository {
         $prefix            = DatabaseContext::getDbPrefix();
         $tasks_table       = $prefix . 'tasks';
         $assignments_table = $prefix . 'assignments';
-        $history_table     = $prefix . 'task_history';
         $results = $wpdb->get_col(
             $wpdb->prepare(
                 "SELECT assignment.user_id
@@ -493,11 +474,10 @@ final class TaskRepository {
                  INNER JOIN {$tasks_table} task ON task.id = assignment.task_id
                  WHERE task.board_name = %s
                  UNION
-                 SELECT history_entry.user_id
-                 FROM {$history_table} history_entry
-                 INNER JOIN {$tasks_table} task ON task.id = history_entry.task_id
+                 SELECT task.creator_id
+                 FROM {$tasks_table} task
                  WHERE task.board_name = %s
-                   AND history_entry.field_changed = 'task_created'",
+                   AND task.creator_id IS NOT NULL",
                 $board_name,
                 $board_name
             )
@@ -514,19 +494,10 @@ final class TaskRepository {
         $assignments_table = $prefix . 'assignments';
         $categories_table  = $prefix . 'categories';
         $projects_table    = $prefix . 'projects';
-        $history_table     = $prefix . 'task_history';
         $sql               = $wpdb->prepare(
             "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
-             parent.status as parent_task_status,
-             (
-                 SELECT creator_history.user_id
-                 FROM {$history_table} creator_history
-                 WHERE creator_history.task_id = t.id
-                   AND creator_history.field_changed = 'task_created'
-                 ORDER BY creator_history.id ASC
-                 LIMIT 1
-             ) as creator_id
+             parent.status as parent_task_status
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
@@ -538,13 +509,7 @@ final class TaskRepository {
                      WHERE user_assignment.task_id = t.id
                        AND user_assignment.user_id = %d
                  )
-                 OR EXISTS (
-                     SELECT 1
-                     FROM {$history_table} user_history
-                     WHERE user_history.task_id = t.id
-                       AND user_history.field_changed = 'task_created'
-                       AND user_history.user_id = %d
-                 )
+                 OR t.creator_id = %d
              )
              AND t.archived = %d",
             $user_id,

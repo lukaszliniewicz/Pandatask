@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useTaskMutations } from '../hooks/useTaskMutations';
+import { useTaskStatusTransition } from '../context/CompletionContext';
 
 const STATUS_COLORS = {
     'pending': '#e9b44c',
@@ -15,7 +15,7 @@ const STATUS_LABELS = {
 
 const StatusBadge = ({ task, mode = 'pill' }) => {
     // mode: 'pill' (text + color bg), 'dot' (color circle only)
-    const { updateTask } = useTaskMutations();
+    const { setStatus, isPending } = useTaskStatusTransition();
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef(null);
 
@@ -32,11 +32,11 @@ const StatusBadge = ({ task, mode = 'pill' }) => {
     }, [isOpen]);
 
     const handleStatusChange = async (newStatus) => {
-        if (updateTask.isPending) return;
+        if (isPending) return;
         setIsOpen(false);
         if (task.status !== newStatus) {
             try {
-                await updateTask.mutateAsync({ id: task.id, data: { status: newStatus } });
+                await setStatus(task, newStatus);
             } catch (error) {
                 console.error(error);
             }
@@ -81,7 +81,7 @@ const StatusBadge = ({ task, mode = 'pill' }) => {
                             }}
                             role="menuitemradio"
                             aria-checked={task.status === key}
-                            disabled={updateTask.isPending}
+                            disabled={isPending}
                         >
                             <span className="dot" style={{backgroundColor: STATUS_COLORS[key]}}></span>
                             {STATUS_LABELS[key]}

@@ -97,17 +97,17 @@ final class TaskCommandRepository {
         }
 
         $assignments_table = DatabaseContext::getDbPrefix() . 'assignments';
-        $history_table = DatabaseContext::getDbPrefix() . 'task_history';
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
         $task_ids_sql = implode( ',', $task_ids );
         $user_ids = $wpdb->get_col(
             "SELECT user_id
              FROM {$assignments_table}
              WHERE task_id IN ({$task_ids_sql})"
             . " UNION
-                SELECT user_id
-                FROM {$history_table}
-                WHERE task_id IN ({$task_ids_sql})
-                AND field_changed = 'task_created'"
+                SELECT creator_id
+                FROM {$tasks_table}
+                WHERE id IN ({$task_ids_sql})
+                AND creator_id IS NOT NULL"
         );
 
         return array_values( array_filter( array_map( 'absint', (array) $user_ids ) ) );

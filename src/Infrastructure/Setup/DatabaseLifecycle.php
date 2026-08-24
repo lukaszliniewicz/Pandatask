@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.15';
+    private const DB_VERSION = '1.0.16';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -32,6 +32,11 @@ final class DatabaseLifecycle {
         $table_task_history        = $prefix . 'task_history';
         $table_change_buffers      = $prefix . 'task_change_buffers';
         $table_board_events        = $prefix . 'board_events';
+        $table_work_occurrences    = $prefix . 'task_work_occurrences';
+        $table_work_entries        = $prefix . 'work_entries';
+        $table_work_allocations    = $prefix . 'work_allocations';
+        $table_time_resolutions    = $prefix . 'task_time_resolutions';
+        $table_work_audit_log      = $prefix . 'work_audit_log';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -41,8 +46,11 @@ final class DatabaseLifecycle {
 
         $sql_tasks = "CREATE TABLE $table_tasks (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            board_name VARCHAR(100) NOT NULL,
+            board_name VARCHAR(191) NOT NULL,
             name VARCHAR(255) NOT NULL,
+            creator_id BIGINT(20) UNSIGNED NULL,
+            estimated_effort_seconds INT UNSIGNED NULL,
+            current_work_occurrence_id BIGINT(20) UNSIGNED NULL,
             description LONGTEXT NULL,
             task_type VARCHAR(20) NOT NULL DEFAULT 'task',
             bug_url VARCHAR(2048) NULL,
@@ -74,6 +82,8 @@ final class DatabaseLifecycle {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY board_name (board_name),
+            KEY creator_id (creator_id),
+            KEY current_work_occurrence_id (current_work_occurrence_id),
             KEY task_type (task_type),
             KEY status (status),
             KEY priority (priority),
@@ -100,7 +110,7 @@ final class DatabaseLifecycle {
 
         $sql_projects = "CREATE TABLE $table_projects (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            board_name VARCHAR(100) NOT NULL,
+            board_name VARCHAR(191) NOT NULL,
             name VARCHAR(255) NOT NULL,
             description LONGTEXT NULL,
             deadline DATE NULL,
@@ -125,7 +135,7 @@ final class DatabaseLifecycle {
 
         $sql_categories = "CREATE TABLE $table_categories (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            board_name VARCHAR(100) NOT NULL,
+            board_name VARCHAR(191) NOT NULL,
             name VARCHAR(100) NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY board_name_name (board_name, name),
@@ -208,7 +218,7 @@ final class DatabaseLifecycle {
 
         $sql_board_events = "CREATE TABLE $table_board_events (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            board_name VARCHAR(100) NOT NULL,
+            board_name VARCHAR(191) NOT NULL,
             task_id BIGINT(20) UNSIGNED NOT NULL,
             actor_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
             event_type VARCHAR(32) NOT NULL,
@@ -226,6 +236,128 @@ final class DatabaseLifecycle {
             KEY event_type (event_type)
         ) $charset_collate;";
         dbDelta( $sql_board_events );
+
+        $sql_work_occurrences = "CREATE TABLE $table_work_occurrences (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            task_id BIGINT(20) UNSIGNED NOT NULL,
+            creator_id_snapshot BIGINT(20) UNSIGNED NULL,
+            sequence_number INT UNSIGNED NOT NULL DEFAULT 1,
+            occurrence_key VARCHAR(191) NOT NULL,
+            state VARCHAR(20) NOT NULL DEFAULT 'open',
+            board_name_snapshot VARCHAR(191) NOT NULL,
+            task_name_snapshot VARCHAR(255) NOT NULL,
+            project_id_snapshot BIGINT(20) UNSIGNED NULL,
+            project_name_snapshot VARCHAR(255) NULL,
+            category_id_snapshot BIGINT(20) UNSIGNED NULL,
+            category_name_snapshot VARCHAR(100) NULL,
+            start_date_snapshot DATE NULL,
+            deadline_snapshot DATE NULL,
+            estimated_effort_seconds INT UNSIGNED NULL,
+            opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at DATETIME NULL,
+            skipped_at DATETIME NULL,
+            cancelled_at DATETIME NULL,
+            tombstoned_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY task_sequence (task_id, sequence_number),
+            UNIQUE KEY occurrence_key (occurrence_key),
+            KEY creator_id_snapshot (creator_id_snapshot),
+            KEY task_state (task_id, state),
+            KEY board_state (board_name_snapshot, state),
+            KEY opened_at (opened_at)
+        ) $charset_collate;";
+        dbDelta( $sql_work_occurrences );
+
+        $sql_work_entries = "CREATE TABLE $table_work_entries (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            created_by BIGINT(20) UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            notes LONGTEXT NULL,
+            activity_type VARCHAR(32) NULL,
+            capacity VARCHAR(20) NULL,
+            work_date DATE NOT NULL,
+            started_at_utc DATETIME NULL,
+            ended_at_utc DATETIME NULL,
+            timezone VARCHAR(64) NULL,
+            duration_seconds INT UNSIGNED NOT NULL,
+            kind VARCHAR(20) NOT NULL DEFAULT 'manual',
+            source_key VARCHAR(191) NULL,
+            source_url VARCHAR(2048) NULL,
+            visibility VARCHAR(20) NOT NULL DEFAULT 'private',
+            deleted_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY source_key (source_key),
+            KEY user_date (user_id, work_date, id),
+            KEY activity_type (activity_type),
+            KEY kind (kind),
+            KEY deleted_at (deleted_at)
+        ) $charset_collate;";
+        dbDelta( $sql_work_entries );
+
+        $sql_work_allocations = "CREATE TABLE $table_work_allocations (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            work_entry_id BIGINT(20) UNSIGNED NOT NULL,
+            occurrence_id BIGINT(20) UNSIGNED NULL,
+            seconds INT UNSIGNED NOT NULL,
+            task_id_snapshot BIGINT(20) UNSIGNED NULL,
+            task_name_snapshot VARCHAR(255) NULL,
+            board_name_snapshot VARCHAR(191) NULL,
+            project_id_snapshot BIGINT(20) UNSIGNED NULL,
+            project_name_snapshot VARCHAR(255) NULL,
+            category_id_snapshot BIGINT(20) UNSIGNED NULL,
+            category_name_snapshot VARCHAR(100) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY work_entry_id (work_entry_id),
+            KEY occurrence_id (occurrence_id),
+            KEY task_id_snapshot (task_id_snapshot),
+            KEY board_date_scope (board_name_snapshot, work_entry_id),
+            KEY project_id_snapshot (project_id_snapshot),
+            KEY category_id_snapshot (category_id_snapshot)
+        ) $charset_collate;";
+        dbDelta( $sql_work_allocations );
+
+        $sql_time_resolutions = "CREATE TABLE $table_time_resolutions (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            occurrence_id BIGINT(20) UNSIGNED NOT NULL,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            revision INT UNSIGNED NOT NULL DEFAULT 1,
+            state VARCHAR(20) NOT NULL DEFAULT 'unresolved',
+            declared_actual_seconds INT UNSIGNED NULL,
+            specific_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+            residual_entry_id BIGINT(20) UNSIGNED NULL,
+            resolved_by BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY occurrence_user_revision (occurrence_id, user_id, revision),
+            KEY occurrence_user (occurrence_id, user_id),
+            KEY state (state),
+            KEY residual_entry_id (residual_entry_id)
+        ) $charset_collate;";
+        dbDelta( $sql_time_resolutions );
+
+        $sql_work_audit_log = "CREATE TABLE $table_work_audit_log (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            entity_type VARCHAR(32) NOT NULL,
+            entity_id BIGINT(20) UNSIGNED NOT NULL,
+            action VARCHAR(32) NOT NULL,
+            actor_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            before_data LONGTEXT NULL,
+            after_data LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY entity_history (entity_type, entity_id, id),
+            KEY actor_id (actor_id),
+            KEY created_at (created_at)
+        ) $charset_collate;";
+        dbDelta( $sql_work_audit_log );
 
         return true;
     }
@@ -257,6 +389,11 @@ final class DatabaseLifecycle {
             $prefix . 'task_relationships',
             $prefix . 'task_change_buffers',
             $prefix . 'board_events',
+            $prefix . 'task_work_occurrences',
+            $prefix . 'work_entries',
+            $prefix . 'work_allocations',
+            $prefix . 'task_time_resolutions',
+            $prefix . 'work_audit_log',
         );
 
         foreach ( $required_tables as $table ) {
@@ -268,7 +405,7 @@ final class DatabaseLifecycle {
         $tasks_table = $prefix . 'tasks';
         $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 
-        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_anchor_day' ) as $column ) {
+        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id' ) as $column ) {
             if ( ! in_array( $column, $task_columns, true ) ) {
                 return false;
             }
@@ -287,6 +424,11 @@ final class DatabaseLifecycle {
             $prefix . 'task_history' => array( 'task_changed' ),
             $prefix . 'task_change_buffers' => array( 'task_actor_delivery', 'delivery_queue' ),
             $prefix . 'board_events' => array( 'source_activity', 'board_created', 'task_id', 'actor_id', 'event_type' ),
+            $prefix . 'task_work_occurrences' => array( 'task_sequence', 'occurrence_key', 'creator_id_snapshot', 'task_state', 'board_state', 'opened_at' ),
+            $prefix . 'work_entries' => array( 'source_key', 'user_date', 'activity_type', 'kind', 'deleted_at' ),
+            $prefix . 'work_allocations' => array( 'work_entry_id', 'occurrence_id', 'task_id_snapshot', 'board_date_scope', 'project_id_snapshot', 'category_id_snapshot' ),
+            $prefix . 'task_time_resolutions' => array( 'occurrence_user_revision', 'occurrence_user', 'state', 'residual_entry_id' ),
+            $prefix . 'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {
@@ -319,6 +461,9 @@ final class DatabaseLifecycle {
         $comments = $prefix . 'comments';
         $relationships = $prefix . 'task_relationships';
         $buffers = $prefix . 'task_change_buffers';
+        $history = $prefix . 'task_history';
+        $occurrences = $prefix . 'task_work_occurrences';
+        $time_resolutions = $prefix . 'task_time_resolutions';
         $users = $wpdb->users;
 
         try {
@@ -371,6 +516,20 @@ final class DatabaseLifecycle {
                  SET child.parent_task_id = NULL, child.updated_at = UTC_TIMESTAMP()
                  WHERE child.parent_task_id IS NOT NULL
                    AND (parent.id IS NULL OR parent.board_name <> child.board_name)",
+                "UPDATE {$tasks} task
+                 LEFT JOIN {$users} user_record ON user_record.ID = task.creator_id
+                 SET task.creator_id = NULL
+                 WHERE task.creator_id IS NOT NULL AND user_record.ID IS NULL",
+                "UPDATE {$tasks} task
+                 SET task.creator_id = (
+                     SELECT creator_history.user_id
+                     FROM {$history} creator_history
+                     WHERE creator_history.task_id = task.id
+                       AND creator_history.field_changed = 'task_created'
+                     ORDER BY creator_history.id ASC
+                     LIMIT 1
+                 )
+                 WHERE task.creator_id IS NULL",
                 "UPDATE {$tasks}
                  SET status = 'pending', completed_at = NULL, updated_at = UTC_TIMESTAMP()
                  WHERE status NOT IN ('pending', 'in-progress', 'done')",
@@ -450,6 +609,88 @@ final class DatabaseLifecycle {
                 if ( false === $wpdb->query( $query ) ) {
                     throw new Exception( 'A PandaTask data-repair query failed.' );
                 }
+            }
+
+            $missing_occurrences = $wpdb->get_results(
+                "SELECT task.*,
+                        project.name AS project_name_snapshot,
+                        category.name AS category_name_snapshot
+                 FROM {$tasks} task
+                 LEFT JOIN {$projects} project ON project.id = task.project_id AND project.board_name = task.board_name
+                 LEFT JOIN {$categories} category ON category.id = task.category_id AND category.board_name = task.board_name
+                 LEFT JOIN {$occurrences} occurrence ON occurrence.task_id = task.id
+                 WHERE occurrence.id IS NULL
+                 ORDER BY task.id ASC"
+            );
+
+            foreach ( $missing_occurrences as $task ) {
+                $state = 'done' === $task->status ? 'completed' : 'open';
+                $created = $wpdb->insert(
+                    $occurrences,
+                    array(
+                        'task_id'                  => (int) $task->id,
+                        'creator_id_snapshot'      => $task->creator_id ? (int) $task->creator_id : null,
+                        'sequence_number'          => 1,
+                        'occurrence_key'           => 'task-' . (int) $task->id . '-1',
+                        'state'                    => $state,
+                        'board_name_snapshot'      => $task->board_name,
+                        'task_name_snapshot'       => $task->name,
+                        'project_id_snapshot'      => $task->project_id ?: null,
+                        'project_name_snapshot'    => $task->project_name_snapshot ?: null,
+                        'category_id_snapshot'     => $task->category_id ?: null,
+                        'category_name_snapshot'   => $task->category_name_snapshot ?: null,
+                        'start_date_snapshot'      => $task->start_date ?: null,
+                        'deadline_snapshot'        => $task->deadline ?: null,
+                        'estimated_effort_seconds' => $task->estimated_effort_seconds ?: null,
+                        'opened_at'                => $task->created_at ?: gmdate( 'Y-m-d H:i:s' ),
+                        'completed_at'             => 'completed' === $state ? ( $task->completed_at ?: $task->updated_at ) : null,
+                    )
+                );
+
+                if ( false === $created ) {
+                    throw new Exception( 'A PandaTask work-occurrence backfill failed.' );
+                }
+
+                $occurrence_id = (int) $wpdb->insert_id;
+                if ( false === $wpdb->update( $tasks, array( 'current_work_occurrence_id' => $occurrence_id ), array( 'id' => (int) $task->id ), array( '%d' ), array( '%d' ) ) ) {
+                    throw new Exception( 'A PandaTask current occurrence backfill failed.' );
+                }
+            }
+
+            $current_occurrence_repair = $wpdb->query(
+                "UPDATE {$tasks} task
+                 LEFT JOIN {$occurrences} current_occurrence
+                    ON current_occurrence.id = task.current_work_occurrence_id
+                   AND current_occurrence.task_id = task.id
+                 SET task.current_work_occurrence_id = (
+                     SELECT latest.id
+                     FROM {$occurrences} latest
+                     WHERE latest.task_id = task.id
+                     ORDER BY latest.sequence_number DESC, latest.id DESC
+                     LIMIT 1
+                 )
+                 WHERE current_occurrence.id IS NULL"
+            );
+            if ( false === $current_occurrence_repair ) {
+                throw new Exception( 'A PandaTask current work-occurrence repair failed.' );
+            }
+
+            $unresolved_backfill = $wpdb->query(
+                "INSERT INTO {$time_resolutions}
+                    (occurrence_id, user_id, revision, state, declared_actual_seconds, specific_seconds, residual_entry_id, resolved_by, created_at, updated_at)
+                 SELECT occurrence.id, assignment.user_id, 1, 'unresolved', NULL, 0, NULL, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+                 FROM {$occurrences} occurrence
+                 INNER JOIN {$assignments} assignment
+                    ON assignment.task_id = occurrence.task_id
+                   AND assignment.role = 'assignee'
+                 LEFT JOIN {$time_resolutions} existing
+                    ON existing.occurrence_id = occurrence.id
+                   AND existing.user_id = assignment.user_id
+                 WHERE occurrence.state = 'completed'
+                   AND existing.id IS NULL"
+            );
+            if ( false === $unresolved_backfill ) {
+                throw new Exception( 'A PandaTask unresolved task-time backfill failed.' );
             }
 
             if ( ! self::repairGraphCycles() || ! self::repairProjectInheritance() ) {
@@ -592,10 +833,10 @@ final class DatabaseLifecycle {
                  FROM {$assignments_table}
                  WHERE task_id IN ({$task_ids_sql})
                  UNION
-                 SELECT DISTINCT user_id
-                 FROM {$history_table}
-                 WHERE task_id IN ({$task_ids_sql})
-                 AND field_changed = 'task_created'"
+                 SELECT DISTINCT creator_id
+                 FROM {$tasks_table}
+                 WHERE id IN ({$task_ids_sql})
+                 AND creator_id IS NOT NULL"
             );
 
         $detached = $wpdb->query(

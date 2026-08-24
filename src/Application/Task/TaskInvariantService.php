@@ -48,10 +48,10 @@ final class TaskInvariantService {
 
         $board_name = sanitize_key( $data['board_name'] ?? ( $current_task->board_name ?? '' ) );
 
-        if ( '' === $board_name ) {
+        if ( '' === $board_name || strlen( $board_name ) > 191 ) {
             return new WP_Error(
                 'rest_invalid_param',
-                __( 'A valid board is required.', 'pandatask' ),
+                __( 'A valid board name of at most 191 characters is required.', 'pandatask' ),
                 array( 'status' => 422 )
             );
         }
@@ -289,6 +289,9 @@ final class TaskInvariantService {
             if ( '' === $data['name'] ) {
                 return new WP_Error( 'rest_invalid_param', __( 'Task name cannot be empty.', 'pandatask' ), array( 'status' => 422 ) );
             }
+            if ( function_exists( 'mb_strlen' ) ? mb_strlen( $data['name'] ) > 255 : strlen( $data['name'] ) > 255 ) {
+                return new WP_Error( 'rest_invalid_param', __( 'Task name cannot exceed 255 characters.', 'pandatask' ), array( 'status' => 422 ) );
+            }
         }
 
         if ( array_key_exists( 'description', $data ) ) {
@@ -313,6 +316,12 @@ final class TaskInvariantService {
 
         if ( array_key_exists( 'priority', $data ) ) {
             $data['priority'] = max( 1, min( 10, (int) $data['priority'] ) );
+        }
+
+        if ( array_key_exists( 'estimated_effort_seconds', $data ) ) {
+            $data['estimated_effort_seconds'] = '' === $data['estimated_effort_seconds'] || null === $data['estimated_effort_seconds']
+                ? null
+                : max( 0, (int) $data['estimated_effort_seconds'] );
         }
 
         foreach ( array( 'assigned_persons', 'supervisor_persons', 'predecessors' ) as $id_field ) {

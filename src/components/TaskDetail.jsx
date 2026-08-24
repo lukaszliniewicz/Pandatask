@@ -6,6 +6,7 @@ import TaskDetailHeader from './task-detail/TaskDetailHeader';
 import TaskDetailMetadata from './task-detail/TaskDetailMetadata';
 import TaskDetailSubtasks from './task-detail/TaskDetailSubtasks';
 import TaskHistory from './task-detail/TaskHistory';
+import TaskTimeCard from './work/TaskTimeCard';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHeader = false }) => {
     const { data: task, isLoading, isError } = useTaskDetails(taskId);
@@ -31,6 +32,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHe
             />
             <TaskDetailMetadata task={task} />
             <TaskDetailSubtasks task={task} onAddSubtask={onAddSubtask} onNavigate={handleNavigate} />
+            <TaskTimeCard task={task} />
             <TaskDetailDescription task={task} />
             <TaskComments task={task} />
             <TaskHistory taskId={task.id} />

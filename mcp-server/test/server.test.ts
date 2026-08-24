@@ -81,6 +81,77 @@ test('MCP server publishes annotated granular tools, workflows, resources, and p
   assert.ok(prompts.prompts.some((prompt) => prompt.name === 'launch-project'));
 });
 
+test('work_log supports split allocations without double-counting the entry duration', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
+
+  const preview = await client.callTool({
+    name: 'work_log',
+    arguments: {
+      title: 'Committee meeting',
+      activity_type: 'meeting',
+      work_date: '2026-08-24',
+      duration_seconds: 5400,
+      allocations: [
+        { task_id: 10, seconds: 3600 },
+        { task_id: 11, seconds: 1800 },
+      ],
+      idempotency_key: 'work-meeting-20260824',
+    },
+  });
+  assert.equal(preview.isError, undefined);
+  const envelope = preview.structuredContent as Record<string, unknown>;
+  const data = envelope.data as Record<string, unknown>;
+  const request = data.would_execute as Record<string, unknown>;
+  const body = request.body as Record<string, unknown>;
+  assert.equal(body.duration_seconds, 5400);
+  assert.deepEqual(body.allocations, [
+    { task_id: 10, seconds: 3600 },
+    { task_id: 11, seconds: 1800 },
+  ]);
+
+  const overallocated = await client.callTool({
+    name: 'work_log',
+    arguments: {
+      title: 'Impossible split',
+      activity_type: 'meeting',
+      work_date: '2026-08-24',
+      duration_seconds: 3600,
+      allocations: [
+        { task_id: 10, seconds: 2400 },
+        { task_id: 11, seconds: 2400 },
+      ],
+    },
+  });
+  assert.equal(overallocated.isError, true);
+
+  const duplicate = await client.callTool({
+    name: 'work_log',
+    arguments: {
+      title: 'Duplicate task split',
+      activity_type: 'meeting',
+      work_date: '2026-08-24',
+      duration_seconds: 3600,
+      allocations: [
+        { task_id: 10, seconds: 1800 },
+        { task_id: 10, seconds: 1800 },
+      ],
+    },
+  });
+  assert.equal(duplicate.isError, true);
+});
+
+test('task status tool keeps completion on the time-aware boundary', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
+  const tools = await client.listTools();
+  assert.ok(tools.tools.some((tool) => tool.name === 'task_complete'));
+
+  const done = await client.callTool({
+    name: 'task_set_status',
+    arguments: { task_id: 10, status: 'done' },
+  });
+  assert.equal(done.isError, true);
+});
+
 test('tool profiles keep core focused and administrator tools opt-in', async (t) => {
   const fetchImplementation = async () => new Response('{}', { status: 200 });
   const coreClient = await connectedClient(t, { ...config, toolProfile: 'core' }, fetchImplementation);

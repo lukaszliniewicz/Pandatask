@@ -130,7 +130,7 @@ final class TaskInputNormalizer {
             $data['priority'] = max( 1, min( 10, absint( $params['priority'] ) ) );
         }
 
-        foreach ( array( 'category_id', 'project_id', 'parent_task_id', 'deadline_days_after_start', 'notify_days_before', 'recurrence_interval', 'attachment_post_id' ) as $integer_field ) {
+        foreach ( array( 'category_id', 'project_id', 'parent_task_id', 'deadline_days_after_start', 'notify_days_before', 'recurrence_interval', 'attachment_post_id', 'estimated_effort_seconds' ) as $integer_field ) {
             if ( array_key_exists( $integer_field, $params ) ) {
                 $data[ $integer_field ] = '' === $params[ $integer_field ] || null === $params[ $integer_field ]
                     ? null

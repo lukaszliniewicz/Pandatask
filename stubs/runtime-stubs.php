@@ -20,8 +20,12 @@ if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', '/' );
 }
 
+if ( ! defined( 'ARRAY_A' ) ) {
+    define( 'ARRAY_A', 'ARRAY_A' );
+}
+
 if ( ! defined( 'PANDAT69_PLUGIN_DIR' ) ) {
-    define( 'PANDAT69_PLUGIN_DIR', '/' );
+    define( 'PANDAT69_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 }
 
 if ( ! defined( 'PANDAT69_PLUGIN_URL' ) ) {

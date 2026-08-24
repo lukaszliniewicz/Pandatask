@@ -38,7 +38,7 @@ const BoardShell = ({ controller }) => (
             />
 
             <main className="pandat69-main-content">
-                <BoardTabNavigation currentTab={controller.currentTab} onChange={controller.setCurrentTab} />
+                <BoardTabNavigation currentTab={controller.currentTab} onChange={controller.setCurrentTab} isUserBoard={controller.isUserBoard} />
                 <BoardContent controller={controller} />
             </main>
         </div>

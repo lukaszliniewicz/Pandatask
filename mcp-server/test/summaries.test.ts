@@ -31,13 +31,13 @@ test('workload and deadline review preserve useful task references', () => {
   assert.deepEqual((review.tasks as Record<string, unknown>[]).map((task) => task.id), [1, 2, 3]);
 });
 
-test('recurring templates are reported but excluded from actionable totals', () => {
+test('recurrence-enabled tasks remain actionable current occurrences', () => {
   const summary = summarizeTasks(
-    [...tasks, { id: 5, name: 'Template', status: 'pending', priority: 10, deadline: '2026-07-18', is_recurring: true }],
+    [...tasks, { id: 5, name: 'Recurring current work', status: 'pending', priority: 10, deadline: '2026-07-18', is_recurring: true }],
     '2026-07-19',
   );
-  assert.equal(summary.total, 4);
+  assert.equal(summary.total, 5);
   assert.equal(summary.total_records, 5);
-  assert.equal(summary.recurring_templates, 1);
-  assert.equal(summary.overdue, 1);
+  assert.equal(summary.recurring_tasks, 1);
+  assert.equal(summary.overdue, 2);
 });

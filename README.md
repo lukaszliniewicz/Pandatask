@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.19
+**Version:** 1.0.20
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -380,6 +380,13 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.20
+
+- Add first-class Work Log entries with split task allocations, activity/capacity classification, private notes, and personal cross-board reporting.
+- Add durable task work occurrences and cumulative time resolution so recurring, skipped, reopened, and deleted tasks preserve distinct work history without double-counting residual time.
+- Centralize human task completion through time-aware REST, React, and MCP boundaries; add task effort estimates, audit persistence, access policy, schema 1.0.16 migration/backfill, and Work Log UI.
+- Repair personal report scope, recurring MCP semantics, creator persistence, schema/smoke drift, PHPStan stubs, accessibility findings, and production backup coverage for Work Log tables.
 
 ### 1.0.19
 

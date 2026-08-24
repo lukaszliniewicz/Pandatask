@@ -8,6 +8,8 @@ final class RestApi {
 
     private $route_registrar;
 
+    private $work_route_registrar;
+
     public function __construct() {
         $permission_checker = new PermissionChecker();
         $schema_provider    = new SchemaProvider();
@@ -35,11 +37,13 @@ final class RestApi {
             $batch_action_handler,
             $schema_provider
         );
+        $this->work_route_registrar = new WorkRouteRegistrar( 'pandatask/v1', $permission_checker );
     }
 
     public function registerRoutes() {
         IdempotencyMiddleware::register();
         $this->route_registrar->register();
+        $this->work_route_registrar->register();
     }
 
     public function register_routes() {

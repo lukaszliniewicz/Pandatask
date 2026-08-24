@@ -33,7 +33,7 @@ function enabled(value: unknown): boolean {
 }
 
 function actionableTasks(tasks: UnknownRecord[]): UnknownRecord[] {
-  return tasks.filter((task) => !enabled(task.is_recurring));
+  return tasks;
 }
 
 function dateValue(value: unknown): string | null {
@@ -96,7 +96,8 @@ export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRe
     high_priority_open: highPriority.length,
     unassigned_open: unassigned.length,
     blocked_open: blocked.length,
-    recurring_templates: tasks.filter((task) => enabled(task.is_recurring)).length,
+    recurring_tasks: tasks.filter((task) => enabled(task.is_recurring)).length,
+    recurring_templates: tasks.filter((task) => enabled(task.is_recurring)).length, // Backward-compatible alias; recurrence-enabled rows are current work, not template-only records.
     attention: {
       overdue: overdue.slice(0, 25).map(compactTask),
       due_today: dueToday.slice(0, 25).map(compactTask),

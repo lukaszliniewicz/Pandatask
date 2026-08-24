@@ -25,6 +25,7 @@ import {
   taskUpdateData,
 } from './schemas.js';
 import { collection, deadlineReview, numberIds, summarizeTasks, workload } from './summaries.js';
+import { registerWorkTools } from './work-tools.js';
 
 const VERSION = '1.1.0';
 
@@ -607,8 +608,9 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     'Creates a fully specified task, bug, recurring template, or top-level work item on a board.',
     taskCreateData.safeExtend({ board_name: boardName, dry_run: dryRunField, idempotency_key: idempotencyKey }),
     write,
-    async (input, extra) =>
-      client.mutate(
+    async (input, extra) => {
+      if (input.status === 'done') throw new Error('Create the task in an open state, then use task_complete so actual time is resolved explicitly.');
+      return client.mutate(
         {
           method: 'POST',
           path: boardPath(input.board_name, '/tasks'),
@@ -617,7 +619,8 @@ export function createPandataskServer(client: PandataskClient): McpServer {
           signal: extra.signal,
         },
         input.dry_run,
-      ),
+      );
+    },
   );
 
   register(
@@ -630,6 +633,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     async (input, extra) => {
       const body = mutationBody(input, ['task_id', 'dry_run']);
       if (Object.keys(body).length === 0) throw new Error('Provide at least one task field to update.');
+      if (body.status === 'done') throw new Error('Use task_complete when completing a task so actual time is resolved explicitly.');
       return client.mutate({ method: 'PATCH', path: `/tasks/${input.task_id}`, body, signal: extra.signal }, input.dry_run);
     },
   );
@@ -656,16 +660,16 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_set_status',
     'Set task status',
-    'Moves a task to pending, in-progress, or done and optionally records a change comment.',
+    'Moves a task to pending or in-progress. Use task_complete for done so actual time is resolved explicitly.',
     z.object({
       task_id: positiveId,
-      status: z.enum(['pending', 'in-progress', 'done']).describe('New workflow status.'),
+      status: z.enum(['pending', 'in-progress']).describe('New open workflow status. Use task_complete for done.'),
       change_comment: z.string().max(2000).optional().describe('Audit-history explanation for the status change.'),
       dry_run: dryRunField,
     }),
     write,
-    async ({ task_id, status, change_comment, dry_run }, extra) =>
-      client.mutate(
+    async ({ task_id, status, change_comment, dry_run }, extra) => {
+      return client.mutate(
         {
           method: 'PATCH',
           path: `/tasks/${task_id}`,
@@ -673,7 +677,8 @@ export function createPandataskServer(client: PandataskClient): McpServer {
           signal: extra.signal,
         },
         dry_run,
-      ),
+      );
+    },
   );
 
   register(
@@ -1364,6 +1369,8 @@ export function createPandataskServer(client: PandataskClient): McpServer {
       ],
     }),
   );
+
+  registerWorkTools(server, client);
 
   return server;
 }

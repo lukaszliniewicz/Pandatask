@@ -15,6 +15,20 @@ export const queryKeys = {
 		[ ...root, 'task', Number( taskId ) ] as const,
 	taskHistory: ( taskId: number | string ) =>
 		[ ...root, 'task-history', Number( taskId ) ] as const,
+	taskWork: ( taskId: number | string ) =>
+		[ ...root, 'task-work', Number( taskId ) ] as const,
+	work: {
+		all: () => [ ...root, 'work' ] as const,
+		entries: ( filters: Record< string, unknown > = {} ) =>
+			[ ...root, 'work', 'entries', filters ] as const,
+		report: ( filters: Record< string, unknown > = {} ) =>
+			[ ...root, 'work', 'report', filters ] as const,
+		boardReport: (
+			boardName: string,
+			filters: Record< string, unknown > = {}
+		) => [ ...root, 'work', 'board-report', boardName, filters ] as const,
+		activityTypes: () => [ ...root, 'work', 'activity-types' ] as const,
+	},
 	categories: ( boardName: string ) =>
 		[ ...root, 'categories', boardName ] as const,
 	projects: {

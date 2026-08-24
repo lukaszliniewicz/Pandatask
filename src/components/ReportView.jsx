@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react';
 import { useReports } from '../hooks/useReports';
+import { useBoardWorkReport } from '../hooks/useWorkLog';
 import { parseUtcDateTime } from '../utils';
 import Icon from './Icon';
 
@@ -7,6 +8,13 @@ const formatReportDate = (value) => {
     if (!value) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     return parseUtcDateTime(value).toLocaleString();
+};
+
+const formatDuration = (seconds) => {
+    const totalMinutes = Math.round(Number(seconds || 0) / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours ? `${hours}h${minutes ? ` ${minutes}m` : ''}` : `${minutes}m`;
 };
 
 const CollapsibleReportSection = ({ title, children, defaultExpanded = false }) => {
@@ -41,7 +49,7 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue, defaultExp
         {items.length > 0 ? (
             <ul className="pandat69-report-list">
                 {items.map(task => (
-                    <li key={task.id}>
+                    <li key={task.occurrence_id ? `occurrence-${task.occurrence_id}` : task.id}>
                         <span className="pandat69-report-item-title">{task.name}</span>
                         <div className="pandat69-report-item-meta">
                             <Icon name={icon} size={15} /> {metaPrefix}: {formatReportDate(task.created_at || task.completed_at || task.deadline)}
@@ -75,6 +83,7 @@ const ReportView = () => {
     const isCustomValid = period !== 'custom' || (customRange.start && customRange.end);
     
     const { data, isLoading, isError, error, refetch } = useReports(filters);
+    const { data: workReport } = useBoardWorkReport(filters);
 
     const handleGenerate = () => {
         if (isCustomValid) refetch();
@@ -147,6 +156,24 @@ const ReportView = () => {
                         <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="circle-plus" metaPrefix="Added" defaultExpanded />
                         <ReportSection title={`Tasks Completed (${data.tasks_completed.length})`} items={data.tasks_completed} icon="circle-check" metaPrefix="Completed" />
                         <ReportSection title={`Missed Deadlines (${data.missed_deadlines.length})`} items={data.missed_deadlines} icon="calendar" metaPrefix="Deadline" showOverdue={true} />
+
+                        {workReport && (
+                            <CollapsibleReportSection title={`Work recorded (${formatDuration(workReport.total_seconds)})`}>
+                                <p className="pandat69-report-item-meta">
+                                    Allocated work in this report period. Completed assignee-occurrences still awaiting a time resolution: <strong>{workReport.unresolved_occurrences || 0}</strong>.
+                                </p>
+                                {workReport.breakdown?.length > 0 ? (
+                                    <ul className="pandat69-report-list">
+                                        {workReport.breakdown.map((row, index) => (
+                                            <li key={`${row.activity_type || row.kind || 'other'}-${row.capacity || 'none'}-${index}`}>
+                                                <strong>{row.activity_type || (row.kind === 'residual' ? 'Unitemised' : 'Other')}:</strong> {formatDuration(row.duration_seconds)}
+                                                {row.capacity ? ` · ${row.capacity}` : ''}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <p className="pandat69-report-empty">No work allocated to this board in the selected period.</p>}
+                            </CollapsibleReportSection>
+                        )}
                         
                         <CollapsibleReportSection title="Current Open Tasks Per Person">
                             {data.tasks_per_person.length > 0 ? (

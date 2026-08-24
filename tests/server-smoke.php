@@ -192,6 +192,12 @@ $index_requirements = array(
     'comments'     => array( 'task_created_id' ),
     'task_history' => array( 'task_field', 'task_changed' ),
     'task_change_buffers' => array( 'task_actor_delivery', 'delivery_queue' ),
+    'board_events' => array( 'source_activity', 'board_created', 'task_id', 'actor_id', 'event_type' ),
+    'task_work_occurrences' => array( 'task_sequence', 'occurrence_key', 'creator_id_snapshot', 'task_state', 'board_state', 'opened_at' ),
+    'work_entries' => array( 'source_key', 'user_date', 'activity_type', 'kind', 'deleted_at' ),
+    'work_allocations' => array( 'work_entry_id', 'occurrence_id', 'task_id_snapshot', 'board_date_scope', 'project_id_snapshot', 'category_id_snapshot' ),
+    'task_time_resolutions' => array( 'occurrence_user_revision', 'occurrence_user', 'state', 'residual_entry_id' ),
+    'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
 );
 $result['indexes'] = array();
 
@@ -213,13 +219,8 @@ foreach ( $index_requirements as $table_suffix => $required_indexes ) {
 $plugin_dir      = untrailingslashit( PANDAT69_PLUGIN_DIR );
 $required_assets = array(
     'build/main.js',
-    'build/156.js',
-    'build/725.js',
-    'build/226.js',
-    'build/638.js',
-    'build/651.js',
-    'build/785.js',
-    'build/940.js',
+    'build/main.css',
+    'build/main.asset.php',
     'assets/css/floating-bug-reporter.css',
     'assets/js/floating-bug-reporter.js',
 );
@@ -245,14 +246,17 @@ $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_ta
 $result['schema_columns'] = array(
     'deadline_reminder_sent_for' => in_array( 'deadline_reminder_sent_for', $task_columns, true ),
     'recurrence_anchor_day'      => in_array( 'recurrence_anchor_day', $task_columns, true ),
+    'creator_id'                 => in_array( 'creator_id', $task_columns, true ),
+    'estimated_effort_seconds'   => in_array( 'estimated_effort_seconds', $task_columns, true ),
+    'current_work_occurrence_id' => in_array( 'current_work_occurrence_id', $task_columns, true ),
 );
 
 if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( '1.0.19' !== $result['plugin_version'] || '1.0.14' !== $result['db_version'] ) {
-    $failures[] = 'Expected plugin version 1.0.19 with database schema 1.0.14.';
+if ( '1.0.20' !== $result['plugin_version'] || '1.0.16' !== $result['db_version'] ) {
+    $failures[] = 'Expected plugin version 1.0.20 with database schema 1.0.16.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
