@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { PandataskClient } from './client.js';
 import { handled, toolOutputSchema } from './result.js';
 import { dryRunField, idempotencyKey, isoDate, positiveId } from './schemas.js';
+import { toolEnabledForServer } from './tool-profile.js';
 
 const readOnly: ToolAnnotations = { readOnlyHint: true, openWorldHint: false, destructiveHint: false, idempotentHint: true };
 const write: ToolAnnotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: false, idempotentHint: false };
@@ -53,6 +54,7 @@ function register(
   annotations: ToolAnnotations,
   operation: (input: Record<string, unknown>, extra: Parameters<ToolCallback<z.ZodType<Record<string, unknown>>>>[1]) => Promise<unknown>,
 ): void {
+  if (!toolEnabledForServer(server, name)) return;
   const callback = (async (input: unknown, extra) => handled(() => operation(inputSchema.parse(input), extra))) as ToolCallback<z.ZodType<Record<string, unknown>>>;
   server.registerTool(name, {
     title,

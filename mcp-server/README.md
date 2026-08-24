@@ -177,19 +177,20 @@ Because dependency IDs are resolved sequentially, large plans can take longer th
 
 The server owns its advertised surface so profiles behave consistently across Codex, Antigravity, OpenCode, and other clients:
 
-- `core` — 19 recommended workflows and common read/write tools.
-- `full` — 38 non-administrator granular and workflow tools.
-- `admin` — the complete 40-tool surface, including `board_list` and `batch_execute`.
+- `core` — 24 recommended workflows and common read/write tools, including first-class task completion and work logging.
+- `full` — 43 non-administrator granular and workflow tools.
+- `admin` — the complete 45-tool surface, including `board_list` and `batch_execute`.
 
 Client-side allow/deny lists can narrow these profiles further.
 
 ## Granular tool groups
 
-The `admin` profile exposes 40 tools:
+The `admin` profile exposes 45 tools:
 
 - Connection/directory: `connection_check`, `user_search`.
 - Boards/workflows: `board_list`, `board_list_writable`, `board_get_context`, `board_get_summary`, `board_deadline_review`, `board_get_workload`, `daily_briefing`.
 - Tasks: `task_list`, `task_get`, `task_get_history`, `task_list_potential_parents`, `task_create`, `task_update`, `task_delete`, `task_set_status`, `task_set_archived`, `task_set_assignments`, `task_set_schedule`, `task_set_dependencies`, `task_create_subtask`, `task_move`, `task_bulk_update`, `task_archive_completed`.
+- Work/time: `task_complete`, `task_time_resolve`, `work_log`, `work_list`, `work_report`.
 - Projects: `project_list`, `project_get`, `project_create`, `project_update`, `project_delete`, `project_plan`.
 - Categories: `category_list`, `category_create`, `category_delete`.
 - Comments: `comment_list`, `comment_create`, `comment_update`, `comment_delete`.

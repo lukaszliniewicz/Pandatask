@@ -25,6 +25,7 @@ import {
   taskUpdateData,
 } from './schemas.js';
 import { collection, deadlineReview, numberIds, summarizeTasks, workload } from './summaries.js';
+import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
 const VERSION = '1.1.0';
@@ -56,37 +57,6 @@ const destructiveBatch: ToolAnnotations = {
 
 type ZodToolSchema = z.ZodType<Record<string, unknown>>;
 type ToolExtra = Parameters<ToolCallback<ZodToolSchema>>[1];
-type ToolProfile = 'core' | 'full' | 'admin';
-
-const serverProfiles = new WeakMap<McpServer, ToolProfile>();
-const adminTools = new Set(['board_list', 'batch_execute']);
-const coreTools = new Set([
-  'connection_check',
-  'board_list_writable',
-  'board_get_context',
-  'board_get_summary',
-  'board_deadline_review',
-  'board_get_workload',
-  'daily_briefing',
-  'user_search',
-  'task_list',
-  'task_get',
-  'task_create',
-  'task_update',
-  'task_set_status',
-  'project_list',
-  'project_get',
-  'project_create',
-  'project_update',
-  'project_plan',
-  'report_get',
-]);
-
-function toolEnabled(profile: ToolProfile, name: string): boolean {
-  if (profile === 'admin') return true;
-  if (adminTools.has(name)) return false;
-  return profile === 'full' || coreTools.has(name);
-}
 
 function register<T extends ZodToolSchema>(
   server: McpServer,
@@ -97,8 +67,7 @@ function register<T extends ZodToolSchema>(
   annotations: ToolAnnotations,
   operation: (input: z.output<T>, extra: ToolExtra) => Promise<unknown>,
 ): void {
-  const profile = serverProfiles.get(server) ?? 'full';
-  if (!toolEnabled(profile, name)) return;
+  if (!toolEnabledForServer(server, name)) return;
   const callback = (async (input: unknown, extra: ToolExtra) =>
     handled(() => operation(inputSchema.parse(input), extra))) as ToolCallback<T>;
   server.registerTool(
@@ -318,7 +287,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
         'Pandatask manages WordPress-backed tasks. Start with connection_check and board_list_writable, then prefer board_get_context, board_get_summary, daily_briefing, or project_plan for multi-step workflows. Use granular tools when precise control is needed. Every result uses an {ok,data} or {ok,error} envelope. dry_run performs local schema/workflow preflight and sends no mutation; WordPress remains authoritative for permissions and references. Supply a stable idempotency_key when executing create or mixed batch operations. Board IDs are scopes: standard boards become discoverable after their first task, while group_* and user_* boards follow BuddyPress/user ownership.',
     },
   );
-  serverProfiles.set(server, client.config.toolProfile);
+  setServerToolProfile(server, client.config.toolProfile);
 
   register(
     server,

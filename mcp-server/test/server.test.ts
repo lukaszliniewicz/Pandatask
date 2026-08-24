@@ -158,6 +158,12 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   const coreNames = new Set((await coreClient.listTools()).tools.map((tool) => tool.name));
   assert.ok(coreNames.has('daily_briefing'));
   assert.ok(coreNames.has('project_plan'));
+  assert.ok(coreNames.has('task_complete'));
+  assert.ok(coreNames.has('task_time_resolve'));
+  assert.ok(coreNames.has('work_log'));
+  assert.ok(coreNames.has('work_list'));
+  assert.ok(coreNames.has('work_report'));
+  assert.equal(coreNames.size, 24);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 
