@@ -4,6 +4,7 @@ namespace Pandatask\Application\Work;
 
 use Exception;
 use Throwable;
+use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
 use Pandatask\Domain\Work\ActivityTypes;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
@@ -19,16 +20,18 @@ final class WorkEntryService {
     private $task_repository;
     private $occurrence_repository;
     private $task_access_policy;
+    private $board_access_policy;
     private $audit_repository;
     private $task_time_service;
 
-    public function __construct( $repository = null, $task_repository = null, $occurrence_repository = null, $task_access_policy = null, $audit_repository = null, $task_time_service = null ) {
+    public function __construct( $repository = null, $task_repository = null, $occurrence_repository = null, $task_access_policy = null, $audit_repository = null, $task_time_service = null, $board_access_policy = null ) {
         $this->repository            = $repository ?: new WorkEntryRepository();
         $this->task_repository       = $task_repository ?: new TaskRepository();
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceRepository();
         $this->task_access_policy    = $task_access_policy ?: new TaskAccessPolicy();
+        $this->board_access_policy   = $board_access_policy ?: new BoardAccessPolicy();
         $this->audit_repository      = $audit_repository ?: new WorkAuditRepository();
-        $this->task_time_service      = $task_time_service ?: new TaskTimeService();
+        $this->task_time_service     = $task_time_service ?: new TaskTimeService();
     }
 
     public function activityTypes() {
@@ -67,7 +70,26 @@ final class WorkEntryService {
 
     public function createEntry( array $input, $actor_id = null ) {
         $actor_id = null === $actor_id ? get_current_user_id() : (int) $actor_id;
-        $normalized = $this->normalizeEntry( $input, $actor_id );
+        return $this->createEntryInternal( $input, $actor_id, 'manual', null, null );
+    }
+
+    public function createSourcedEntry( array $input, $source_key, $source_url = null, $actor_id = null ) {
+        $actor_id = null === $actor_id ? get_current_user_id() : (int) $actor_id;
+        $source_key = sanitize_text_field( (string) $source_key );
+        if ( '' === $source_key ) {
+            return new WP_Error( 'rest_invalid_param', __( 'A sourced work entry requires a source key.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        $existing = $this->repository->findBySourceKey( $source_key );
+        if ( $existing ) {
+            return $existing;
+        }
+
+        return $this->createEntryInternal( $input, $actor_id, 'imported', $source_key, $source_url );
+    }
+
+    private function createEntryInternal( array $input, $actor_id, $kind, $source_key, $source_url ) {
+        $normalized = $this->normalizeEntry( $input, $actor_id, $kind, $source_key, $source_url );
         if ( is_wp_error( $normalized ) ) {
             return $normalized;
         }
@@ -107,7 +129,8 @@ final class WorkEntryService {
             }
         } catch ( Throwable $exception ) {
             DatabaseContext::rollback();
-            return new WP_Error( 'pandatask_work_entry_failed', __( 'The work entry could not be saved.', 'pandatask' ), array( 'status' => 500 ) );
+            $existing = $source_key ? $this->repository->findBySourceKey( $source_key ) : null;
+            return $existing ?: new WP_Error( 'pandatask_work_entry_failed', __( 'The work entry could not be saved.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
         $this->invalidateScopes( $normalized['entry']['user_id'], $allocations );
@@ -142,15 +165,24 @@ final class WorkEntryService {
             'visibility'     => $current->visibility,
             'allocations'    => array_map(
                 static function ( $allocation ) {
-                    return array(
-                        'task_id' => $allocation->task_id_snapshot,
-                        'seconds' => $allocation->seconds,
-                    );
+                    $target = array( 'seconds' => $allocation->seconds );
+                    if ( ! empty( $allocation->task_id_snapshot ) ) {
+                        $target['task_id'] = (int) $allocation->task_id_snapshot;
+                    } elseif ( ! empty( $allocation->board_name_snapshot ) ) {
+                        $target['board_name'] = (string) $allocation->board_name_snapshot;
+                    }
+                    return $target;
                 },
                 (array) $current->allocations
             ),
         );
-        $normalized = $this->normalizeEntry( array_merge( $merged, $input ), $actor_id, 'manual' );
+        $normalized = $this->normalizeEntry(
+            array_merge( $merged, $input ),
+            $actor_id,
+            (string) $current->kind,
+            $current->source_key ?? null,
+            $current->source_url ?? null
+        );
         if ( is_wp_error( $normalized ) ) {
             return $normalized;
         }
@@ -232,7 +264,7 @@ final class WorkEntryService {
         return true;
     }
 
-    private function normalizeEntry( array $input, $actor_id, $kind = 'manual' ) {
+    private function normalizeEntry( array $input, $actor_id, $kind = 'manual', $source_key = null, $source_url = null ) {
         $user_id = isset( $input['user_id'] ) ? absint( $input['user_id'] ) : (int) $actor_id;
         if ( $user_id <= 0 || ( $user_id !== (int) $actor_id && ! user_can( $actor_id, 'manage_options' ) ) ) {
             return new WP_Error( 'rest_forbidden', __( 'You cannot log work for that user.', 'pandatask' ), array( 'status' => 403 ) );
@@ -259,49 +291,75 @@ final class WorkEntryService {
         $allocations = array();
         $resolution_actions = array();
         $allocated_seconds = 0;
-        $seen_task_ids = array();
+        $seen_targets = array();
         foreach ( $allocation_inputs as $allocation_input ) {
             $task_id = absint( $allocation_input['task_id'] ?? 0 );
+            $board_name = sanitize_key( $allocation_input['board_name'] ?? '' );
             $seconds = absint( $allocation_input['seconds'] ?? 0 );
-            if ( $task_id <= 0 || $seconds <= 0 ) {
-                return new WP_Error( 'rest_invalid_reference', __( 'Each allocation requires a task and positive duration.', 'pandatask' ), array( 'status' => 422 ) );
+            if ( $seconds <= 0 || ( $task_id <= 0 && '' === $board_name ) ) {
+                return new WP_Error( 'rest_invalid_reference', __( 'Each allocation requires a task or board and positive duration.', 'pandatask' ), array( 'status' => 422 ) );
             }
-            if ( isset( $seen_task_ids[ $task_id ] ) ) {
-                return new WP_Error( 'pandatask_duplicate_work_allocation', __( 'A task can appear only once in a work entry. Combine its allocated time into one allocation.', 'pandatask' ), array( 'status' => 422 ) );
-            }
-            $seen_task_ids[ $task_id ] = true;
-            $permission = $this->task_access_policy->canReadTask( $task_id, $actor_id );
-            if ( true !== $permission ) {
-                return $permission;
-            }
-            $task = $this->task_repository->findById( $task_id );
-            if ( ! $task ) {
-                return new WP_Error( 'rest_invalid_reference', __( 'An allocated task no longer exists.', 'pandatask' ), array( 'status' => 422 ) );
-            }
-            $occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
-            $residual_mode = sanitize_key( $allocation_input['residual_handling'] ?? '' );
-            if ( $occurrence ) {
-                $validation = $this->task_time_service->validateSpecificAddition( (int) $occurrence->id, $user_id, $seconds, $residual_mode );
-                if ( is_wp_error( $validation ) ) {
-                    return $validation;
+
+            if ( $task_id > 0 ) {
+                $target_key = 'task:' . $task_id;
+                if ( isset( $seen_targets[ $target_key ] ) ) {
+                    return new WP_Error( 'pandatask_duplicate_work_allocation', __( 'A task can appear only once in a work entry. Combine its allocated time into one allocation.', 'pandatask' ), array( 'status' => 422 ) );
                 }
-                $resolution_actions[] = array(
-                    'occurrence_id' => (int) $occurrence->id,
-                    'seconds'       => $seconds,
-                    'mode'          => $residual_mode,
+                $seen_targets[ $target_key ] = true;
+                $permission = $this->task_access_policy->canReadTask( $task_id, $actor_id );
+                if ( true !== $permission ) {
+                    return $permission;
+                }
+                $task = $this->task_repository->findById( $task_id );
+                if ( ! $task ) {
+                    return new WP_Error( 'rest_invalid_reference', __( 'An allocated task no longer exists.', 'pandatask' ), array( 'status' => 422 ) );
+                }
+                $occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+                $residual_mode = sanitize_key( $allocation_input['residual_handling'] ?? '' );
+                if ( $occurrence ) {
+                    $validation = $this->task_time_service->validateSpecificAddition( (int) $occurrence->id, $user_id, $seconds, $residual_mode );
+                    if ( is_wp_error( $validation ) ) {
+                        return $validation;
+                    }
+                    $resolution_actions[] = array(
+                        'occurrence_id' => (int) $occurrence->id,
+                        'seconds'       => $seconds,
+                        'mode'          => $residual_mode,
+                    );
+                }
+                $allocations[] = array(
+                    'occurrence_id'          => $occurrence ? (int) $occurrence->id : null,
+                    'seconds'                => $seconds,
+                    'task_id_snapshot'       => $task_id,
+                    'task_name_snapshot'     => $task->name,
+                    'board_name_snapshot'    => $task->board_name,
+                    'project_id_snapshot'    => $task->project_id ? (int) $task->project_id : null,
+                    'project_name_snapshot'  => $task->project_name ?? null,
+                    'category_id_snapshot'   => $task->category_id ? (int) $task->category_id : null,
+                    'category_name_snapshot' => $task->category_name ?? null,
+                );
+            } else {
+                $target_key = 'board:' . $board_name;
+                if ( isset( $seen_targets[ $target_key ] ) ) {
+                    return new WP_Error( 'pandatask_duplicate_work_allocation', __( 'A board can appear only once in a work entry. Combine its allocated time into one allocation.', 'pandatask' ), array( 'status' => 422 ) );
+                }
+                $seen_targets[ $target_key ] = true;
+                $permission = $this->board_access_policy->canReadBoard( $board_name, $actor_id );
+                if ( true !== $permission ) {
+                    return $permission;
+                }
+                $allocations[] = array(
+                    'occurrence_id'          => null,
+                    'seconds'                => $seconds,
+                    'task_id_snapshot'       => null,
+                    'task_name_snapshot'     => null,
+                    'board_name_snapshot'    => $board_name,
+                    'project_id_snapshot'    => null,
+                    'project_name_snapshot'  => null,
+                    'category_id_snapshot'   => null,
+                    'category_name_snapshot' => null,
                 );
             }
-            $allocations[] = array(
-                'occurrence_id'          => $occurrence ? (int) $occurrence->id : null,
-                'seconds'                => $seconds,
-                'task_id_snapshot'       => $task_id,
-                'task_name_snapshot'     => $task->name,
-                'board_name_snapshot'    => $task->board_name,
-                'project_id_snapshot'    => $task->project_id ? (int) $task->project_id : null,
-                'project_name_snapshot'  => $task->project_name ?? null,
-                'category_id_snapshot'   => $task->category_id ? (int) $task->category_id : null,
-                'category_name_snapshot' => $task->category_name ?? null,
-            );
             $allocated_seconds += $seconds;
         }
         if ( $allocated_seconds > $duration ) {
@@ -322,8 +380,8 @@ final class WorkEntryService {
             'timezone'         => isset( $input['timezone'] ) ? sanitize_text_field( $input['timezone'] ) : null,
             'duration_seconds' => $duration,
             'kind'             => $kind,
-            'source_key'       => isset( $input['source_key'] ) ? sanitize_text_field( $input['source_key'] ) : null,
-            'source_url'       => isset( $input['source_url'] ) ? esc_url_raw( $input['source_url'] ) : null,
+            'source_key'       => $source_key ? sanitize_text_field( (string) $source_key ) : null,
+            'source_url'       => $source_url ? esc_url_raw( (string) $source_url ) : null,
             'visibility'       => in_array( sanitize_key( $input['visibility'] ?? 'private' ), array( 'private', 'aggregate', 'shared' ), true ) ? sanitize_key( $input['visibility'] ?? 'private' ) : 'private',
             'created_at'       => $now,
             'updated_at'       => $now,

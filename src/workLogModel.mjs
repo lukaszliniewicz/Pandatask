@@ -60,3 +60,55 @@ export const buildAllocationPayload = ( allocations = [] ) =>
 			? { residual_handling: allocation.residualHandling }
 			: {} ),
 	} ) );
+
+export const workAllocationTargetLabel = ( allocation = {} ) => {
+	const taskName = String( allocation.task_name_snapshot || '' ).trim();
+	if ( taskName ) {
+		return taskName;
+	}
+
+	const boardName = String( allocation.board_name_snapshot || '' ).trim();
+	if ( /^group_\d+$/.test( boardName ) ) {
+		return 'Group board';
+	}
+	if ( /^user_\d+$/.test( boardName ) ) {
+		return 'Private board';
+	}
+	return boardName || 'Board';
+};
+
+export const buildSuggestionAllocationOverride = (
+	durationSeconds,
+	providerAllocations = [],
+	taskAllocations = []
+) => {
+	if ( ! taskAllocations.length ) {
+		return null;
+	}
+
+	const totalSeconds = Math.max( 0, Number( durationSeconds || 0 ) );
+	const allocatedSeconds = taskAllocations.reduce(
+		( total, allocation ) =>
+			total + Math.max( 0, Number( allocation.seconds || 0 ) ),
+		0
+	);
+	if ( allocatedSeconds > totalSeconds ) {
+		throw new Error(
+			'Task allocations cannot exceed the confirmed work duration.'
+		);
+	}
+
+	const allocations = taskAllocations.map( ( allocation ) => ( {
+		...allocation,
+	} ) );
+	const providerBoardAllocation = providerAllocations.find(
+		( allocation ) => allocation?.board_name && ! allocation?.task_id
+	);
+	if ( providerBoardAllocation && allocatedSeconds < totalSeconds ) {
+		allocations.push( {
+			board_name: providerBoardAllocation.board_name,
+			seconds: totalSeconds - allocatedSeconds,
+		} );
+	}
+	return allocations;
+};

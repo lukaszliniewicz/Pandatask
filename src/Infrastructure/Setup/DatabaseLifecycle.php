@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.16';
+    private const DB_VERSION = '1.0.17';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -37,6 +37,7 @@ final class DatabaseLifecycle {
         $table_work_allocations    = $prefix . 'work_allocations';
         $table_time_resolutions    = $prefix . 'task_time_resolutions';
         $table_work_audit_log      = $prefix . 'work_audit_log';
+        $table_work_suggestion_decisions = $prefix . 'work_suggestion_decisions';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -359,6 +360,23 @@ final class DatabaseLifecycle {
         ) $charset_collate;";
         dbDelta( $sql_work_audit_log );
 
+        $sql_work_suggestion_decisions = "CREATE TABLE $table_work_suggestion_decisions (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            provider_key VARCHAR(64) NOT NULL,
+            external_key VARCHAR(191) NOT NULL,
+            decision VARCHAR(20) NOT NULL,
+            work_entry_id BIGINT(20) UNSIGNED NULL,
+            decided_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_provider_external (user_id, provider_key, external_key),
+            KEY user_decision (user_id, decision, updated_at),
+            KEY work_entry_id (work_entry_id)
+        ) $charset_collate;";
+        dbDelta( $sql_work_suggestion_decisions );
+
         return true;
     }
 
@@ -394,6 +412,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_allocations',
             $prefix . 'task_time_resolutions',
             $prefix . 'work_audit_log',
+            $prefix . 'work_suggestion_decisions',
         );
 
         foreach ( $required_tables as $table ) {
@@ -429,6 +448,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_allocations' => array( 'work_entry_id', 'occurrence_id', 'task_id_snapshot', 'board_date_scope', 'project_id_snapshot', 'category_id_snapshot' ),
             $prefix . 'task_time_resolutions' => array( 'occurrence_user_revision', 'occurrence_user', 'state', 'residual_entry_id' ),
             $prefix . 'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
+            $prefix . 'work_suggestion_decisions' => array( 'user_provider_external', 'user_decision', 'work_entry_id' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {

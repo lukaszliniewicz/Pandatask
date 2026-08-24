@@ -54,6 +54,40 @@ final class WorkRouteRegistrar {
 
         register_rest_route(
             $this->namespace,
+            '/users/me/work-suggestions',
+            array(
+                'methods'             => 'GET',
+                'callback'            => array( $this->handler, 'list_my_suggestions' ),
+                'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                'args'                => array(
+                    'start_date' => array( 'type' => 'string' ),
+                    'end_date'   => array( 'type' => 'string' ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/users/me/work-suggestions/confirm',
+            array(
+                'methods'             => 'POST',
+                'callback'            => array( $this->handler, 'confirm_suggestion' ),
+                'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/users/me/work-suggestions/dismiss',
+            array(
+                'methods'             => 'POST',
+                'callback'            => array( $this->handler, 'dismiss_suggestion' ),
+                'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
             '/work-entries/(?P<id>\\d+)',
             array(
                 array(

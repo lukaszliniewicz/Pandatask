@@ -204,7 +204,7 @@ test('Subtask projects are authoritative, cascaded, and repaired on upgrade', ()
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.16'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.17'/);
 	assert.match(lifecycle, /board_events/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
@@ -390,6 +390,7 @@ test('Production deployment keeps rollback active through exact release verifica
 	assert.match(deploy, /pandat69_work_allocations/);
 	assert.match(deploy, /pandat69_task_time_resolutions/);
 	assert.match(deploy, /pandat69_work_audit_log/);
+	assert.match(deploy, /pandat69_work_suggestion_decisions/);
 	assert.match(deploy, /wp db export .*--tables=.*--add-drop-table/);
 	assert.match(deploy, /\$PluginSlug-db-\$Timestamp\.sql/);
 	assert.ok(

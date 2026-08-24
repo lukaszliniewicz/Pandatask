@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.20
+Stable tag: 1.0.21
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.21 =
+
+* Add a generic work-suggestion provider boundary with quiet confirm, adjust, and dismiss review in the personal Work Log.
+* Keep suggestions outside accounting until confirmation, persist idempotent provider decisions, and protect source provenance behind a trusted import path.
+* Allow work allocations to target a board without inventing a task, enabling optional integrations such as IARF Network group meetings.
 
 = 1.0.20 =
 

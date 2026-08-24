@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useWorkEntries, useWorkMutations, useWorkReport } from '../hooks/useWorkLog';
 import WorkEntryForm from './work/WorkEntryForm';
+import WorkSuggestionsPanel from './work/WorkSuggestionsPanel';
+import { workAllocationTargetLabel } from '../workLogModel.mjs';
 
 const formatDuration = (seconds) => {
     const totalMinutes = Math.round(Number(seconds || 0) / 60);
@@ -25,14 +27,14 @@ const WorkLogView = () => {
 
     const exportCsv = () => {
         const rows = [
-            ['Date', 'Activity', 'Title', 'Minutes', 'Capacity', 'Allocated tasks'],
+            ['Date', 'Activity', 'Title', 'Minutes', 'Capacity', 'Allocated targets'],
             ...entries.map((entry) => [
                 entry.work_date,
                 entry.activity_type || entry.kind,
                 entry.title,
                 Math.round(Number(entry.duration_seconds || 0) / 60),
                 entry.capacity || '',
-                (entry.allocations || []).map((allocation) => allocation.task_name_snapshot || '').join(' | '),
+                (entry.allocations || []).map((allocation) => workAllocationTargetLabel(allocation)).join(' | '),
             ]),
         ];
         const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('\"', '\"\"')}"`).join(',')).join('\n');
@@ -50,7 +52,7 @@ const WorkLogView = () => {
             <div className="pandat69-work-log-header">
                 <div>
                     <h2>Work Log</h2>
-                    <p>Record actual work independently of task workflow. Entries can be standalone or allocated to a task.</p>
+                    <p>Record actual work independently of task workflow. Entries can be standalone or allocated to a task or board.</p>
                 </div>
                 <div className="pandat69-work-range">
                     <label>From <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
@@ -59,6 +61,8 @@ const WorkLogView = () => {
                     <button type="button" className="pandat69-button" onClick={() => window.print()}>Print</button>
                 </div>
             </div>
+
+            <WorkSuggestionsPanel filters={{ start_date: startDate, end_date: endDate }} />
 
             <div className="pandat69-work-summary-grid">
                 <div className="pandat69-work-summary-card"><strong>{formatDuration(report?.total_seconds)}</strong><span>Total work</span></div>
@@ -95,7 +99,7 @@ const WorkLogView = () => {
                                         <strong>{entry.title}</strong>
                                         <span>{entry.work_date} · {formatDuration(entry.duration_seconds)} · {entry.activity_type || 'Unitemised'}</span>
                                         {entry.allocations?.length > 0 && (
-                                            <small>{entry.allocations.map((allocation) => `${allocation.task_name_snapshot || 'Task'} (${formatDuration(allocation.seconds)})`).join(' · ')}</small>
+                                            <small>{entry.allocations.map((allocation) => `${workAllocationTargetLabel(allocation)} (${formatDuration(allocation.seconds)})`).join(' · ')}</small>
                                         )}
                                     </div>
                                     {entry.kind !== 'residual' && (

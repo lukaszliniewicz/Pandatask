@@ -30,6 +30,20 @@ export const useWorkEntries = ( filters = {} ) => {
 	} );
 };
 
+export const useWorkSuggestions = ( filters = {} ) => {
+	const { apiClient } = useConfig();
+	return useQuery( {
+		queryKey: queryKeys.work.suggestions( filters ),
+		queryFn: async ( { signal } ) => {
+			const response = await apiClient.get( 'users/me/work-suggestions', {
+				params: filters,
+				signal,
+			} );
+			return response.suggestions || [];
+		},
+	} );
+};
+
 export const useWorkReport = ( filters = {} ) => {
 	const { apiClient } = useConfig();
 	return useQuery( {
@@ -117,6 +131,19 @@ export const useWorkMutations = () => {
 		onSuccess: () => invalidate(),
 	} );
 
+	const confirmSuggestion = useMutation( {
+		mutationFn: async ( data ) =>
+			apiClient.post( 'users/me/work-suggestions/confirm', data ),
+		onSuccess: () => invalidate(),
+	} );
+
+	const dismissSuggestion = useMutation( {
+		mutationFn: async ( data ) =>
+			apiClient.post( 'users/me/work-suggestions/dismiss', data ),
+		onSuccess: () =>
+			queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } ),
+	} );
+
 	const resolveTaskTime = useMutation( {
 		mutationFn: async ( {
 			taskId,
@@ -157,6 +184,8 @@ export const useWorkMutations = () => {
 		createEntry,
 		updateEntry,
 		deleteEntry,
+		confirmSuggestion,
+		dismissSuggestion,
 		resolveTaskTime,
 		resolveOccurrenceTime,
 	};

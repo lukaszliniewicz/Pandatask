@@ -21,6 +21,8 @@ export const queryKeys = {
 		all: () => [ ...root, 'work' ] as const,
 		entries: ( filters: Record< string, unknown > = {} ) =>
 			[ ...root, 'work', 'entries', filters ] as const,
+		suggestions: ( filters: Record< string, unknown > = {} ) =>
+			[ ...root, 'work', 'suggestions', filters ] as const,
 		report: ( filters: Record< string, unknown > = {} ) =>
 			[ ...root, 'work', 'report', filters ] as const,
 		boardReport: (

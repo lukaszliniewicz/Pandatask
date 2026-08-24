@@ -40,6 +40,18 @@ final class WorkEntryRepository {
         return $entry;
     }
 
+    public function findBySourceKey( $source_key ) {
+        global $wpdb;
+        $table = DatabaseContext::getDbPrefix() . 'work_entries';
+        $entry_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$table} WHERE source_key = %s AND deleted_at IS NULL LIMIT 1",
+                sanitize_text_field( (string) $source_key )
+            )
+        );
+        return $entry_id > 0 ? $this->findById( $entry_id ) : null;
+    }
+
     public function softDelete( $entry_id ) {
         return $this->update(
             $entry_id,

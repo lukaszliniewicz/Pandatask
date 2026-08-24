@@ -52,6 +52,57 @@
     opacity: .7;
 }
 
+.pandat69-work-suggestions {
+    border: 1px solid var(--pandat69-border-color, #d9dee5);
+    border-radius: 10px;
+    padding: 1rem;
+    background: #fff;
+}
+
+.pandat69-work-suggestion-list {
+    list-style: none;
+    margin: .75rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: .6rem;
+}
+
+.pandat69-work-suggestion-list > li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: .75rem;
+    border: 1px solid var(--pandat69-border-color, #e5e7eb);
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.pandat69-work-suggestion-main {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.pandat69-work-suggestion-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+
+.pandat69-work-suggestion-actions label {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.pandat69-work-suggestion-minutes {
+    width: 78px;
+}
+
 .pandat69-work-breakdown {
     display: flex;
     gap: .5rem 1rem;
@@ -161,6 +212,14 @@
     .pandat69-work-layout,
     .pandat69-work-allocation-row {
         grid-template-columns: 1fr;
+    }
+
+    .pandat69-work-suggestion-list > li {
+        flex-direction: column;
+    }
+
+    .pandat69-work-suggestion-actions {
+        justify-content: flex-start;
     }
 
     .pandat69-work-allocation-residual {

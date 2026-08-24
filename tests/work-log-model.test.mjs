@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     buildAllocationPayload,
+    buildSuggestionAllocationOverride,
     minutesToSeconds,
     summarizeAllocationDrafts,
     validateAllocationDrafts,
+    workAllocationTargetLabel,
 } from '../src/workLogModel.mjs';
 
 test('split allocations preserve one entry duration and expose unallocated remainder', () => {
@@ -60,4 +62,36 @@ test('residual handling is preserved in the allocation payload', () => {
     ]), [
         { task_id: 10, seconds: 900, residual_handling: 'refine_residual' },
     ]);
+});
+
+test('suggestion adjustment keeps provider board time as the task-allocation remainder', () => {
+    assert.deepEqual(
+        buildSuggestionAllocationOverride(
+            3600,
+            [{ board_name: 'group_10', seconds: 3600 }],
+            [{ task_id: 42, seconds: 1500 }]
+        ),
+        [
+            { task_id: 42, seconds: 1500 },
+            { board_name: 'group_10', seconds: 2100 },
+        ]
+    );
+});
+
+test('suggestion adjustment preserves provider defaults when no task allocation is supplied', () => {
+    assert.equal(
+        buildSuggestionAllocationOverride(
+            3600,
+            [{ board_name: 'group_10', seconds: 3600 }],
+            []
+        ),
+        null
+    );
+});
+
+test('board-only allocations render as boards rather than fake tasks', () => {
+    assert.equal(workAllocationTargetLabel({ task_name_snapshot: 'Research report' }), 'Research report');
+    assert.equal(workAllocationTargetLabel({ board_name_snapshot: 'group_10' }), 'Group board');
+    assert.equal(workAllocationTargetLabel({ board_name_snapshot: 'user_8' }), 'Private board');
+    assert.equal(workAllocationTargetLabel({ board_name_snapshot: 'project_alpha' }), 'project_alpha');
 });

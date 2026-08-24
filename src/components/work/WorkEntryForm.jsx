@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import {
   useActivityTypes,
   useTaskWork,
@@ -106,15 +106,31 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
   );
 };
 
-const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
+const WorkEntryForm = ({
+  task = null,
+  onSaved = null,
+  compact = false,
+  initialValues = null,
+  onSubmitOverride = null,
+  isSubmitting = false,
+  submitLabel = null,
+  allocationHint = "",
+}) => {
   const { data: activityTypes = [] } = useActivityTypes();
   const { createEntry } = useWorkMutations();
-  const [activityType, setActivityType] = useState("research");
-  const [minutes, setMinutes] = useState(30);
-  const [workDate, setWorkDate] = useState(today());
-  const [title, setTitle] = useState(task?.name || "");
-  const [notes, setNotes] = useState("");
-  const [capacity, setCapacity] = useState("");
+  const formId = useId().replaceAll(":", "");
+  const [activityType, setActivityType] = useState(
+    initialValues?.activity_type || "research",
+  );
+  const [minutes, setMinutes] = useState(() =>
+    initialValues?.duration_seconds
+      ? Math.max(1, Math.round(Number(initialValues.duration_seconds) / 60))
+      : 30,
+  );
+  const [workDate, setWorkDate] = useState(initialValues?.work_date || today());
+  const [title, setTitle] = useState(initialValues?.title || task?.name || "");
+  const [notes, setNotes] = useState(initialValues?.notes || "");
+  const [capacity, setCapacity] = useState(initialValues?.capacity || "");
   const [allocations, setAllocations] = useState([]);
   const [residualHandling, setResidualHandling] = useState("");
   const [error, setError] = useState("");
@@ -194,7 +210,7 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
     }
 
     try {
-      const entry = await createEntry.mutateAsync({
+      const payload = {
         title:
           title.trim() ||
           activityTypes.find((item) => item.key === activityType)?.label ||
@@ -205,11 +221,16 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
         work_date: workDate,
         duration_seconds: durationSeconds,
         allocations: payloadAllocations,
-      });
-      setNotes("");
-      if (!task) {
-        setTitle("");
-        setAllocations([]);
+      };
+      const entry = onSubmitOverride
+        ? await onSubmitOverride(payload)
+        : await createEntry.mutateAsync(payload);
+      if (!onSubmitOverride) {
+        setNotes("");
+        if (!task) {
+          setTitle("");
+          setAllocations([]);
+        }
       }
       onSaved?.(entry);
     } catch (err) {
@@ -228,9 +249,9 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
     >
       <div className="pandat69-form-row">
         <div className="pandat69-form-field pandat69-form-field-half">
-          <label htmlFor="pandat69-work-activity">Activity</label>
+          <label htmlFor={`${formId}-activity`}>Activity</label>
           <select
-            id="pandat69-work-activity"
+            id={`${formId}-activity`}
             className="pandat69-select"
             value={activityType}
             onChange={(event) => setActivityType(event.target.value)}
@@ -244,9 +265,9 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
           </select>
         </div>
         <div className="pandat69-form-field pandat69-form-field-half">
-          <label htmlFor="pandat69-work-date">Work date</label>
+          <label htmlFor={`${formId}-date`}>Work date</label>
           <input
-            id="pandat69-work-date"
+            id={`${formId}-date`}
             type="date"
             className="pandat69-input"
             value={workDate}
@@ -285,9 +306,9 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
       </div>
 
       <div className="pandat69-form-field">
-        <label htmlFor="pandat69-work-title">Title</label>
+        <label htmlFor={`${formId}-title`}>Title</label>
         <input
-          id="pandat69-work-title"
+          id={`${formId}-title`}
           className="pandat69-input"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -300,8 +321,8 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
         <fieldset className="pandat69-form-field pandat69-fieldset pandat69-work-allocations">
           <legend>Allocate time (optional)</legend>
           <p className="pandat69-field-hint">
-            One real event stays one work entry. Split its time between tasks
-            here; any remainder stays explicitly unallocated.
+            {allocationHint ||
+              "One real event stays one work entry. Split its time between tasks here; any remainder stays explicitly unallocated."}
           </p>
           {allocations.map((allocation) => (
             <WorkAllocationRow
@@ -337,11 +358,11 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
 
       {task && isResolved && (
         <div className="pandat69-form-field">
-          <label htmlFor="pandat69-work-residual-handling">
+          <label htmlFor={`${formId}-residual-handling`}>
             Resolved task time
           </label>
           <select
-            id="pandat69-work-residual-handling"
+            id={`${formId}-residual-handling`}
             className="pandat69-select"
             value={residualHandling}
             onChange={(event) => setResidualHandling(event.target.value)}
@@ -367,9 +388,9 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
 
       <div className="pandat69-form-row">
         <div className="pandat69-form-field pandat69-form-field-half">
-          <label htmlFor="pandat69-work-capacity">Capacity</label>
+          <label htmlFor={`${formId}-capacity`}>Capacity</label>
           <select
-            id="pandat69-work-capacity"
+            id={`${formId}-capacity`}
             className="pandat69-select"
             value={capacity}
             onChange={(event) => setCapacity(event.target.value)}
@@ -383,9 +404,9 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
       </div>
 
       <div className="pandat69-form-field">
-        <label htmlFor="pandat69-work-notes">Notes (private by default)</label>
+        <label htmlFor={`${formId}-notes`}>Notes (private by default)</label>
         <textarea
-          id="pandat69-work-notes"
+          id={`${formId}-notes`}
           className="pandat69-textarea"
           rows={compact ? 2 : 3}
           value={notes}
@@ -401,9 +422,13 @@ const WorkEntryForm = ({ task = null, onSaved = null, compact = false }) => {
       <button
         type="submit"
         className="pandat69-button pandat69-button-primary"
-        disabled={createEntry.isPending}
+        disabled={createEntry.isPending || isSubmitting}
       >
-        {createEntry.isPending ? "Logging…" : "Log work"}
+        {createEntry.isPending || isSubmitting
+          ? onSubmitOverride
+            ? "Confirming…"
+            : "Logging…"
+          : submitLabel || (onSubmitOverride ? "Confirm work" : "Log work")}
       </button>
     </form>
   );

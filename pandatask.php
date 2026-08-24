@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Pandatask
  * Description:       Adds a shortcode [task_board board_name="unique_board_id"] to display a task management board.
- * Version:           1.0.20
+ * Version:           1.0.21
  * Author:            Lukasz Liniewicz
  * Author URI:        https://github.com/lukaszliniewicz
  * Plugin URI:        https://github.com/lukaszliniewicz/Pandatask
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'PANDAT69_VERSION' ) ) {
-    define( 'PANDAT69_VERSION', '1.0.20' );
+    define( 'PANDAT69_VERSION', '1.0.21' );
 }
 
 if ( ! defined( 'PANDAT69_PLUGIN_DIR' ) ) {
@@ -32,6 +32,12 @@ if ( ! defined( 'PANDAT69_PLUGIN_FILE' ) ) {
 }
 
 require_once PANDAT69_PLUGIN_DIR . 'src/autoload.php';
+
+if ( ! function_exists( 'pandatask_register_work_suggestion_provider' ) ) {
+    function pandatask_register_work_suggestion_provider( $provider_key, array $definition ) {
+        return \Pandatask\Application\Work\WorkSuggestionProviderRegistry::register( $provider_key, $definition );
+    }
+}
 
 if ( ! function_exists( 'pandatask_register_legacy_alias' ) ) {
     function pandatask_register_legacy_alias( $legacy_class, $modern_class ) {

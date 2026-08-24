@@ -6,6 +6,7 @@ use Pandatask\Application\Task\TaskService;
 use Pandatask\Application\Work\TaskTimeService;
 use Pandatask\Application\Work\WorkEntryService;
 use Pandatask\Application\Work\WorkReportService;
+use Pandatask\Application\Work\WorkSuggestionService;
 use WP_Error;
 use WP_REST_Response;
 
@@ -15,12 +16,14 @@ final class WorkRouteHandler {
     private $task_service;
     private $task_time_service;
     private $report_service;
+    private $suggestion_service;
 
-    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null ) {
-        $this->work_service      = $work_service ?: new WorkEntryService();
-        $this->task_service      = $task_service ?: new TaskService();
-        $this->task_time_service = $task_time_service ?: new TaskTimeService();
-        $this->report_service    = $report_service ?: new WorkReportService();
+    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null, $suggestion_service = null ) {
+        $this->work_service       = $work_service ?: new WorkEntryService();
+        $this->task_service       = $task_service ?: new TaskService();
+        $this->task_time_service  = $task_time_service ?: new TaskTimeService();
+        $this->report_service     = $report_service ?: new WorkReportService();
+        $this->suggestion_service = $suggestion_service ?: new WorkSuggestionService();
     }
 
     public function activity_types( $request ) {
@@ -36,6 +39,64 @@ final class WorkRouteHandler {
             absint( $request['offset'] ?? 0 )
         );
         return new WP_REST_Response( array( 'entries' => $entries ), 200 );
+    }
+
+    public function list_my_suggestions( $request ) {
+        list( $start, $end ) = $this->dateRange( $request );
+        if ( is_wp_error( $start ) ) {
+            return $start;
+        }
+        $suggestions = $this->suggestion_service->listForUser(
+            get_current_user_id(),
+            array(
+                'start_date' => $start,
+                'end_date'   => $end,
+                'now_utc'    => gmdate( 'c' ),
+            )
+        );
+        return new WP_REST_Response( array( 'suggestions' => $suggestions ), 200 );
+    }
+
+    public function confirm_suggestion( $request ) {
+        $data = $request->get_json_params();
+        $data = is_array( $data ) ? $data : array();
+        $overrides = array();
+        if ( array_key_exists( 'duration_seconds', $data ) ) {
+            $overrides['duration_seconds'] = absint( $data['duration_seconds'] );
+        }
+        foreach ( array( 'title', 'notes', 'activity_type', 'capacity', 'work_date' ) as $field ) {
+            if ( array_key_exists( $field, $data ) ) {
+                $overrides[ $field ] = $data[ $field ];
+            }
+        }
+        if ( array_key_exists( 'allocations', $data ) && is_array( $data['allocations'] ) ) {
+            $overrides['allocations'] = $data['allocations'];
+        }
+        $result = $this->suggestion_service->confirm(
+            get_current_user_id(),
+            sanitize_key( $data['provider_key'] ?? '' ),
+            sanitize_text_field( $data['external_key'] ?? '' ),
+            $overrides,
+            get_current_user_id()
+        );
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+        return new WP_REST_Response( $result, ! empty( $result['already_confirmed'] ) ? 200 : 201 );
+    }
+
+    public function dismiss_suggestion( $request ) {
+        $data = $request->get_json_params();
+        $data = is_array( $data ) ? $data : array();
+        $decision = $this->suggestion_service->dismiss(
+            get_current_user_id(),
+            sanitize_key( $data['provider_key'] ?? '' ),
+            sanitize_text_field( $data['external_key'] ?? '' ),
+            get_current_user_id()
+        );
+        return is_wp_error( $decision )
+            ? $decision
+            : new WP_REST_Response( array( 'decision' => $decision ), 200 );
     }
 
     public function create_entry( $request ) {
