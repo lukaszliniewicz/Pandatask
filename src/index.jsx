@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import TaskBoard from './components/TaskBoard';
@@ -8,7 +8,12 @@ import AppErrorBoundary from './components/AppErrorBoundary';
 import { ConfigProvider } from './context/ConfigContext';
 import { createApiClient } from './api/client';
 import { createPandataskQueryClient } from './query/createQueryClient';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import '../assets/scss/main.scss';
+
+const GroupWorkLogsView = lazyWithRetry( () =>
+	import( './components/GroupWorkLogsView' )
+);
 
 const mountedRoots = new WeakMap();
 
@@ -145,12 +150,38 @@ const mountFloatingBugReporter = ( container, props = {} ) => {
 	);
 };
 
+const mountGroupWorkLogs = ( container, props = {} ) => {
+	const settings = resolveSettings( props.apiSettings );
+	const groupId = Number( props.groupId || container?.dataset?.groupId || 0 );
+	return renderInto(
+		container,
+		<AppErrorBoundary>
+			<AppWrapper
+				apiSettings={ settings }
+				currentUser={ resolveCurrentUser( settings, props.currentUser ) }
+				boardName={ `group_${ groupId }` }
+			>
+				<Suspense
+					fallback={
+						<div className="pandat69-loading" role="status">
+							Loading shared work logs…
+						</div>
+					}
+				>
+					<GroupWorkLogsView groupId={ groupId } />
+				</Suspense>
+			</AppWrapper>
+		</AppErrorBoundary>
+	);
+};
+
 // Merge with integrations registered by the host instead of replacing the
 // shared namespace.
 window.Pandatask = {
 	...( window.Pandatask || {} ),
 	mountBoard,
 	mountFloatingBugReporter,
+	mountGroupWorkLogs,
 };
 
 const bootstrapStandaloneMounts = () => {
@@ -192,6 +223,18 @@ const bootstrapStandaloneMounts = () => {
 					</AppWrapper>
 				</AppErrorBoundary>
 			);
+		} );
+
+	document
+		.querySelectorAll( '[data-pandatask-group-work-logs-root]' )
+		.forEach( ( container ) => {
+			if ( container.dataset.reactMounted !== 'true' ) {
+				mountGroupWorkLogs( container, {
+					groupId: container.dataset.groupId,
+					apiSettings,
+					currentUser,
+				} );
+			}
 		} );
 
 	const floatingContainer = document.getElementById(

@@ -4,6 +4,8 @@ namespace Pandatask\Http\Rest\V1;
 
 use Pandatask\Application\Settings\FeatureSettings;
 use Pandatask\Application\Security\WorkEntryAccessPolicy;
+use Pandatask\Application\Security\WorkLogShareAccessPolicy;
+use Pandatask\Application\Work\WorkLogShareService;
 
 final class WorkRouteRegistrar {
 
@@ -12,13 +14,17 @@ final class WorkRouteRegistrar {
     private $handler;
     private $work_entry_access_policy;
     private $feature_settings;
+    private $work_log_share_access_policy;
+    private $work_log_share_service;
 
-    public function __construct( $namespace = 'pandatask/v1', $permissions = null, $handler = null, $work_entry_access_policy = null, $feature_settings = null ) {
+    public function __construct( $namespace = 'pandatask/v1', $permissions = null, $handler = null, $work_entry_access_policy = null, $feature_settings = null, $work_log_share_access_policy = null, $work_log_share_service = null ) {
         $this->namespace                = $namespace;
         $this->permissions              = $permissions ?: new PermissionChecker();
         $this->handler                  = $handler ?: new WorkRouteHandler();
         $this->work_entry_access_policy = $work_entry_access_policy ?: new WorkEntryAccessPolicy();
         $this->feature_settings         = $feature_settings ?: new FeatureSettings();
+        $this->work_log_share_access_policy = $work_log_share_access_policy;
+        $this->work_log_share_service = $work_log_share_service;
     }
 
     public function register() {
@@ -26,6 +32,9 @@ final class WorkRouteRegistrar {
             $this->registerTaskCompletionRoute();
             return;
         }
+
+        $this->work_log_share_access_policy = $this->work_log_share_access_policy ?: new WorkLogShareAccessPolicy();
+        $this->work_log_share_service = $this->work_log_share_service ?: new WorkLogShareService();
 
         register_rest_route(
             $this->namespace,
@@ -179,6 +188,55 @@ final class WorkRouteRegistrar {
 
         register_rest_route(
             $this->namespace,
+            '/users/me/work-log-sharing',
+            array(
+                array(
+                    'methods'             => 'GET',
+                    'callback'            => array( $this->handler, 'work_log_sharing' ),
+                    'permission_callback' => array( $this, 'check_work_log_sharing_permission' ),
+                ),
+                array(
+                    'methods'             => 'PUT',
+                    'callback'            => array( $this->handler, 'replace_work_log_sharing' ),
+                    'permission_callback' => array( $this, 'check_work_log_sharing_permission' ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/groups/(?P<group_id>\\d+)/work-logs',
+            array(
+                'methods'             => 'GET',
+                'callback'            => array( $this->handler, 'group_work_logs' ),
+                'permission_callback' => array( $this, 'check_group_work_logs_permission' ),
+                'args'                => array(
+                    'start_date' => array( 'type' => 'string' ),
+                    'end_date'   => array( 'type' => 'string' ),
+                    'period'     => array( 'type' => 'string' ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/groups/(?P<group_id>\\d+)/work-logs/(?P<user_id>\\d+)',
+            array(
+                'methods'             => 'GET',
+                'callback'            => array( $this->handler, 'group_work_log' ),
+                'permission_callback' => array( $this, 'check_group_work_log_permission' ),
+                'args'                => array(
+                    'start_date' => array( 'type' => 'string' ),
+                    'end_date'   => array( 'type' => 'string' ),
+                    'period'     => array( 'type' => 'string' ),
+                    'limit'      => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 500, 'default' => 200 ),
+                    'offset'     => array( 'type' => 'integer', 'minimum' => 0, 'default' => 0 ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
             '/boards/(?P<board_name>[a-zA-Z0-9_-]+)/work-report',
             array(
                 'methods'             => 'GET',
@@ -190,6 +248,29 @@ final class WorkRouteRegistrar {
 
     public function check_entry_manage_permission( $request ) {
         return $this->work_entry_access_policy->canManageEntry( (int) $request['id'], get_current_user_id() );
+    }
+
+    public function check_work_log_sharing_permission( $request ) {
+        return $this->workLogShareAccessPolicy()->canManageOwnSharing( get_current_user_id() );
+    }
+
+    public function check_group_work_logs_permission( $request ) {
+        return $this->workLogShareAccessPolicy()->canReadGroup( (int) $request['group_id'], get_current_user_id() );
+    }
+
+    public function check_group_work_log_permission( $request ) {
+        return $this->workLogShareAccessPolicy()->canReadOwner(
+            (int) $request['group_id'],
+            (int) $request['user_id'],
+            get_current_user_id()
+        );
+    }
+
+    private function workLogShareAccessPolicy() {
+        if ( ! $this->work_log_share_access_policy ) {
+            $this->work_log_share_access_policy = new WorkLogShareAccessPolicy();
+        }
+        return $this->work_log_share_access_policy;
     }
 
     private function registerTaskCompletionRoute() {

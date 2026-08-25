@@ -70,34 +70,174 @@
 
 .pandat69-work-toolbar {
 	display: grid;
-	grid-template-columns: auto 1fr auto;
+	position: relative;
+	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
-	gap: 14px;
-	padding: 10px 12px;
+	gap: 12px 18px;
+	padding: 12px 14px;
 	border: 1px solid $border-color;
-	border-radius: 9px;
+	border-radius: 10px;
 	background: $white;
+	box-shadow: 0 1px 2px rgba(25, 44, 66, 0.03);
+}
 
-	.pandat69-work-range {
-		justify-content: center;
+.pandat69-work-toolbar-summary,
+.pandat69-work-toolbar-actions,
+.pandat69-work-custom-range {
+	display: flex;
+	align-items: center;
+}
 
-		label {
+.pandat69-work-toolbar-summary {
+	min-width: 0;
+	gap: 10px;
+
+	> span:last-child {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	small {
+		color: $secondary-color;
+		font-size: 9px;
+		font-weight: 750;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+	}
+
+	strong {
+		overflow: hidden;
+		font-size: 12px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+}
+
+.pandat69-work-toolbar-icon {
+	display: grid;
+	width: 32px;
+	height: 32px;
+	flex: 0 0 auto;
+	place-items: center;
+	border-radius: 8px;
+	background: #edf3f6;
+	color: #405d72;
+}
+
+.pandat69-work-toolbar-actions {
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.pandat69-work-menu {
+	position: relative;
+}
+
+.pandat69-work-menu-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 34px;
+	white-space: nowrap;
+}
+
+.pandat69-work-menu-popover {
+	display: grid;
+	position: absolute;
+	top: calc(100% + 7px);
+	left: 0;
+	z-index: 45;
+	width: max-content;
+	min-width: 220px;
+	max-width: min(310px, calc(100vw - 28px));
+	padding: 6px;
+	border: 1px solid #d8e0e6;
+	border-radius: 10px;
+	background: $white;
+	box-shadow: 0 14px 36px rgba(25, 44, 66, 0.17);
+
+	&.is-end {
+		right: 0;
+		left: auto;
+	}
+
+	> button {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 9px;
+		width: 100%;
+		padding: 9px 10px;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		color: $primary-color;
+		font: inherit;
+		text-align: left;
+
+		&:hover,
+		&:focus-visible,
+		&.is-selected {
+			background: #eef4f7;
+		}
+
+		&:disabled {
+			opacity: 0.45;
+		}
+
+		> span {
 			display: flex;
-			align-items: center;
-			gap: 6px;
-			color: $secondary-color;
-			font-size: 12px;
-			font-weight: 650;
+			min-width: 0;
+			flex-direction: column;
+			gap: 1px;
 		}
 
-		input {
-			min-height: 32px;
-			padding: 4px 7px;
-			border: 1px solid $border-color;
-			border-radius: 5px;
-			background: $white;
-			color: $primary-color;
+		strong {
+			font-size: 12px;
 		}
+
+		small {
+			color: $secondary-color;
+			font-size: 10px;
+			line-height: 1.35;
+		}
+	}
+}
+
+.pandat69-work-menu-label {
+	padding: 6px 10px 4px;
+	color: $secondary-color;
+	font-size: 9px;
+	font-weight: 750;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.pandat69-work-custom-range {
+	grid-column: 1 / -1;
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 10px;
+	border-top: 1px solid $border-color;
+
+	label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		color: $secondary-color;
+		font-size: 11px;
+		font-weight: 650;
+	}
+
+	input {
+		min-height: 32px;
+		padding: 4px 7px;
+		border: 1px solid $border-color;
+		border-radius: 6px;
+		background: $white;
+		color: $primary-color;
 	}
 }
 
@@ -598,6 +738,123 @@
 	}
 }
 
+/* Explicit group sharing */
+.pandat69-work-sharing-dialog {
+	display: grid;
+	gap: 16px;
+}
+
+.pandat69-work-sharing-warning {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 12px;
+	padding: 14px;
+	border: 1px solid #cfe0d6;
+	border-radius: 10px;
+	background: #f2f8f4;
+
+	> span {
+		display: grid;
+		width: 36px;
+		height: 36px;
+		place-items: center;
+		border-radius: 9px;
+		background: #dceee3;
+		color: #2f7150;
+	}
+
+	> div {
+		display: grid;
+		gap: 3px;
+	}
+
+	p,
+	small {
+		margin: 0;
+		color: #465d52;
+		line-height: 1.5;
+	}
+
+	p {
+		font-size: 12px;
+	}
+
+	small {
+		font-size: 10px;
+	}
+}
+
+.pandat69-work-sharing-groups {
+	display: grid;
+	gap: 7px;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+
+	legend {
+		margin-bottom: 7px;
+		font-size: 12px;
+		font-weight: 750;
+	}
+
+	label {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 10px;
+		padding: 11px 12px;
+		border: 1px solid $border-color;
+		border-radius: 8px;
+		background: $white;
+		cursor: pointer;
+
+		&:has(input:checked) {
+			border-color: #8abca1;
+			background: #f3f8f5;
+		}
+	}
+
+	input {
+		width: 17px;
+		height: 17px;
+		accent-color: $success-color;
+	}
+
+	label > span {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	strong {
+		font-size: 12px;
+	}
+
+	small {
+		color: $secondary-color;
+		font-size: 10px;
+	}
+}
+
+.pandat69-work-sharing-unavailable {
+	padding: 11px 12px;
+	border-radius: 8px;
+	background: #f5f6f7;
+	color: $secondary-color;
+
+	p {
+		margin: 2px 0;
+		color: $primary-color;
+		font-size: 12px;
+	}
+
+	small {
+		font-size: 10px;
+	}
+}
+
 /* Shared logger form */
 .pandat69-work-form {
 
@@ -831,9 +1088,30 @@
 
 	.pandat69-work-toolbar {
 		grid-template-columns: 1fr;
+	}
 
-		.pandat69-work-range {
-			justify-content: flex-start;
+	.pandat69-work-toolbar-actions,
+	.pandat69-work-custom-range {
+		justify-content: flex-start;
+	}
+
+	.pandat69-work-custom-range {
+		grid-column: 1;
+		align-items: stretch;
+		flex-direction: column;
+
+		label {
+			justify-content: space-between;
+		}
+	}
+
+	.pandat69-work-menu-popover {
+		left: 0;
+		max-width: min(300px, calc(100vw - 52px));
+
+		&.is-end {
+			right: auto;
+			left: 0;
 		}
 	}
 
@@ -897,6 +1175,7 @@
 			flex: none;
 		}
 	}
+
 }
 
 .pandat69-container.is-container-narrow {
@@ -907,4 +1186,33 @@
 @media (max-width: 720px) {
 
 	@include pandat69-compact-work-log;
+}
+
+@media print {
+
+	.pandat69-work-log-primary-actions,
+	.pandat69-work-toolbar-actions,
+	.pandat69-work-custom-range,
+	.pandat69-work-suggestions,
+	.pandat69-work-entry-actions,
+	.pandat69-work-load-more {
+		display: none !important;
+	}
+
+	.pandat69-work-log-header,
+	.pandat69-work-toolbar,
+	.pandat69-work-insights,
+	.pandat69-work-history-panel {
+		border-color: #ccd3d8;
+		box-shadow: none;
+		break-inside: avoid;
+	}
+
+	.pandat69-work-toolbar {
+		grid-template-columns: 1fr;
+	}
+
+	.pandat69-work-entry-list > li {
+		grid-template-columns: 5px minmax(0, 1fr);
+	}
 }

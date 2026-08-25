@@ -30,6 +30,31 @@ export const queryKeys = {
 			filters: Record< string, unknown > = {}
 		) => [ ...root, 'work', 'board-report', boardName, filters ] as const,
 		activityTypes: () => [ ...root, 'work', 'activity-types' ] as const,
+		sharing: () => [ ...root, 'work', 'sharing' ] as const,
+		groupPresenters: (
+			groupId: number | string,
+			filters: Record< string, unknown > = {}
+		) =>
+			[
+				...root,
+				'work',
+				'group-presenters',
+				Number( groupId ),
+				filters,
+			] as const,
+		groupLog: (
+			groupId: number | string,
+			userId: number | string,
+			filters: Record< string, unknown > = {}
+		) =>
+			[
+				...root,
+				'work',
+				'group-log',
+				Number( groupId ),
+				Number( userId ),
+				filters,
+			] as const,
 	},
 	categories: ( boardName: string ) =>
 		[ ...root, 'categories', boardName ] as const,

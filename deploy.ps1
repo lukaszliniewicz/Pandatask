@@ -97,6 +97,10 @@ try {
         }
     }
 
+    $PackageTests = Join-Path $PackageRoot 'tests'
+    New-Item -ItemType Directory -Path $PackageTests -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $RootPath 'tests/server-smoke.php') -Destination $PackageTests -Force
+
     tar -czf $PackagePath -C $PackageRoot .
     if ($LASTEXITCODE -ne 0) {
         throw "Package creation failed (exit code $LASTEXITCODE)"
@@ -161,6 +165,7 @@ rm -rf $RemoteStagingDirQ $RemotePreviousDirQ
 mkdir -p $RemoteStagingDirQ
 tar -xzf $RemotePackagePathQ -C $RemoteStagingDirQ
 test -f $RemoteStagingDirQ/pandatask.php
+test -f $RemoteStagingDirQ/tests/server-smoke.php
 test -f $RemoteStagingDirQ/build/main.asset.php
 test -s $RemoteStagingDirQ/build/main.js
 test -s $RemoteStagingDirQ/build/main.css
@@ -173,7 +178,7 @@ if [ -f $RemoteStagingDirQ/composer.json ] && command -v composer >/dev/null 2>&
 fi
 db_prefix=`$(sudo -u iarf -- wp db prefix --path=$RemoteWordPressDirQ)
 existing_tables=`$(sudo -u iarf -- wp db query 'SHOW TABLES;' --skip-column-names --path=$RemoteWordPressDirQ)
-db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions"
+db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions `${db_prefix}pandat69_work_log_group_shares"
 db_tables=""
 for table in `$db_candidates; do
     if printf '%s\n' "`$existing_tables" | grep -Fxq "`$table"; then
@@ -211,6 +216,7 @@ command -v wp >/dev/null 2>&1
 sudo -u iarf -- wp plugin is-active pandatask --path=$RemoteWordPressDirQ
 actual_version=`$(sudo -u iarf -- wp plugin get pandatask --field=version --path=$RemoteWordPressDirQ)
 test "`$actual_version" = $ExpectedVersionQ
+sudo -u iarf -- wp eval-file $RemotePluginDirQ/tests/server-smoke.php --path=$RemoteWordPressDirQ
 if ! sudo -u iarf -- wp cache flush --path=$RemoteWordPressDirQ >/dev/null; then
     echo 'Warning: WordPress object cache could not be flushed; deployment files and plugin activation were verified.' >&2
 fi

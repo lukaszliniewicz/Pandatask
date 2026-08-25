@@ -49,6 +49,10 @@ class BuddyPressBootstrap {
             if ( class_exists( GroupTasksExtension::class, true ) ) {
                 bp_register_group_extension( GroupTasksExtension::class );
             }
+
+            if ( class_exists( GroupWorkLogsExtension::class, true ) ) {
+                bp_register_group_extension( GroupWorkLogsExtension::class );
+            }
             
             // Register Bug Tracker extension if the class exists
             if ( class_exists( GroupBugTrackerExtension::class, true ) ) {

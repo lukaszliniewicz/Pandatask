@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.23
+Stable tag: 1.0.24
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.24 =
+
+* Add explicit, member-controlled sharing of complete personal Work Logs with selected BuddyPress groups, protected by group-level enablement and live membership checks.
+* Add a read-only group Work Logs view with member summaries, full entry history, and privacy-safe shared data projections.
+* Consolidate date presets and export actions into compact menus, and make CSV exports include every entry in the selected period with spreadsheet-injection protection.
+* Seed Development as a built-in work type and preserve the improved Other task time presentation for reconciliation entries.
 
 = 1.0.23 =
 

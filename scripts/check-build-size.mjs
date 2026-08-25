@@ -5,8 +5,10 @@ import { readFile } from 'node:fs/promises';
 
 const gzipAsync = promisify( gzip );
 const budgets = [
-	{ path: 'build/main.js', maximum: 260 * 1024, maximumGzip: 72 * 1024 },
-	{ path: 'build/main.css', maximum: 123 * 1024, maximumGzip: 20 * 1024 },
+	// The group Work Log is route-split; the small increase here is the runtime
+	// needed to load its JS/CSS chunks rather than the view implementation.
+	{ path: 'build/main.js', maximum: 260 * 1024, maximumGzip: 73 * 1024 },
+	{ path: 'build/main.css', maximum: 127 * 1024, maximumGzip: 21 * 1024 },
 ];
 
 let failed = false;

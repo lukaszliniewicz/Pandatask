@@ -62,9 +62,13 @@ const WorkReportSummary = ( {
 	isUserBoard = true,
 	compact = false,
 	onOpenTask = null,
+	activityTypes: activityTypesOverride = null,
+	boards: boardsOverride = null,
 } ) => {
-	const { data: activityTypes = [] } = useActivityTypes();
-	const { data: boards = [] } = useUserBoards();
+	const { data: personalActivityTypes = [] } = useActivityTypes();
+	const { data: personalBoards = [] } = useUserBoards();
+	const activityTypes = activityTypesOverride || personalActivityTypes;
+	const boards = boardsOverride || personalBoards;
 	if ( ! report ) return null;
 
 	const breakdowns = [

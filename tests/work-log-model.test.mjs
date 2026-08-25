@@ -16,6 +16,11 @@ import {
     getWorkEntryPresentation,
     normalizeWorkBreakdown,
 } from '../src/workReportModel.mjs';
+import {
+    WORK_LOG_RANGE_PRESETS,
+    workLogCsv,
+    workLogRangeForPreset,
+} from '../src/workLogUiModel.mjs';
 
 test('personal work-log tab availability comes from the canonical board tab model', () => {
     assert.equal(isBoardTabAvailable('work', true), true);
@@ -26,6 +31,33 @@ test('personal work-log tab availability comes from the canonical board tab mode
             .filter(tab => tab.id === 'work')
             .map(tab => tab.label),
         ['Work Log']
+    );
+});
+
+test('compact work-log range presets produce inclusive local-date ranges', () => {
+    const now = new Date(2026, 7, 25, 12);
+    assert.deepEqual(workLogRangeForPreset('last_7_days', now), {
+        startDate: '2026-08-19',
+        endDate: '2026-08-25',
+    });
+    assert.deepEqual(workLogRangeForPreset('this_week', now), {
+        startDate: '2026-08-24',
+        endDate: '2026-08-25',
+    });
+    assert.deepEqual(workLogRangeForPreset('this_month', now), {
+        startDate: '2026-08-01',
+        endDate: '2026-08-25',
+    });
+    assert.ok(WORK_LOG_RANGE_PRESETS.some(option => option.value === 'custom'));
+});
+
+test('work-log CSV is Excel-friendly and escapes spreadsheet cells', () => {
+    assert.equal(
+        workLogCsv([
+            ['Title', 'Notes', 'Formula'],
+            ['Development', 'Quoted "detail"', '=IMPORTXML("bad")'],
+        ]),
+        '\uFEFF"Title","Notes","Formula"\n"Development","Quoted ""detail""","\'=IMPORTXML(""bad"")"'
     );
 });
 

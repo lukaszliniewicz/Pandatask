@@ -12,6 +12,23 @@ class TaskBoardShortcode {
     public function register() {
         add_shortcode( 'task_board', array( $this, 'render_shortcode' ) );
         add_shortcode( 'pandatask_bug_tracker', array( $this, 'render_bug_tracker_shortcode' ) );
+        add_shortcode( 'pandatask_group_work_logs', array( $this, 'render_group_work_logs_shortcode' ) );
+    }
+
+    public function render_group_work_logs_shortcode( $atts ) {
+        $atts     = shortcode_atts( array( 'group_id' => 0 ), $atts, 'pandatask_group_work_logs' );
+        $group_id = absint( $atts['group_id'] );
+
+        if ( ! $group_id ) {
+            return '';
+        }
+
+        $this->enqueue_assets();
+
+        return sprintf(
+            '<div class="pandat69-mount pandat69-root iarf-app iarf-app--pandatask iarf-plugin iarf-plugin--pandatask" data-iarf-product="pandatask" data-iarf-app="pandatask" data-iarf-plugin="pandatask" data-iarf-product-kind="react-plugin" data-pandatask-group-work-logs-root data-group-id="%s"></div>',
+            esc_attr( $group_id )
+        );
     }
 
     public function render_bug_tracker_shortcode( $atts ) {

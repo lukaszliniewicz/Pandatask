@@ -208,7 +208,10 @@ final class AssetRegistrar {
             ? ( wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) ?: '' )
             : '';
 
-        if ( preg_match( '#/(groups|members)/[^/]+/(tasks|bug-tracker)(/|$)#', $request_path ) ) {
+        if (
+            preg_match( '#/(groups|members)/[^/]+/(tasks|bug-tracker)(/|$)#', $request_path )
+            || preg_match( '#/groups/[^/]+/work-logs(/|$)#', $request_path )
+        ) {
             return true;
         }
 
@@ -216,7 +219,7 @@ final class AssetRegistrar {
             function_exists( 'bp_is_group_single' )
             && bp_is_group_single()
             && function_exists( 'bp_is_current_action' )
-            && ( bp_is_current_action( 'tasks' ) || bp_is_current_action( 'bug-tracker' ) )
+            && ( bp_is_current_action( 'tasks' ) || bp_is_current_action( 'bug-tracker' ) || bp_is_current_action( 'work-logs' ) )
         ) {
             return true;
         }

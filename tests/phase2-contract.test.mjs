@@ -119,6 +119,7 @@ test('Pandatask registers assets globally but only enqueues on owned surfaces', 
 	assert.match(assets, /has_shortcode\(\s*\$post->post_content,\s*'pandatask_bug_tracker'\s*\)/);
 	assert.match(assets, /get_query_var\(\s*'pandatask_fullscreen_page'\s*\)/);
 	assert.match(assets, /preg_match\(\s*'#\/\(groups\|members\)\/\[\^\/\]\+\/\(tasks\|bug-tracker\)\(\/\|\$\)#'/);
+	assert.match(assets, /preg_match\(\s*'#\/groups\/\[\^\/\]\+\/work-logs\(\/\|\$\)#'/);
 	assert.match(assets, /bp_is_current_action\(\s*'tasks'\s*\)/);
 	assert.match(assets, /bp_is_current_action\(\s*'bug-tracker'\s*\)/);
 	assert.doesNotMatch(shouldEnqueueFrontendAssets, /floatingBugReporterIsVisible/);
@@ -129,6 +130,40 @@ test('Pandatask registers assets globally but only enqueues on owned surfaces', 
 	assert.match(groupTasks, /AssetRegistrar::enqueueFrontendAssetHandles\(\)/);
 	assert.match(groupBugTracker, /AssetRegistrar::enqueueFrontendAssetHandles\(\)/);
 	assert.match(profileTasks, /AssetRegistrar::enqueueFrontendAssetHandles\(\)/);
+});
+
+test('BuddyPress exposes a private, member-controlled group work-log surface', () => {
+	const extension = fs.readFileSync(path.join(repoRoot, 'src/Integration/BuddyPress/GroupWorkLogsExtension.php'), 'utf8');
+	const bootstrap = fs.readFileSync(path.join(repoRoot, 'src/Integration/BuddyPress/BuddyPressBootstrap.php'), 'utf8');
+	const shortcode = fs.readFileSync(path.join(repoRoot, 'src/Frontend/TaskBoardShortcode.php'), 'utf8');
+	const registrar = fs.readFileSync(path.join(repoRoot, 'src/Integration/BuddyPress/BuddyPressRegistrar.php'), 'utf8');
+	const assets = fs.readFileSync(path.join(repoRoot, 'src/Bootstrap/AssetRegistrar.php'), 'utf8');
+	const createScreen = methodBody(extension, 'create_screen');
+
+	assert.match(extension, /'slug'\s*=>\s*'work-logs'/);
+	assert.match(extension, /'name'\s*=>\s*__\(\s*'Work logs'/);
+	assert.match(extension, /'visibility'\s*=>\s*'private'/);
+	assert.match(extension, /'pandat69_work_logs_enabled'/);
+	assert.match(extension, /Enable member work logs for this group/);
+	assert.match(extension, /does not opt any member into sharing/);
+	assert.match(extension, /FeatureSettings/);
+	assert.match(extension, /WorkLogShareRepository::deleteForGroup\(\s*\$group_id\s*\)/);
+	assert.doesNotMatch(createScreen, /checked\s*\(/);
+	assert.match(extension, /is_user_logged_in\(\)[\s\S]*groups_is_user_member[\s\S]*groups_is_user_admin[\s\S]*groups_is_user_mod/);
+	assert.match(extension, /pandatask_group_work_logs group_id=/);
+	assert.match(bootstrap, /bp_register_group_extension\(\s*GroupWorkLogsExtension::class\s*\)/);
+	assert.match(shortcode, /add_shortcode\(\s*'pandatask_group_work_logs'/);
+	assert.match(shortcode, /data-pandatask-group-work-logs-root/);
+	assert.match(shortcode, /data-group-id=/);
+	assert.doesNotMatch(shortcode, /data-pandatask-board-root[^]*render_group_work_logs_shortcode/);
+	assert.match(assets, /#\/groups\/\[\^\/\]\+\/work-logs/);
+	assert.match(assets, /bp_is_current_action\(\s*'work-logs'\s*\)/);
+	assert.match(registrar, /groups_leave_group/);
+	assert.match(registrar, /groups_remove_member/);
+	assert.match(registrar, /groups_ban_member/);
+	assert.match(registrar, /groups_delete_group/);
+	assert.match(registrar, /WorkLogShareRepository::deleteForUserGroup\(\s*\$user_id\s*,\s*\$group_id\s*\)/);
+	assert.match(registrar, /WorkLogShareRepository::deleteForGroup\(\s*\$group_id\s*\)/);
 });
 
 test('Pandatask uses an explicit Lucide icon boundary without Dashicons', () => {
@@ -204,7 +239,7 @@ test('Subtask projects are authoritative, cascaded, and repaired on upgrade', ()
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.17'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.18'/);
 	assert.match(lifecycle, /board_events/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
@@ -391,7 +426,10 @@ test('Production deployment keeps rollback active through exact release verifica
 	assert.match(deploy, /pandat69_task_time_resolutions/);
 	assert.match(deploy, /pandat69_work_audit_log/);
 	assert.match(deploy, /pandat69_work_suggestion_decisions/);
+	assert.match(deploy, /pandat69_work_log_group_shares/);
 	assert.match(deploy, /wp db export .*--tables=.*--add-drop-table/);
+	assert.match(deploy, /tests\/server-smoke\.php/);
+	assert.match(deploy, /wp eval-file .*server-smoke\.php/);
 	assert.match(deploy, /\$PluginSlug-db-\$Timestamp\.sql/);
 	assert.ok(
 		deploy.lastIndexOf('trap - ERR') <

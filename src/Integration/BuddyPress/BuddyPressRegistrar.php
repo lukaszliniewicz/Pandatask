@@ -3,6 +3,7 @@
 namespace Pandatask\Integration\BuddyPress;
 
 use Pandatask\Application\Board\BoardService;
+use Pandatask\Infrastructure\Persistence\WorkLogShareRepository;
 
 final class BuddyPressRegistrar {
 
@@ -40,6 +41,10 @@ final class BuddyPressRegistrar {
         add_action( 'groups_delete_group', array( $this, 'clearAllBoardNamesCache' ) );
         add_action( 'groups_join_group', array( $this, 'clearWritableBoardsCache' ), 10, 2 );
         add_action( 'groups_leave_group', array( $this, 'clearWritableBoardsCache' ), 10, 2 );
+        add_action( 'groups_leave_group', array( $this, 'deleteWorkLogShareForUserGroup' ), 10, 2 );
+        add_action( 'groups_remove_member', array( $this, 'deleteWorkLogShareForUserGroup' ), 10, 2 );
+        add_action( 'groups_ban_member', array( $this, 'deleteWorkLogShareForUserGroup' ), 10, 2 );
+        add_action( 'groups_delete_group', array( $this, 'deleteWorkLogSharesForGroup' ), 10, 1 );
     }
 
     public function clearGroupBoardNameCache( $group_id ) {
@@ -54,6 +59,27 @@ final class BuddyPressRegistrar {
         if ( $user_id > 0 ) {
             delete_transient( 'pandat69_writable_boards_v2_' . $user_id );
             delete_transient( 'pandat69_writable_boards_' . $user_id );
+        }
+    }
+
+    /**
+     * BuddyPress emits its leave, remove, and ban hooks as
+     * ($group_id, $user_id).
+     */
+    public function deleteWorkLogShareForUserGroup( $group_id, $user_id ) {
+        $group_id = absint( $group_id );
+        $user_id  = absint( $user_id );
+
+        if ( $group_id > 0 && $user_id > 0 ) {
+            WorkLogShareRepository::deleteForUserGroup( $user_id, $group_id );
+        }
+    }
+
+    public function deleteWorkLogSharesForGroup( $group_id ) {
+        $group_id = absint( $group_id );
+
+        if ( $group_id > 0 ) {
+            WorkLogShareRepository::deleteForGroup( $group_id );
         }
     }
 }

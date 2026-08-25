@@ -9,6 +9,7 @@ use Pandatask\Application\Work\WorkEntryService;
 use Pandatask\Application\Work\WorkReportService;
 use Pandatask\Application\Work\WorkSuggestionService;
 use Pandatask\Application\Work\WorkTypeService;
+use Pandatask\Application\Work\WorkLogShareService;
 use WP_Error;
 use WP_REST_Response;
 
@@ -21,8 +22,9 @@ final class WorkRouteHandler {
     private $suggestion_service;
     private $work_type_service;
     private $feature_settings;
+    private $work_log_share_service;
 
-    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null, $suggestion_service = null, $work_type_service = null, $feature_settings = null ) {
+    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null, $suggestion_service = null, $work_type_service = null, $feature_settings = null, $work_log_share_service = null ) {
         $this->work_service       = $work_service ?: new WorkEntryService();
         $this->task_service       = $task_service ?: new TaskService();
         $this->task_time_service  = $task_time_service ?: new TaskTimeService();
@@ -30,6 +32,7 @@ final class WorkRouteHandler {
         $this->suggestion_service = $suggestion_service ?: new WorkSuggestionService();
         $this->work_type_service  = $work_type_service ?: new WorkTypeService();
         $this->feature_settings   = $feature_settings ?: new FeatureSettings();
+        $this->work_log_share_service = $work_log_share_service;
     }
 
     public function activity_types( $request ) {
@@ -272,6 +275,55 @@ final class WorkRouteHandler {
             return $start;
         }
         return new WP_REST_Response( $this->report_service->board( sanitize_key( $request['board_name'] ), $start, $end ), 200 );
+    }
+
+    public function work_log_sharing( $request ) {
+        $result = $this->workLogShareService()->getSharing( get_current_user_id() );
+        return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    public function replace_work_log_sharing( $request ) {
+        $data = $request->get_json_params();
+        $data = is_array( $data ) ? $data : array();
+        $group_ids = $data['shared_group_ids'] ?? $data['group_ids'] ?? null;
+        if ( ! is_array( $group_ids ) ) {
+            return new WP_Error( 'rest_invalid_param', __( 'shared_group_ids must be an array.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        $result = $this->workLogShareService()->replaceSharing( get_current_user_id(), $group_ids );
+        return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    public function group_work_logs( $request ) {
+        list( $start, $end ) = $this->dateRange( $request );
+        if ( is_wp_error( $start ) ) {
+            return $start;
+        }
+        $result = $this->workLogShareService()->groupPresenters( (int) $request['group_id'], $start, $end );
+        return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    public function group_work_log( $request ) {
+        list( $start, $end ) = $this->dateRange( $request );
+        if ( is_wp_error( $start ) ) {
+            return $start;
+        }
+        $result = $this->workLogShareService()->groupOwnerLog(
+            (int) $request['group_id'],
+            (int) $request['user_id'],
+            $start,
+            $end,
+            absint( $request['limit'] ?? 200 ),
+            absint( $request['offset'] ?? 0 )
+        );
+        return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    private function workLogShareService() {
+        if ( ! $this->work_log_share_service ) {
+            $this->work_log_share_service = new WorkLogShareService();
+        }
+        return $this->work_log_share_service;
     }
 
     private function canCompleteWithoutPersonalTime( $task, $user_id ) {

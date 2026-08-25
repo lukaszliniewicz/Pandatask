@@ -4,6 +4,40 @@ namespace Pandatask\Infrastructure\Persistence;
 
 final class WorkReportRepository {
 
+    /**
+     * Fetch the roster total for many users in one aggregate query.
+     */
+    public function personalTotalsForUsers( array $user_ids, $start_date, $end_date ) {
+        global $wpdb;
+
+        $user_ids = array_values( array_unique( array_filter( array_map( 'absint', $user_ids ) ) ) );
+        if ( empty( $user_ids ) ) {
+            return array();
+        }
+
+        $entries      = DatabaseContext::getDbPrefix() . 'work_entries';
+        $placeholders = implode( ', ', array_fill( 0, count( $user_ids ), '%d' ) );
+        $params       = array_merge( $user_ids, array( $start_date, $end_date ) );
+        $rows         = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT user_id, COALESCE(SUM(duration_seconds), 0) AS total_seconds
+                 FROM {$entries}
+                 WHERE user_id IN ({$placeholders})
+                   AND deleted_at IS NULL
+                   AND work_date BETWEEN %s AND %s
+                 GROUP BY user_id",
+                ...$params
+            )
+        );
+        $totals       = array_fill_keys( $user_ids, 0 );
+
+        foreach ( $rows as $row ) {
+            $totals[ (int) $row->user_id ] = (int) $row->total_seconds;
+        }
+
+        return $totals;
+    }
+
     public function personalSummary( $user_id, $start_date, $end_date ) {
         global $wpdb;
         $prefix = DatabaseContext::getDbPrefix();

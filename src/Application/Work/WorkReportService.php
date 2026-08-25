@@ -26,6 +26,29 @@ final class WorkReportService {
         );
     }
 
+    /**
+     * Return the shareable part of a personal report.
+     *
+     * Unresolved task-time decisions are intentionally private workflow state;
+     * a shared log exposes only the same aggregate data as the owner's report.
+     */
+    public function sharedPersonal( $user_id, $start_date, $end_date ) {
+        $summary = $this->repository->personalSummary( $user_id, $start_date, $end_date );
+        foreach ( array( 'unresolved_occurrences', 'unresolved', 'action', 'actions' ) as $private_key ) {
+            unset( $summary[ $private_key ] );
+        }
+
+        return array_merge(
+            array(
+                'scope'      => 'personal_shared',
+                'user_id'    => (int) $user_id,
+                'start_date' => $start_date,
+                'end_date'   => $end_date,
+            ),
+            $summary
+        );
+    }
+
     public function board( $board_name, $start_date, $end_date ) {
         return array_merge(
             array(

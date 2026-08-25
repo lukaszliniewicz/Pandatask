@@ -83,6 +83,59 @@ export const useWorkReport = ( filters = {}, options = {} ) => {
 	} );
 };
 
+export const useWorkLogSharing = ( options = {} ) => {
+	const { apiClient } = useConfig();
+	return useQuery( {
+		queryKey: queryKeys.work.sharing(),
+		queryFn: ( { signal } ) =>
+			apiClient.get( 'users/me/work-log-sharing', { signal } ),
+		enabled: options.enabled !== false,
+	} );
+};
+
+export const useGroupWorkLogs = ( groupId, filters = {} ) => {
+	const { apiClient } = useConfig();
+	return useQuery( {
+		queryKey: queryKeys.work.groupPresenters( groupId, filters ),
+		queryFn: ( { signal } ) =>
+			apiClient.get( `groups/${ groupId }/work-logs`, {
+				params: filters,
+				signal,
+			} ),
+		enabled: Boolean( groupId ),
+	} );
+};
+
+export const useInfiniteSharedWorkLog = (
+	groupId,
+	userId,
+	filters = {},
+	pageSize = 40
+) => {
+	const { apiClient } = useConfig();
+	return useInfiniteQuery( {
+		queryKey: queryKeys.work.groupLog( groupId, userId, {
+			...filters,
+			pageSize,
+		} ),
+		queryFn: ( { pageParam = 0, signal } ) =>
+			apiClient.get( `groups/${ groupId }/work-logs/${ userId }`, {
+				params: {
+					...filters,
+					limit: pageSize,
+					offset: pageParam,
+				},
+				signal,
+			} ),
+		initialPageParam: 0,
+		getNextPageParam: ( lastPage, pages ) =>
+			( lastPage.entries || [] ).length === pageSize
+				? pages.length * pageSize
+				: undefined,
+		enabled: Boolean( groupId && userId ),
+	} );
+};
+
 export const useBoardWorkReport = ( filters = {}, options = {} ) => {
 	const { apiClient, boardName } = useConfig();
 	const isUserBoard = boardName?.startsWith( 'user_' );
@@ -247,6 +300,21 @@ export const useWorkMutations = () => {
 			} ),
 	} );
 
+	const updateSharing = useMutation( {
+		mutationFn: ( groupIds ) =>
+			apiClient.put( 'users/me/work-log-sharing', {
+				group_ids: groupIds,
+			} ),
+		onSuccess: () => {
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.work.sharing(),
+			} );
+			queryClient.invalidateQueries( {
+				queryKey: [ ...queryKeys.work.all(), 'group-presenters' ],
+			} );
+		},
+	} );
+
 	return {
 		createEntry,
 		updateEntry,
@@ -258,5 +326,6 @@ export const useWorkMutations = () => {
 		createActivityType,
 		updateActivityType,
 		archiveActivityType,
+		updateSharing,
 	};
 };

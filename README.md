@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.21
+**Version:** 1.0.24
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -380,6 +380,13 @@ WordPress installation.
 ---
 
 ## Changelog
+
+### 1.0.24
+
+- Add explicit, member-controlled sharing of complete personal Work Logs with selected BuddyPress groups, protected by group-level enablement and live membership checks.
+- Add a read-only group Work Logs view with member summaries, full entry history, and privacy-safe shared data projections.
+- Consolidate date presets and export actions into compact menus, and make CSV exports include every entry in the selected period with spreadsheet-injection protection.
+- Seed Development as a built-in work type and preserve the improved Other task time presentation for reconciliation entries.
 
 ### 1.0.21
 

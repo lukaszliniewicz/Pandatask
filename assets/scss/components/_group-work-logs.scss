@@ -1,0 +1,208 @@
+@use "../base/variables" as *;
+
+/* Loaded only for the dedicated, read-only BuddyPress group surface. */
+.pandat69-group-work-logs {
+	max-width: 1180px;
+	margin: 0 auto;
+}
+
+.pandat69-group-work-header {
+	align-items: center;
+}
+
+.pandat69-work-consent-badge {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	gap: 7px;
+	padding: 8px 10px;
+	border: 1px solid #bcd8c7;
+	border-radius: 99px;
+	background: rgba(255, 255, 255, 0.72);
+	color: #2f7150;
+	font-size: 10px;
+	font-weight: 750;
+	white-space: nowrap;
+}
+
+.pandat69-work-presenters {
+	padding: 18px;
+	border: 1px solid $border-color;
+	border-radius: 12px;
+	background: $white;
+	box-shadow: 0 1px 2px rgba(25, 44, 66, 0.04);
+}
+
+.pandat69-work-presenter-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	> li {
+		min-width: 0;
+		margin: 0;
+		list-style: none;
+	}
+
+	> li::marker {
+		content: "";
+	}
+
+	button {
+		display: grid;
+		width: 100%;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 10px;
+		padding: 10px;
+		border: 1px solid $border-color;
+		border-radius: 9px;
+		background: #fbfcfd;
+		color: $primary-color;
+		font: inherit;
+		text-align: left;
+
+		&:hover,
+		&:focus-visible {
+			border-color: #aebec9;
+			background: #f5f8fa;
+		}
+
+		&.is-selected {
+			border-color: #7994aa;
+			background: #edf3f6;
+			box-shadow: inset 3px 0 #405d72;
+		}
+
+		> span:nth-child(2) {
+			display: flex;
+			min-width: 0;
+			flex-direction: column;
+			gap: 1px;
+		}
+
+		strong,
+		small {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		strong {
+			font-size: 12px;
+		}
+
+		small {
+			color: $secondary-color;
+			font-size: 10px;
+		}
+	}
+}
+
+.pandat69-work-presenter-avatar {
+	display: grid;
+	width: 36px;
+	height: 36px;
+	flex: 0 0 auto;
+	place-items: center;
+	border: 1px solid #d5e0e6;
+	border-radius: 50%;
+	background: #e8f0f4;
+	color: #405d72;
+	font-size: 11px;
+	font-weight: 800;
+	overflow: hidden;
+
+	&.is-large {
+		width: 48px;
+		height: 48px;
+		font-size: 14px;
+	}
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+}
+
+.pandat69-shared-work-owner {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 15px 18px;
+	border: 1px solid #dce5ec;
+	border-radius: 12px;
+	background: linear-gradient(135deg, #f7fafc, #fff);
+
+	> div {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		flex-direction: column;
+	}
+
+	> div > span {
+		color: $success-color;
+		font-size: 9px;
+		font-weight: 750;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+	}
+
+	h3,
+	p {
+		margin: 0;
+	}
+
+	h3 {
+		font-size: 1.15rem;
+	}
+
+	p {
+		color: $secondary-color;
+		font-size: 10px;
+	}
+}
+
+.pandat69-work-group-loading {
+	min-height: 240px;
+}
+
+@media (max-width: 720px) {
+
+	.pandat69-group-work-header {
+		align-items: flex-start;
+	}
+
+	.pandat69-work-presenter-list {
+		grid-template-columns: 1fr;
+	}
+
+	.pandat69-shared-work-owner {
+		align-items: flex-start;
+		flex-wrap: wrap;
+
+		> div {
+			min-width: 180px;
+		}
+	}
+}
+
+@media print {
+
+	.pandat69-work-presenters,
+	.pandat69-work-consent-badge,
+	.pandat69-shared-work-owner .pandat69-button {
+		display: none !important;
+	}
+
+	.pandat69-shared-work-owner {
+		border-color: #ccd3d8;
+		box-shadow: none;
+		break-inside: avoid;
+	}
+}

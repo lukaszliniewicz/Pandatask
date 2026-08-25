@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.17';
+    private const DB_VERSION = '1.0.18';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -38,6 +38,7 @@ final class DatabaseLifecycle {
         $table_time_resolutions    = $prefix . 'task_time_resolutions';
         $table_work_audit_log      = $prefix . 'work_audit_log';
         $table_work_suggestion_decisions = $prefix . 'work_suggestion_decisions';
+        $table_work_log_group_shares = $prefix . 'work_log_group_shares';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -377,6 +378,20 @@ final class DatabaseLifecycle {
         ) $charset_collate;";
         dbDelta( $sql_work_suggestion_decisions );
 
+        $sql_work_log_group_shares = "CREATE TABLE $table_work_log_group_shares (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            group_id BIGINT(20) UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_group (user_id, group_id),
+            KEY group_user (group_id, user_id),
+            KEY user_id (user_id),
+            KEY group_id (group_id)
+        ) $charset_collate;";
+        dbDelta( $sql_work_log_group_shares );
+
         return true;
     }
 
@@ -413,6 +428,7 @@ final class DatabaseLifecycle {
             $prefix . 'task_time_resolutions',
             $prefix . 'work_audit_log',
             $prefix . 'work_suggestion_decisions',
+            $prefix . 'work_log_group_shares',
         );
 
         foreach ( $required_tables as $table ) {
@@ -449,6 +465,7 @@ final class DatabaseLifecycle {
             $prefix . 'task_time_resolutions' => array( 'occurrence_user_revision', 'occurrence_user', 'state', 'residual_entry_id' ),
             $prefix . 'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
             $prefix . 'work_suggestion_decisions' => array( 'user_provider_external', 'user_decision', 'work_entry_id' ),
+            $prefix . 'work_log_group_shares' => array( 'user_group', 'group_user', 'user_id', 'group_id' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {
