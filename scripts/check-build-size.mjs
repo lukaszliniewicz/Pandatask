@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 
 const gzipAsync = promisify( gzip );
 const budgets = [
-	{ path: 'build/main.js', maximum: 260 * 1024, maximumGzip: 70 * 1024 },
-	{ path: 'build/main.css', maximum: 107 * 1024, maximumGzip: 18 * 1024 },
+	{ path: 'build/main.js', maximum: 260 * 1024, maximumGzip: 72 * 1024 },
+	{ path: 'build/main.css', maximum: 123 * 1024, maximumGzip: 20 * 1024 },
 ];
 
 let failed = false;

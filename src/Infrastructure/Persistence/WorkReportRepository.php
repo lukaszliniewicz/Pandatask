@@ -127,10 +127,10 @@ final class WorkReportRepository {
         );
         $capacity_breakdown = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT capacity AS name, COALESCE(SUM(duration_seconds), 0) AS duration_seconds
+                "SELECT capacity AS name, kind, COALESCE(SUM(duration_seconds), 0) AS duration_seconds
                  FROM {$entries}
                  WHERE user_id = %d AND deleted_at IS NULL AND work_date BETWEEN %s AND %s
-                 GROUP BY capacity
+                 GROUP BY capacity, kind
                  ORDER BY duration_seconds DESC",
                 (int) $user_id, $start_date, $end_date
             )
@@ -255,13 +255,13 @@ final class WorkReportRepository {
         );
         $capacity_breakdown = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT entry.capacity AS name, COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
+                "SELECT entry.capacity AS name, entry.kind, COALESCE(SUM(allocation.seconds), 0) AS duration_seconds
                  FROM {$allocations} allocation
                  INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
                  WHERE allocation.board_name_snapshot = %s
                    AND entry.deleted_at IS NULL
                    AND entry.work_date BETWEEN %s AND %s
-                 GROUP BY entry.capacity
+                 GROUP BY entry.capacity, entry.kind
                  ORDER BY duration_seconds DESC",
                 $board_name, $start_date, $end_date
             )

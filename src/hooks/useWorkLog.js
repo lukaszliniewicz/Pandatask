@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
 import { queryKeys } from '../query/queryKeys';
 
@@ -27,6 +32,27 @@ export const useWorkEntries = ( filters = {} ) => {
 			} );
 			return response.entries || [];
 		},
+	} );
+};
+
+export const useInfiniteWorkEntries = ( filters = {}, pageSize = 40 ) => {
+	const { apiClient } = useConfig();
+	return useInfiniteQuery( {
+		queryKey: queryKeys.work.entries( { ...filters, pageSize } ),
+		queryFn: async ( { pageParam = 0, signal } ) => {
+			const response = await apiClient.get( 'users/me/work-entries', {
+				params: {
+					...filters,
+					limit: pageSize,
+					offset: pageParam,
+				},
+				signal,
+			} );
+			return response.entries || [];
+		},
+		initialPageParam: 0,
+		getNextPageParam: ( lastPage, pages ) =>
+			lastPage.length === pageSize ? pages.length * pageSize : undefined,
 	} );
 };
 
@@ -182,6 +208,45 @@ export const useWorkMutations = () => {
 		onSuccess: () => invalidate(),
 	} );
 
+	const createActivityType = useMutation( {
+		mutationFn: async ( data ) => {
+			const response = await apiClient.post(
+				'work/activity-types',
+				data
+			);
+			return response.activity_type;
+		},
+		onSuccess: () =>
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.work.activityTypes(),
+			} ),
+	} );
+
+	const updateActivityType = useMutation( {
+		mutationFn: async ( { key, data } ) => {
+			const response = await apiClient.patch(
+				`work/activity-types/${ encodeURIComponent( key ) }`,
+				data
+			);
+			return response.activity_type;
+		},
+		onSuccess: () =>
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.work.activityTypes(),
+			} ),
+	} );
+
+	const archiveActivityType = useMutation( {
+		mutationFn: async ( { key } ) =>
+			apiClient.delete(
+				`work/activity-types/${ encodeURIComponent( key ) }`
+			),
+		onSuccess: () =>
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.work.activityTypes(),
+			} ),
+	} );
+
 	return {
 		createEntry,
 		updateEntry,
@@ -190,5 +255,8 @@ export const useWorkMutations = () => {
 		dismissSuggestion,
 		resolveTaskTime,
 		resolveOccurrenceTime,
+		createActivityType,
+		updateActivityType,
+		archiveActivityType,
 	};
 };

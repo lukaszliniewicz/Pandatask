@@ -7,8 +7,15 @@ export const BOARD_TABS = Object.freeze( [
 	{ id: 'report', label: 'Report', icon: 'bar-chart' },
 ] );
 
-export const getBoardTabs = ( isUserBoard = false ) =>
-	BOARD_TABS.filter( ( tab ) => ! tab.userBoardOnly || isUserBoard );
+export const getBoardTabs = ( isUserBoard = false, options = {} ) =>
+	BOARD_TABS.filter(
+		( tab ) =>
+			( ! tab.userBoardOnly || isUserBoard ) &&
+			( tab.id !== 'work' || options.workLogEnabled !== false )
+	);
 
-export const isBoardTabAvailable = ( tabId, isUserBoard = false ) =>
-	getBoardTabs( isUserBoard ).some( ( tab ) => tab.id === tabId );
+export const isBoardTabAvailable = (
+	tabId,
+	isUserBoard = false,
+	options = {}
+) => getBoardTabs( isUserBoard, options ).some( ( tab ) => tab.id === tabId );

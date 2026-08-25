@@ -45,12 +45,13 @@ const ProjectSidebar = ({
     selectedProjectId, onSelectProject, onAddProject, 
     isOpen, isMobile, onClose,
     currentTab, onTabChange,
-    privateOnly = false
+    privateOnly = false,
+    workLogEnabled = true
 }) => {
     const { data: projects, isLoading } = useProjects(undefined, { privateOnly });
     const { boardName } = useConfig();
     const isUserBoard = boardName?.startsWith( 'user_' );
-    const navigationTabs = getBoardTabs( isUserBoard );
+    const navigationTabs = getBoardTabs( isUserBoard, { workLogEnabled } );
     const projectSections = groupProjects( projects, isUserBoard );
     
     // On mobile, if not open, don't render at all

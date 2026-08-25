@@ -2,6 +2,7 @@
 
 namespace Pandatask\Http\Rest\V1;
 
+use Pandatask\Application\Settings\FeatureSettings;
 use Pandatask\Application\Security\WorkEntryAccessPolicy;
 
 final class WorkRouteRegistrar {
@@ -10,22 +11,53 @@ final class WorkRouteRegistrar {
     private $permissions;
     private $handler;
     private $work_entry_access_policy;
+    private $feature_settings;
 
-    public function __construct( $namespace = 'pandatask/v1', $permissions = null, $handler = null, $work_entry_access_policy = null ) {
+    public function __construct( $namespace = 'pandatask/v1', $permissions = null, $handler = null, $work_entry_access_policy = null, $feature_settings = null ) {
         $this->namespace                = $namespace;
         $this->permissions              = $permissions ?: new PermissionChecker();
         $this->handler                  = $handler ?: new WorkRouteHandler();
         $this->work_entry_access_policy = $work_entry_access_policy ?: new WorkEntryAccessPolicy();
+        $this->feature_settings         = $feature_settings ?: new FeatureSettings();
     }
 
     public function register() {
+        if ( ! $this->feature_settings->workLogEnabled() ) {
+            $this->registerTaskCompletionRoute();
+            return;
+        }
+
         register_rest_route(
             $this->namespace,
             '/work/activity-types',
             array(
-                'methods'             => 'GET',
-                'callback'            => array( $this->handler, 'activity_types' ),
-                'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                array(
+                    'methods'             => 'GET',
+                    'callback'            => array( $this->handler, 'activity_types' ),
+                    'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                ),
+                array(
+                    'methods'             => 'POST',
+                    'callback'            => array( $this->handler, 'create_activity_type' ),
+                    'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/work/activity-types/(?P<key>[a-zA-Z0-9_-]{1,32})',
+            array(
+                array(
+                    'methods'             => array( 'PATCH', 'POST' ),
+                    'callback'            => array( $this->handler, 'update_activity_type' ),
+                    'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                ),
+                array(
+                    'methods'             => 'DELETE',
+                    'callback'            => array( $this->handler, 'delete_activity_type' ),
+                    'permission_callback' => array( $this->permissions, 'check_user_logged_in_permission' ),
+                ),
             )
         );
 
@@ -133,15 +165,7 @@ final class WorkRouteRegistrar {
             )
         );
 
-        register_rest_route(
-            $this->namespace,
-            '/tasks/(?P<id>\\d+)/complete',
-            array(
-                'methods'             => 'POST',
-                'callback'            => array( $this->handler, 'complete_task' ),
-                'permission_callback' => array( $this->permissions, 'check_task_update_permission' ),
-            )
-        );
+        $this->registerTaskCompletionRoute();
 
         register_rest_route(
             $this->namespace,
@@ -166,5 +190,17 @@ final class WorkRouteRegistrar {
 
     public function check_entry_manage_permission( $request ) {
         return $this->work_entry_access_policy->canManageEntry( (int) $request['id'], get_current_user_id() );
+    }
+
+    private function registerTaskCompletionRoute() {
+        register_rest_route(
+            $this->namespace,
+            '/tasks/(?P<id>\\d+)/complete',
+            array(
+                'methods'             => 'POST',
+                'callback'            => array( $this->handler, 'complete_task' ),
+                'permission_callback' => array( $this->permissions, 'check_task_update_permission' ),
+            )
+        );
     }
 }

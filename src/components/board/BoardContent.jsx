@@ -39,20 +39,36 @@ const BoardContent = ({ controller }) => (
                     privateOnly={controller.isUserBoard && controller.filters.onlyMyTasks}
                 />
             )}
-            {controller.currentTab === 'archive' && (
-                <ArchiveView onTaskAction={controller.handleTaskAction} />
-            )}
-            {controller.currentTab === 'overview' && (
-                <OverviewView onTaskAction={controller.handleTaskAction} />
-            )}
-            {controller.currentTab === 'work' && controller.isUserBoard && (
-                <Suspense fallback={<div className="pandat69-loading" role="status">Loading work log…</div>}>
-                    <WorkLogView />
+            {controller.currentTab === 'archive' && <ArchiveView onTaskAction={controller.handleTaskAction} />}
+            {controller.currentTab === 'overview' && <OverviewView onTaskAction={controller.handleTaskAction} />}
+            {controller.currentTab === 'work' && controller.isUserBoard && controller.workLogEnabled && (
+                <Suspense
+                    fallback={
+                        <div className="pandat69-loading" role="status">
+                            Loading work log…
+                        </div>
+                    }
+                >
+                    <WorkLogView
+                        onLogWork={controller.openWorkDialog}
+                        onManageWorkTypes={controller.openWorkTypesDialog}
+                        onOpenTask={controller.openTask}
+                    />
                 </Suspense>
             )}
             {controller.currentTab === 'report' && (
-                <Suspense fallback={<div className="pandat69-loading" role="status">Loading report…</div>}>
-                    <ReportView />
+                <Suspense
+                    fallback={
+                        <div className="pandat69-loading" role="status">
+                            Loading report…
+                        </div>
+                    }
+                >
+                    <ReportView
+                        onLogWork={controller.openWorkDialog}
+                        onOpenTask={controller.openTask}
+                        workLogEnabled={controller.workLogEnabled}
+                    />
                 </Suspense>
             )}
         </div>

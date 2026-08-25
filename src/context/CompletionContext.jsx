@@ -9,6 +9,7 @@ import React, {
 import Modal from "../components/Modal";
 import { useTaskMutations } from "../hooks/useTaskMutations";
 import { useTaskWork } from "../hooks/useWorkLog";
+import { useConfig } from "./ConfigContext";
 
 const CompletionContext = createContext(null);
 
@@ -168,35 +169,51 @@ const CompletionDialog = ({ task, changeComment = "", onClose }) => {
 };
 
 export const CompletionProvider = ({ children }) => {
+  const { features } = useConfig();
+  const workLogEnabled = features?.workLog !== false;
   const [request, setRequest] = useState(null);
   const requestCompletion = useCallback((nextTask, options = {}) => {
-    setRequest({ task: nextTask, changeComment: options.changeComment || "" });
+    setRequest({
+      task: nextTask,
+      changeComment: options.changeComment || "",
+    });
   }, []);
   const value = useMemo(() => ({ requestCompletion }), [requestCompletion]);
   return (
     <CompletionContext.Provider value={value}>
       {children}
-      <CompletionDialog
-        task={request?.task || null}
-        changeComment={request?.changeComment || ""}
-        onClose={() => setRequest(null)}
-      />
+      {workLogEnabled && (
+        <CompletionDialog
+          task={request?.task || null}
+          changeComment={request?.changeComment || ""}
+          onClose={() => setRequest(null)}
+        />
+      )}
     </CompletionContext.Provider>
   );
 };
 
 export const useTaskStatusTransition = () => {
   const context = useContext(CompletionContext);
-  const { updateTask } = useTaskMutations();
+  const { features } = useConfig();
+  const { updateTask, completeTask } = useTaskMutations();
   if (!context)
     throw new Error(
       "useTaskStatusTransition must be used inside CompletionProvider",
     );
   return {
-    isPending: updateTask.isPending,
+    isPending: updateTask.isPending || completeTask.isPending,
     setStatus: async (task, status, options = {}) => {
       if (task.status === status) return;
       if (status === "done") {
+        if (features?.workLog === false) {
+          await completeTask.mutateAsync({
+            id: task.id,
+            noPersonalWork: true,
+            changeComment: options.changeComment || "",
+          });
+          return;
+        }
         context.requestCompletion(task, options);
         return;
       }

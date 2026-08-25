@@ -28,9 +28,10 @@ const normalizeTaskId = ( taskId ) => {
 };
 
 export const useBoardController = () => {
-	const { boardName, text } = useConfig();
+	const { boardName, text, features } = useConfig();
 	const isUserBoard = boardName?.startsWith( 'user_' );
-	const navigation = useBoardNavigation( isUserBoard );
+	const workLogEnabled = features?.workLog !== false;
+	const navigation = useBoardNavigation( isUserBoard, workLogEnabled );
 	const { containerRef, isContainerNarrow } = useContainerMode();
 	const fullscreen = useBoardFullscreen();
 	const [ filters, setFilters ] = useState( INITIAL_FILTERS );
@@ -193,9 +194,32 @@ export const useBoardController = () => {
 		isContainerNarrow,
 		isSidebarOpen,
 		isUserBoard,
+		workLogEnabled,
 		navigateTask: ( taskId ) =>
 			navigation.openTask( taskId, { replace: true } ),
 		openCategoryDialog: () => setDialog( { kind: 'category' } ),
+		openWorkTypesDialog: () => setDialog( { kind: 'work-types' } ),
+		openWorkDialog: ( options = {} ) => {
+			if ( ! workLogEnabled ) {
+				return;
+			}
+			const initialValues =
+				options.initialValues ||
+				( ! isUserBoard && ! options.entry && ! options.task
+					? {
+							duration_seconds: 1800,
+							allocations: [
+								{ board_name: boardName, seconds: 1800 },
+							],
+					  }
+					: null );
+			setDialog( {
+				kind: 'work',
+				entry: options.entry || null,
+				task: options.task || null,
+				initialValues,
+			} );
+		},
 		openProjectDialog: ( project = null ) =>
 			setDialog( { kind: 'project', project } ),
 		openTaskDialog: () =>

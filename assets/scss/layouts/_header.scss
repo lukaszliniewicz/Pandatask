@@ -151,6 +151,89 @@
 	}
 }
 
+.pandat69-quick-add {
+	position: relative;
+}
+
+.pandat69-quick-add-menu {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	z-index: 40;
+	display: grid;
+	width: min(280px, calc(100vw - 30px));
+	padding: 6px;
+	border: 1px solid $border-color;
+	border-radius: 10px;
+	background: $white;
+	box-shadow: 0 14px 38px rgba(25, 44, 66, 0.18), 0 2px 8px rgba(25, 44, 66, 0.08);
+
+	&::before {
+		position: absolute;
+		top: -5px;
+		right: 13px;
+		width: 8px;
+		height: 8px;
+		transform: rotate(45deg);
+		border-top: 1px solid $border-color;
+		border-left: 1px solid $border-color;
+		background: $white;
+		content: "";
+	}
+
+	> button {
+		display: grid;
+		grid-template-columns: 38px 1fr;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		min-height: 56px;
+		padding: 7px;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		color: $primary-color;
+		text-align: left;
+
+		&:hover,
+		&:focus-visible {
+			background: #f3f6f8;
+		}
+
+		> span:last-child {
+			display: flex;
+			min-width: 0;
+			flex-direction: column;
+			gap: 1px;
+		}
+
+		strong {
+			font-size: 13px;
+		}
+
+		small {
+			color: $secondary-color;
+			font-size: 10px;
+		}
+	}
+}
+
+.pandat69-quick-add-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 9px;
+	background: #edf2f6;
+	color: $primary-color;
+
+	&.is-work {
+		background: #eaf5ee;
+		color: $success-color;
+	}
+}
+
 /* Fullscreen Specific Overrides to fix "off" look */
 body.pandat69-fullscreen-body {
 

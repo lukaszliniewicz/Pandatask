@@ -7,14 +7,26 @@ import TaskDetailMetadata from './task-detail/TaskDetailMetadata';
 import TaskDetailSubtasks from './task-detail/TaskDetailSubtasks';
 import TaskHistory from './task-detail/TaskHistory';
 import TaskTimeCard from './work/TaskTimeCard';
+import { useConfig } from '../context/ConfigContext';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHeader = false }) => {
+    const { features } = useConfig();
     const { data: task, isLoading, isError } = useTaskDetails(taskId);
 
-    if (isLoading) return <div className="pandat69-loading" role="status">Loading details...</div>;
-    if (isError || !task) return <div className="pandat69-error" role="alert">Failed to load task details.</div>;
+    if (isLoading)
+        return (
+            <div className="pandat69-loading" role="status">
+                Loading details...
+            </div>
+        );
+    if (isError || !task)
+        return (
+            <div className="pandat69-error" role="alert">
+                Failed to load task details.
+            </div>
+        );
 
-    const handleNavigate = (id) => {
+    const handleNavigate = id => {
         if (onNavigate) {
             onNavigate(id);
         } else if (onEdit) {
@@ -32,7 +44,7 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHe
             />
             <TaskDetailMetadata task={task} />
             <TaskDetailSubtasks task={task} onAddSubtask={onAddSubtask} onNavigate={handleNavigate} />
-            <TaskTimeCard task={task} />
+            {features?.workLog !== false && <TaskTimeCard task={task} />}
             <TaskDetailDescription task={task} />
             <TaskComments task={task} />
             <TaskHistory taskId={task.id} />

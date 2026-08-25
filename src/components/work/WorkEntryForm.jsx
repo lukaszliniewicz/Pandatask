@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   useActivityTypes,
   useTaskWork,
@@ -27,17 +27,26 @@ const newAllocation = (minutes = 30, values = {}) => ({
 
 const initialAllocationDrafts = (allocations = []) =>
   allocations.map((allocation) =>
-    newAllocation(Math.max(1, Math.round(Number(allocation.seconds || 0) / 60)), {
-      targetType: allocation.task_id_snapshot || allocation.task_id ? "task" : "board",
-      taskId: allocation.task_id_snapshot || allocation.task_id || "",
-      boardName: allocation.task_id_snapshot || allocation.task_id ? "" : allocation.board_name_snapshot || allocation.board_name || "",
-    }),
+    newAllocation(
+      Math.max(1, Math.round(Number(allocation.seconds || 0) / 60)),
+      {
+        targetType:
+          allocation.task_id_snapshot || allocation.task_id ? "task" : "board",
+        taskId: allocation.task_id_snapshot || allocation.task_id || "",
+        boardName:
+          allocation.task_id_snapshot || allocation.task_id
+            ? ""
+            : allocation.board_name_snapshot || allocation.board_name || "",
+      },
+    ),
   );
 
 const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
   const { data: userBoards = [] } = useUserBoards();
   const isTaskTarget = (allocation.targetType || "task") === "task";
-  const { data: taskWork } = useTaskWork(isTaskTarget ? allocation.taskId || null : null);
+  const { data: taskWork } = useTaskWork(
+    isTaskTarget ? allocation.taskId || null : null,
+  );
   const resolution = taskWork?.my_time?.resolution;
   const specificSeconds = Number(taskWork?.my_time?.specific_seconds || 0);
   const isResolved = resolution?.state === "resolved";
@@ -75,7 +84,11 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
           <TaskSelect
             selectedTaskIds={allocation.taskId}
             onChange={(taskId) =>
-              onChange({ ...allocation, taskId, residualHandling: "" })
+              onChange({
+                ...allocation,
+                taskId,
+                residualHandling: "",
+              })
             }
             mode="single"
             inputLabel="Search for a task to allocate work to"
@@ -84,12 +97,19 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
           <select
             className="pandat69-select"
             value={allocation.boardName || ""}
-            onChange={(event) => onChange({ ...allocation, boardName: event.target.value })}
+            onChange={(event) =>
+              onChange({
+                ...allocation,
+                boardName: event.target.value,
+              })
+            }
             aria-label="Board to allocate work to"
           >
             <option value="">Choose a board…</option>
             {userBoards.map((board) => (
-              <option key={board.id} value={board.id}>{board.name}</option>
+              <option key={board.id} value={board.id}>
+                {board.name}
+              </option>
             ))}
           </select>
         )}
@@ -103,7 +123,10 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
           className="pandat69-input"
           value={allocation.minutes}
           onChange={(event) =>
-            onChange({ ...allocation, minutes: event.target.value })
+            onChange({
+              ...allocation,
+              minutes: event.target.value,
+            })
           }
           aria-label="Allocated minutes"
         />
@@ -124,8 +147,8 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
             {residualSeconds > 0
               ? `This task has ${Math.round(
                   residualSeconds / 60,
-                )} minutes of unitemised time.`
-              : "This task time was already resolved with no unitemised remainder."}
+                )} minutes of other task time.`
+              : "This task time was already resolved with no remaining other time."}
             <select
               className="pandat69-select"
               value={allocation.residualHandling}
@@ -142,7 +165,7 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
               </option>
               {residualSeconds > 0 && (
                 <option value="refine_residual">
-                  Replace part of the unitemised time
+                  Replace part of the other task time
                 </option>
               )}
               <option value="additional">Count as additional work</option>
@@ -152,7 +175,7 @@ const WorkAllocationRow = ({ allocation, onChange, onRemove }) => {
       )}
     </div>
   );
-};;
+};
 
 const WorkEntryForm = ({
   task = null,
@@ -164,7 +187,11 @@ const WorkEntryForm = ({
   submitLabel = null,
   allocationHint = "",
 }) => {
-  const { data: activityTypes = [] } = useActivityTypes();
+  const {
+    data: activityTypes = [],
+    isLoading: areActivityTypesLoading,
+    isError: areActivityTypesUnavailable,
+  } = useActivityTypes();
   const { createEntry } = useWorkMutations();
   const formId = useId().replaceAll(":", "");
   const [activityType, setActivityType] = useState(
@@ -184,6 +211,16 @@ const WorkEntryForm = ({
   );
   const [residualHandling, setResidualHandling] = useState("");
   const [error, setError] = useState("");
+  const retainedActivityType = initialValues?.activity_type || "";
+  const selectableActivityTypes = useMemo(
+    () =>
+      activityTypes.filter(
+        (type) =>
+          (type.is_active !== false && type.is_active !== 0) ||
+          type.key === retainedActivityType,
+      ),
+    [activityTypes, retainedActivityType],
+  );
   const { data: targetWork } = useTaskWork(task?.id || null);
   const resolution = targetWork?.my_time?.resolution;
   const specificSeconds = Number(targetWork?.my_time?.specific_seconds || 0);
@@ -194,6 +231,17 @@ const WorkEntryForm = ({
         Number(resolution.declared_actual_seconds || 0) - specificSeconds,
       )
     : 0;
+
+  useEffect(() => {
+    if (
+      areActivityTypesLoading ||
+      selectableActivityTypes.length === 0 ||
+      selectableActivityTypes.some((type) => type.key === activityType)
+    ) {
+      return;
+    }
+    setActivityType(selectableActivityTypes[0].key);
+  }, [activityType, areActivityTypesLoading, selectableActivityTypes]);
 
   const durationSeconds = useMemo(() => minutesToSeconds(minutes), [minutes]);
   const allocationSummary = useMemo(
@@ -235,7 +283,7 @@ const WorkEntryForm = ({
       if (isResolved && !residualHandling) {
         setError(
           residualSeconds > 0
-            ? "Choose whether this detail refines existing unitemised time or is additional work."
+            ? "Choose whether this detail replaces existing other task time or is additional work."
             : "Confirm that this detail is additional work because the task time was already resolved.",
         );
         return;
@@ -299,15 +347,31 @@ const WorkEntryForm = ({
     >
       <div className="pandat69-form-row">
         <div className="pandat69-form-field pandat69-form-field-half">
-          <label htmlFor={`${formId}-activity`}>Activity</label>
+          <label htmlFor={`${formId}-activity`}>Work type</label>
           <select
             id={`${formId}-activity`}
             className="pandat69-select"
             value={activityType}
             onChange={(event) => setActivityType(event.target.value)}
             required
+            disabled={
+              areActivityTypesLoading ||
+              areActivityTypesUnavailable ||
+              selectableActivityTypes.length === 0
+            }
           >
-            {activityTypes.map((type) => (
+            {areActivityTypesLoading && (
+              <option value="">Loading work types…</option>
+            )}
+            {areActivityTypesUnavailable && (
+              <option value="">Work types unavailable</option>
+            )}
+            {!areActivityTypesLoading &&
+              !areActivityTypesUnavailable &&
+              selectableActivityTypes.length === 0 && (
+                <option value="">No active work types</option>
+              )}
+            {selectableActivityTypes.map((type) => (
               <option key={type.key} value={type.key}>
                 {type.label}
               </option>
@@ -421,7 +485,7 @@ const WorkEntryForm = ({
             <option value="">Choose…</option>
             {residualSeconds > 0 && (
               <option value="refine_residual">
-                This detail replaces part of the unitemised time
+                This detail replaces part of the other task time
               </option>
             )}
             <option value="additional">This is additional work</option>
@@ -430,8 +494,8 @@ const WorkEntryForm = ({
             {residualSeconds > 0
               ? `This task currently has ${Math.round(
                   residualSeconds / 60,
-                )} minutes of unitemised time.`
-              : "The previous declared actual was fully itemised, so new detail must be explicitly additional."}
+                )} minutes of other task time.`
+              : "The previously declared time was fully detailed, so new detail must be explicitly additional."}
           </p>
         </div>
       )}
@@ -472,7 +536,13 @@ const WorkEntryForm = ({
       <button
         type="submit"
         className="pandat69-button pandat69-button-primary"
-        disabled={createEntry.isPending || isSubmitting}
+        disabled={
+          createEntry.isPending ||
+          isSubmitting ||
+          areActivityTypesLoading ||
+          areActivityTypesUnavailable ||
+          selectableActivityTypes.length === 0
+        }
       >
         {createEntry.isPending || isSubmitting
           ? onSubmitOverride

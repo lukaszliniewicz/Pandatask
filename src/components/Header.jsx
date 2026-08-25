@@ -1,6 +1,7 @@
 import React from 'react';
 import { useConfig } from '../context/ConfigContext';
 import Icon from './Icon';
+import QuickAddMenu from './QuickAddMenu';
 
 const VIEWS = [
     { id: 'compact', label: 'Compact', icon: 'list-todo' },
@@ -10,16 +11,18 @@ const VIEWS = [
     { id: 'gantt', label: 'Gantt', icon: 'gantt' },
 ];
 
-const Header = ({ 
-    onAddTask, 
-    onManageCategories, 
+const Header = ({
+    onAddTask,
+    onLogWork,
+    workLogEnabled,
+    onManageCategories,
     onFullscreen,
     isFullscreen,
     fullscreenToggleRef,
     currentView,
     onViewChange,
     toggleSidebar,
-    isSidebarOpen
+    isSidebarOpen,
 }) => {
     const { boardName } = useConfig();
 
@@ -32,11 +35,11 @@ const Header = ({
     return (
         <div className="pandat69-header">
             <div className="pandat69-header-left">
-                {/* 
+                {/**
                    Hamburger Icon: Visible on both Desktop and Mobile now.
                    Controls the sidebar toggle via prop.
                 */}
-                <button 
+                <button
                     type="button"
                     className="pandat69-icon-button pandat69-sidebar-toggle"
                     onClick={toggleSidebar}
@@ -47,16 +50,14 @@ const Header = ({
                     <Icon name="menu" />
                 </button>
 
-                <div className="pandat69-header-title">
-                    {showTitle ? <h2>{displayName}</h2> : <h2>Task Board</h2>}
-                </div>
+                <div className="pandat69-header-title">{showTitle ? <h2>{displayName}</h2> : <h2>Task Board</h2>}</div>
             </div>
 
             <div className="pandat69-header-actions">
                 <div className="pandat69-view-controls-container">
                     <span className="pandat69-view-label">View:</span>
                     {VIEWS.map(view => (
-                        <button 
+                        <button
                             type="button"
                             key={view.id}
                             className={`pandat69-icon-button ${currentView === view.id ? 'active' : ''}`}
@@ -71,28 +72,20 @@ const Header = ({
                 </div>
 
                 <div className="pandat69-header-buttons">
-                    <button 
+                    <QuickAddMenu workLogEnabled={workLogEnabled} onAddTask={onAddTask} onLogWork={onLogWork} />
+                    <button
                         type="button"
-                        className="pandat69-icon-button pandat69-add-task-btn" 
-                        title="Add New Task" 
-                        onClick={onAddTask}
-                        aria-label="Add new task"
-                    >
-                        <Icon name="plus" />
-                    </button>
-                    <button 
-                        type="button"
-                        className="pandat69-icon-button pandat69-manage-categories-btn" 
-                        title="Manage Categories"
+                        className="pandat69-icon-button pandat69-manage-categories-btn"
+                        title="Manage task categories"
                         onClick={onManageCategories}
-                        aria-label="Manage categories"
+                        aria-label="Manage task categories"
                     >
                         <Icon name="tags" />
                     </button>
-                    <button 
+                    <button
                         type="button"
                         ref={fullscreenToggleRef}
-                        className="pandat69-icon-button pandat69-fullscreen-btn" 
+                        className="pandat69-icon-button pandat69-fullscreen-btn"
                         title={isFullscreen ? 'Exit Full View' : 'Full View'}
                         onClick={onFullscreen}
                         aria-label={isFullscreen ? 'Exit full view' : 'Open full view'}

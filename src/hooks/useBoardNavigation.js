@@ -9,14 +9,16 @@ const VALID_VIEWS = new Set( [
 	'gantt',
 ] );
 
-const readLocation = ( isUserBoard = false ) => {
+const readLocation = ( isUserBoard = false, workLogEnabled = true ) => {
 	const params = new URLSearchParams( window.location.search );
 	const tab = params.get( 'pandatask_tab' );
 	const view = params.get( 'pandatask_view' );
 	const taskValue = Number.parseInt( params.get( 'open_task' ) || '', 10 );
 
 	return {
-		currentTab: isBoardTabAvailable( tab || '', isUserBoard )
+		currentTab: isBoardTabAvailable( tab || '', isUserBoard, {
+			workLogEnabled,
+		} )
 			? tab
 			: 'tasks',
 		currentView: VALID_VIEWS.has( view ) ? view : 'compact',
@@ -43,29 +45,40 @@ const writeLocation = ( values, mode, state = {} ) => {
 	);
 };
 
-export const useBoardNavigation = ( isUserBoard = false ) => {
+export const useBoardNavigation = (
+	isUserBoard = false,
+	workLogEnabled = true
+) => {
 	const [ navigation, setNavigation ] = useState( () =>
-		readLocation( isUserBoard )
+		readLocation( isUserBoard, workLogEnabled )
 	);
 
 	useEffect( () => {
 		const handlePopState = () =>
-			setNavigation( readLocation( isUserBoard ) );
+			setNavigation( readLocation( isUserBoard, workLogEnabled ) );
 		window.addEventListener( 'popstate', handlePopState );
 		return () => window.removeEventListener( 'popstate', handlePopState );
-	}, [ isUserBoard ] );
+	}, [ isUserBoard, workLogEnabled ] );
 
 	useEffect( () => {
-		if ( isBoardTabAvailable( navigation.currentTab, isUserBoard ) ) {
+		if (
+			isBoardTabAvailable( navigation.currentTab, isUserBoard, {
+				workLogEnabled,
+			} )
+		) {
 			return;
 		}
 		setNavigation( ( current ) => ( { ...current, currentTab: 'tasks' } ) );
 		writeLocation( { pandatask_tab: null }, 'replace' );
-	}, [ isUserBoard, navigation.currentTab ] );
+	}, [ isUserBoard, navigation.currentTab, workLogEnabled ] );
 
 	const setCurrentTab = useCallback(
 		( currentTab ) => {
-			if ( ! isBoardTabAvailable( currentTab, isUserBoard ) ) {
+			if (
+				! isBoardTabAvailable( currentTab, isUserBoard, {
+					workLogEnabled,
+				} )
+			) {
 				return;
 			}
 			setNavigation( ( current ) => ( { ...current, currentTab } ) );
@@ -74,7 +87,7 @@ export const useBoardNavigation = ( isUserBoard = false ) => {
 				'push'
 			);
 		},
-		[ isUserBoard ]
+		[ isUserBoard, workLogEnabled ]
 	);
 
 	const setCurrentView = useCallback( ( currentView ) => {

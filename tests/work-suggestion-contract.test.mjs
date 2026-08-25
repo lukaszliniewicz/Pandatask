@@ -57,10 +57,10 @@ test('Work Log presents quiet confirmation actions rather than notifications', (
 
     assert.match(panel, /Needs confirmation/);
     assert.match(panel, /Nothing here counts toward your totals until you confirm it/);
-    assert.match(panel, /Confirm .*formatDuration/);
+    assert.match(panel, /Confirm[\s\S]*formatDuration/);
     assert.match(panel, /Adjust/);
     assert.match(panel, /<WorkEntryForm/);
-    assert.match(panel, /initialValues=\{ suggestion \}/);
+    assert.match(panel, /initialValues=\{\s*suggestion\s*\}/);
     assert.match(panel, /onSubmitOverride/);
     assert.match(panel, /buildSuggestionAllocationOverride/);
     assert.match(panel, /Didn't attend/);

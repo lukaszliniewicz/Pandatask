@@ -4,18 +4,13 @@ import { useBoardWorkReport, useWorkReport } from '../hooks/useWorkLog';
 import { useConfig } from '../context/ConfigContext';
 import { parseUtcDateTime } from '../utils';
 import Icon from './Icon';
+import WorkReportSummary from './work/WorkReportSummary';
+import { formatWorkDuration } from '../workReportModel.mjs';
 
-const formatReportDate = (value) => {
+const formatReportDate = value => {
     if (!value) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     return parseUtcDateTime(value).toLocaleString();
-};
-
-const formatDuration = (seconds) => {
-    const totalMinutes = Math.round(Number(seconds || 0) / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return hours ? `${hours}h${minutes ? ` ${minutes}m` : ''}` : `${minutes}m`;
 };
 
 const CollapsibleReportSection = ({ title, children, defaultExpanded = false }) => {
@@ -28,7 +23,7 @@ const CollapsibleReportSection = ({ title, children, defaultExpanded = false }) 
                 <button
                     type="button"
                     className="pandat69-report-section-toggle"
-                    onClick={() => setExpanded((open) => !open)}
+                    onClick={() => setExpanded(open => !open)}
                     aria-expanded={expanded}
                     aria-controls={contentId}
                 >
@@ -53,7 +48,8 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue, defaultExp
                     <li key={task.occurrence_id ? `occurrence-${task.occurrence_id}` : task.id}>
                         <span className="pandat69-report-item-title">{task.name}</span>
                         <div className="pandat69-report-item-meta">
-                            <Icon name={icon} size={15} /> {metaPrefix}: {formatReportDate(task.created_at || task.completed_at || task.deadline)}
+                            <Icon name={icon} size={15} /> {metaPrefix}:{' '}
+                            {formatReportDate(task.created_at || task.completed_at || task.deadline)}
                             {showOverdue && ` (${task.days_overdue} days overdue)`}
                         </div>
                         {task.assigned_user_names && (
@@ -70,27 +66,13 @@ const ReportSection = ({ title, items, icon, metaPrefix, showOverdue, defaultExp
     </CollapsibleReportSection>
 );
 
-const WorkBreakdownList = ({ rows = [], empty = 'No recorded work in this dimension.' }) => (
-    rows.length > 0 ? (
-        <ul className="pandat69-report-list">
-            {rows.map((row, index) => (
-                <li key={`${row.id || row.name || row.activity_type || row.kind || 'other'}-${index}`}>
-                    <strong>{row.name || row.activity_type || (row.kind === 'residual' ? 'Unitemised' : 'Other') || 'Unspecified'}:</strong>{' '}
-                    {formatDuration(row.duration_seconds)}
-                    {row.capacity ? ` · ${row.capacity}` : ''}
-                </li>
-            ))}
-        </ul>
-    ) : <p className="pandat69-report-empty">{empty}</p>
-);
-
-const ReportView = () => {
+const ReportView = ({ onLogWork, onOpenTask, workLogEnabled = true }) => {
     const { boardName } = useConfig();
     const isUserBoard = boardName?.startsWith('user_');
     const [period, setPeriod] = useState('this_week');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const fieldPrefix = useId();
-    
+
     const filters = { period };
     if (period === 'custom') {
         filters.start_date = customRange.start;
@@ -98,11 +80,23 @@ const ReportView = () => {
     }
 
     const isCustomValid = period !== 'custom' || (customRange.start && customRange.end);
-    
+
     const { data, isLoading, isError, error, refetch } = useReports(filters);
-    const { data: personalWorkReport } = useWorkReport(filters, { enabled: isUserBoard });
-    const { data: boardWorkReport } = useBoardWorkReport(filters, { enabled: !isUserBoard });
+    const {
+        data: personalWorkReport,
+        isError: isPersonalWorkError,
+        isLoading: isPersonalWorkLoading,
+    } = useWorkReport(filters, { enabled: workLogEnabled && isUserBoard });
+    const {
+        data: boardWorkReport,
+        isError: isBoardWorkError,
+        isLoading: isBoardWorkLoading,
+    } = useBoardWorkReport(filters, {
+        enabled: workLogEnabled && !isUserBoard,
+    });
     const workReport = isUserBoard ? personalWorkReport : boardWorkReport;
+    const isWorkError = isUserBoard ? isPersonalWorkError : isBoardWorkError;
+    const isWorkLoading = isUserBoard ? isPersonalWorkLoading : isBoardWorkLoading;
 
     const handleGenerate = () => {
         if (isCustomValid) refetch();
@@ -113,11 +107,11 @@ const ReportView = () => {
             <div className="pandat69-report-controls">
                 <div className="pandat69-report-field">
                     <label htmlFor={`${fieldPrefix}-period`}>Select Period:</label>
-                    <select 
+                    <select
                         id={`${fieldPrefix}-period`}
-                        className="pandat69-select" 
-                        value={period} 
-                        onChange={(e) => setPeriod(e.target.value)}
+                        className="pandat69-select"
+                        value={period}
+                        onChange={e => setPeriod(e.target.value)}
                     >
                         <option value="this_week">This Week</option>
                         <option value="last_week">Last Week</option>
@@ -128,34 +122,44 @@ const ReportView = () => {
                         <option value="custom">Custom Date Range</option>
                     </select>
                 </div>
-                
+
                 {period === 'custom' && (
                     <div className="pandat69-report-custom-dates">
                         <div className="pandat69-report-field">
                             <label htmlFor={`${fieldPrefix}-start`}>From:</label>
-                            <input 
+                            <input
                                 id={`${fieldPrefix}-start`}
-                                type="date" 
-                                className="pandat69-input" 
+                                type="date"
+                                className="pandat69-input"
                                 value={customRange.start}
-                                onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
+                                onChange={e =>
+                                    setCustomRange(prev => ({
+                                        ...prev,
+                                        start: e.target.value,
+                                    }))
+                                }
                             />
                         </div>
                         <div className="pandat69-report-field">
                             <label htmlFor={`${fieldPrefix}-end`}>To:</label>
-                            <input 
+                            <input
                                 id={`${fieldPrefix}-end`}
-                                type="date" 
-                                className="pandat69-input" 
+                                type="date"
+                                className="pandat69-input"
                                 value={customRange.end}
-                                onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
+                                onChange={e =>
+                                    setCustomRange(prev => ({
+                                        ...prev,
+                                        end: e.target.value,
+                                    }))
+                                }
                             />
                         </div>
                     </div>
                 )}
-                
+
                 <div className="pandat69-report-actions">
-                    <button 
+                    <button
                         type="button"
                         className="pandat69-button pandat69-generate-report-btn"
                         onClick={handleGenerate}
@@ -168,48 +172,81 @@ const ReportView = () => {
             </div>
 
             <div className="pandat69-report-results">
-                {isError && <div className="pandat69-error" role="alert">Error: {error.message}</div>}
-                
+                {isError && (
+                    <div className="pandat69-error" role="alert">
+                        Error: {error.message}
+                    </div>
+                )}
+
                 {!isLoading && data && (
                     <>
-                        <ReportSection title={`Tasks Added (${data.tasks_added.length})`} items={data.tasks_added} icon="circle-plus" metaPrefix="Added" defaultExpanded />
-                        <ReportSection title={`Tasks Completed (${data.tasks_completed.length})`} items={data.tasks_completed} icon="circle-check" metaPrefix="Completed" />
-                        <ReportSection title={`Missed Deadlines (${data.missed_deadlines.length})`} items={data.missed_deadlines} icon="calendar" metaPrefix="Deadline" showOverdue={true} />
+                        <ReportSection
+                            title={`Tasks Added (${data.tasks_added.length})`}
+                            items={data.tasks_added}
+                            icon="circle-plus"
+                            metaPrefix="Added"
+                            defaultExpanded
+                        />
+                        <ReportSection
+                            title={`Tasks Completed (${data.tasks_completed.length})`}
+                            items={data.tasks_completed}
+                            icon="circle-check"
+                            metaPrefix="Completed"
+                        />
+                        <ReportSection
+                            title={`Missed Deadlines (${data.missed_deadlines.length})`}
+                            items={data.missed_deadlines}
+                            icon="calendar"
+                            metaPrefix="Deadline"
+                            showOverdue={true}
+                        />
 
-                        {workReport && (
-                            <CollapsibleReportSection title={`Work recorded (${formatDuration(workReport.total_seconds)})`}>
-                                <p className="pandat69-report-item-meta">
-                                    {isUserBoard
-                                        ? 'Personal work is counted once by work-entry duration. Allocations classify that total; residual/unitemised time is informational and is not added again.'
-                                        : 'This board report includes only work explicitly allocated to this board. Genuinely unallocated personal work is outside this scope.'}
-                                </p>
-                                <div className="pandat69-work-summary-grid">
-                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.total_seconds)}</strong><span>{isUserBoard ? 'Total recorded' : 'Board allocated'}</span></div>
-                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.task_linked_seconds)}</strong><span>Task-linked</span></div>
-                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.board_only_seconds)}</strong><span>Board-only / ad-hoc</span></div>
-                                    {isUserBoard && <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.unallocated_seconds)}</strong><span>Unallocated personal</span></div>}
-                                    <div className="pandat69-work-summary-card"><strong>{formatDuration(workReport.residual_seconds)}</strong><span>Unitemised residual</span></div>
-                                    <div className="pandat69-work-summary-card"><strong>{workReport.unresolved_occurrences || 0}</strong><span>Completed · time unresolved</span></div>
+                        {workLogEnabled && isWorkLoading && (
+                            <div className="pandat69-loading" role="status">
+                                Loading recorded work…
+                            </div>
+                        )}
+                        {workLogEnabled && isWorkError && (
+                            <div className="pandat69-error" role="alert">
+                                The work section of this report could not be loaded.
+                            </div>
+                        )}
+                        {workLogEnabled && workReport && (
+                            <CollapsibleReportSection
+                                title={`Work recorded (${formatWorkDuration(workReport.total_seconds)})`}
+                            >
+                                <div className="pandat69-report-work-header">
+                                    <p>
+                                        {isUserBoard
+                                            ? 'A compact view of recorded time, its context, and anything that still needs attention.'
+                                            : 'Only work explicitly allocated to this board is included.'}
+                                    </p>
+                                    {onLogWork && (
+                                        <button
+                                            type="button"
+                                            className="pandat69-button pandat69-button-primary pandat69-compact-control"
+                                            onClick={() => onLogWork()}
+                                        >
+                                            <Icon name="clock" size={16} /> Log work
+                                        </button>
+                                    )}
                                 </div>
-                                <h4>By activity</h4>
-                                <WorkBreakdownList rows={workReport.activity_breakdown || workReport.breakdown || []} />
-                                <h4>By task</h4>
-                                <WorkBreakdownList rows={workReport.task_breakdown || []} empty="No task-linked work in this period." />
-                                {isUserBoard && <><h4>By board</h4><WorkBreakdownList rows={workReport.board_breakdown || []} empty="No allocated board work in this period." /></>}
-                                <h4>By project</h4>
-                                <WorkBreakdownList rows={workReport.project_breakdown || []} empty="No project-attributed task work in this period." />
-                                <h4>By category</h4>
-                                <WorkBreakdownList rows={workReport.category_breakdown || []} empty="No category-attributed task work in this period." />
-                                <h4>By capacity</h4>
-                                <WorkBreakdownList rows={workReport.capacity_breakdown || []} />
+                                <WorkReportSummary
+                                    report={workReport}
+                                    isUserBoard={isUserBoard}
+                                    compact
+                                    onOpenTask={onOpenTask}
+                                />
                             </CollapsibleReportSection>
                         )}
 
                         <CollapsibleReportSection title="Current Open Tasks Per Person">
                             {data.tasks_per_person.length > 0 ? (
                                 <ul className="pandat69-report-list">
-                                    {data.tasks_per_person.map((person) => (
-                                        <li key={person.id || person.user_id || person.display_name}><strong>{person.display_name}:</strong> {person.task_count} tasks</li>
+                                    {data.tasks_per_person.map(person => (
+                                        <li key={person.id || person.user_id || person.display_name}>
+                                            <strong>{person.display_name}:</strong> {person.task_count} tasks
+                                        </li>
                                     ))}
                                 </ul>
                             ) : (

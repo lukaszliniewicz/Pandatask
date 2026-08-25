@@ -49,14 +49,17 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 		<form className="pandat69-task-time-resolution" onSubmit={ submit }>
 			<strong>Resolve your time for this completed task</strong>
 			<p className="pandat69-field-hint">
-				Detailed time already logged: { formatDuration( specificSeconds ) }.
-				Confirm your cumulative actual time or mark it as not tracked.
+				Detailed time already logged:{ ' ' }
+				{ formatDuration( specificSeconds ) }. Confirm your cumulative
+				actual time or mark it as not tracked.
 			</p>
 			<label className="pandat69-checkbox-label">
 				<input
 					type="checkbox"
 					checked={ notTracked }
-					onChange={ ( event ) => setNotTracked( event.target.checked ) }
+					onChange={ ( event ) =>
+						setNotTracked( event.target.checked )
+					}
 				/>{ ' ' }
 				Not tracked
 			</label>
@@ -69,7 +72,9 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 							type="number"
 							min="0"
 							value={ hours }
-							onChange={ ( event ) => setHours( event.target.value ) }
+							onChange={ ( event ) =>
+								setHours( event.target.value )
+							}
 						/>
 					</label>
 					<label className="pandat69-form-field pandat69-form-field-half">
@@ -80,7 +85,9 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 							min="0"
 							max="59"
 							value={ minutes }
-							onChange={ ( event ) => setMinutes( event.target.value ) }
+							onChange={ ( event ) =>
+								setMinutes( event.target.value )
+							}
 						/>
 					</label>
 				</div>
@@ -113,7 +120,8 @@ const TaskTimeCard = ( { task } ) => {
 	const aggregate = data?.aggregate;
 	const needsResolution =
 		task.status === 'done' &&
-		( resolution?.state === 'unresolved' || ( ! resolution && specific > 0 ) );
+		( resolution?.state === 'unresolved' ||
+			( ! resolution && specific > 0 ) );
 
 	return (
 		<section className="pandat69-task-time-card">
@@ -127,8 +135,8 @@ const TaskTimeCard = ( { task } ) => {
 					{ logging
 						? 'Close logger'
 						: task.status === 'done'
-							? 'Log additional work'
-							: 'Add time' }
+						? 'Log additional work'
+						: 'Add time' }
 				</button>
 			</div>
 			{ isLoading ? (
@@ -136,7 +144,9 @@ const TaskTimeCard = ( { task } ) => {
 			) : (
 				<div className="pandat69-task-time-stats">
 					<span>
-						<strong>{ formatDuration( task.estimated_effort_seconds ) }</strong>
+						<strong>
+							{ formatDuration( task.estimated_effort_seconds ) }
+						</strong>
 						<small>Estimate</small>
 					</span>
 					<span>
@@ -148,30 +158,37 @@ const TaskTimeCard = ( { task } ) => {
 							{ resolution?.state === 'not_tracked'
 								? 'Not tracked'
 								: resolution?.state === 'unresolved'
-									? 'Unresolved'
-									: formatDuration( actual ) }
+								? 'Unresolved'
+								: formatDuration( actual ) }
 						</strong>
 						<small>Declared actual</small>
 					</span>
 					{ resolution?.state === 'resolved' &&
-						Number( resolution.declared_actual_seconds || 0 ) > specific && (
+						Number( resolution.declared_actual_seconds || 0 ) >
+							specific && (
 							<span>
 								<strong>
 									{ formatDuration(
-										Number( resolution.declared_actual_seconds ) - specific
+										Number(
+											resolution.declared_actual_seconds
+										) - specific
 									) }
 								</strong>
-								<small>Unitemised</small>
+								<small>Other task time</small>
 							</span>
 						) }
 					<span>
-						<strong>{ formatDuration( aggregate?.direct_seconds || 0 ) }</strong>
+						<strong>
+							{ formatDuration( aggregate?.direct_seconds || 0 ) }
+						</strong>
 						<small>All recorded · direct</small>
 					</span>
 					{ Number( aggregate?.descendant_count || 0 ) > 0 && (
 						<span>
 							<strong>
-								{ formatDuration( aggregate?.including_subtasks_seconds || 0 ) }
+								{ formatDuration(
+									aggregate?.including_subtasks_seconds || 0
+								) }
 							</strong>
 							<small>All recorded · incl. subtasks</small>
 						</span>
@@ -180,15 +197,23 @@ const TaskTimeCard = ( { task } ) => {
 			) }
 			{ task.status !== 'done' && (
 				<p className="pandat69-field-hint">
-					Add time as you work. These entries accumulate on the current task occurrence;
-					the final cumulative actual is reconciled when the task is completed.
+					Add time as you work. These entries accumulate on the
+					current task occurrence; the final cumulative actual is
+					reconciled when the task is completed.
 				</p>
 			) }
 			{ needsResolution && (
-				<TimeResolutionForm taskId={ task.id } specificSeconds={ specific } />
+				<TimeResolutionForm
+					taskId={ task.id }
+					specificSeconds={ specific }
+				/>
 			) }
 			{ logging && (
-				<WorkEntryForm task={ task } compact onSaved={ () => setLogging( false ) } />
+				<WorkEntryForm
+					task={ task }
+					compact
+					onSaved={ () => setLogging( false ) }
+				/>
 			) }
 			{ data?.entries?.length > 0 && (
 				<details className="pandat69-task-work-details">
@@ -199,7 +224,8 @@ const TaskTimeCard = ( { task } ) => {
 					<ul>
 						{ data.entries.map( ( entry ) => (
 							<li key={ entry.id }>
-								{ entry.work_date } · { formatDuration( entry.duration_seconds ) } ·{ ' ' }
+								{ entry.work_date } ·{ ' ' }
+								{ formatDuration( entry.duration_seconds ) } ·{ ' ' }
 								{ entry.title }
 							</li>
 						) ) }

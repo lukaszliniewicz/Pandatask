@@ -15,6 +15,7 @@ use Pandatask\Infrastructure\Persistence\TaskCommandRepository;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
 use Pandatask\Application\Work\TaskTimeService;
 use Pandatask\Application\Work\WorkOccurrenceLifecycleService;
+use Pandatask\Application\Settings\FeatureSettings;
 use WP_Error;
 
 final class TaskMutationService {
@@ -37,7 +38,9 @@ final class TaskMutationService {
 
     private $task_time_service;
 
-    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null ) {
+    private $feature_settings;
+
+    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null, $feature_settings = null ) {
         $this->repository      = $repository ?: new TaskCommandRepository();
         $this->task_repository = $task_repository ?: new TaskRepository();
         $this->history_service = $history_service ?: new HistoryService();
@@ -47,6 +50,7 @@ final class TaskMutationService {
         $this->cache_invalidator = $cache_invalidator ?: new TaskCacheInvalidator( $this->task_repository );
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceLifecycleService();
         $this->task_time_service = $task_time_service ?: new TaskTimeService();
+        $this->feature_settings = $feature_settings ?: new FeatureSettings();
     }
 
     public function createTask( $data ) {
@@ -156,7 +160,7 @@ final class TaskMutationService {
             if ( ! $occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $occurrence_id ) ) {
                 throw new Exception( 'Failed to create the task work occurrence.' );
             }
-            if ( 'done' === $task_data['status'] && $creator_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $creator_id, $creator_id ) ) {
+            if ( $this->feature_settings->workLogEnabled() && 'done' === $task_data['status'] && $creator_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $creator_id, $creator_id ) ) {
                 throw new Exception( 'Failed to preserve unresolved time for a completed task.' );
             }
 
@@ -557,13 +561,17 @@ final class TaskMutationService {
         }
 
         $current_occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+        $work_log_enabled = $this->feature_settings->workLogEnabled();
 
         if ( $is_completing && $current_occurrence ) {
             if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'completed', $actor_id ) ) {
                 throw new Exception( 'The work occurrence could not be completed.' );
             }
 
-            if ( is_array( $completion ) ) {
+            if ( ! $work_log_enabled ) {
+                // Completing tasks remains available when Work Log is disabled,
+                // but the optional time-tracking state must not be created.
+            } elseif ( is_array( $completion ) ) {
                 if ( empty( $completion['skip_personal_resolution'] ) ) {
                     $completion_user_id = ! empty( $completion['user_id'] ) ? absint( $completion['user_id'] ) : $actor_id;
                     $resolution = $this->task_time_service->resolveCurrentOccurrence(
@@ -583,7 +591,7 @@ final class TaskMutationService {
                 throw new Exception( 'The unresolved task time could not be recorded.' );
             }
 
-            if ( ! $this->task_time_service->ensureUnresolvedForUsers( $task_id, (array) ( $current_task->assigned_user_ids ?? array() ), $actor_id ) ) {
+            if ( $work_log_enabled && ! $this->task_time_service->ensureUnresolvedForUsers( $task_id, (array) ( $current_task->assigned_user_ids ?? array() ), $actor_id ) ) {
                 throw new Exception( 'Assignee task-time states could not be preserved.' );
             }
         }
@@ -593,7 +601,7 @@ final class TaskMutationService {
             if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'open', $actor_id ) ) {
                 throw new Exception( 'The work occurrence could not be reopened.' );
             }
-            if ( $actor_id > 0 && ! $this->task_time_service->reviseOnReopen( $task_id, $actor_id, $actor_id ) ) {
+            if ( $work_log_enabled && $actor_id > 0 && ! $this->task_time_service->reviseOnReopen( $task_id, $actor_id, $actor_id ) ) {
                 throw new Exception( 'The reopened task time could not be revised.' );
             }
         }

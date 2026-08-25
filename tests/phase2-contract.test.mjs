@@ -432,7 +432,7 @@ test('Annotated task views expose project grouping and progressive disclosure co
 	assert.match(workspace, /\[ 'compact', 'list' \]\.includes\( currentView \)/);
 	assert.match(controller, /useState\( true \)/);
 	assert.match(sidebar, /onSelectProject\(isSelected \? 'all' : project\.id\)/);
-	assert.match(report, /aria-expanded=\{expanded\}/);
+	assert.match(report, /aria-expanded=\{\s*expanded\s*\}/);
 	assert.match(report, /pandat69-generate-report-btn/);
 	assert.match(gantt, /data-pandatask-gantt-viewport/);
 	assert.match(gantt, /pandat69-gantt-viewport-open/);

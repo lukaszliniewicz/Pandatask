@@ -2,6 +2,8 @@
 
 namespace Pandatask\Bootstrap;
 
+use Pandatask\Application\Settings\FeatureSettings;
+
 final class AssetRegistrar {
 
     private static $frontend_assets_registered = false;
@@ -155,6 +157,9 @@ final class AssetRegistrar {
             'home_url'                  => home_url( '/' ),
             'current_user_id'           => get_current_user_id(),
             'current_user_display_name' => is_user_logged_in() ? wp_get_current_user()->display_name : '',
+            'features'                  => array(
+                'workLog' => ( new FeatureSettings() )->workLogEnabled(),
+            ),
             'text'                      => array(
                 'confirm_delete_task'     => esc_js( __( 'Are you sure you want to delete this task?', 'pandatask' ) ),
                 'confirm_delete_category' => esc_js( __( 'Are you sure you want to delete this category? Tasks using it will lose their category.', 'pandatask' ) ),

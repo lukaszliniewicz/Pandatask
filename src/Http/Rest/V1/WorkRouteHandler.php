@@ -2,11 +2,13 @@
 
 namespace Pandatask\Http\Rest\V1;
 
+use Pandatask\Application\Settings\FeatureSettings;
 use Pandatask\Application\Task\TaskService;
 use Pandatask\Application\Work\TaskTimeService;
 use Pandatask\Application\Work\WorkEntryService;
 use Pandatask\Application\Work\WorkReportService;
 use Pandatask\Application\Work\WorkSuggestionService;
+use Pandatask\Application\Work\WorkTypeService;
 use WP_Error;
 use WP_REST_Response;
 
@@ -17,17 +19,47 @@ final class WorkRouteHandler {
     private $task_time_service;
     private $report_service;
     private $suggestion_service;
+    private $work_type_service;
+    private $feature_settings;
 
-    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null, $suggestion_service = null ) {
+    public function __construct( $work_service = null, $task_service = null, $task_time_service = null, $report_service = null, $suggestion_service = null, $work_type_service = null, $feature_settings = null ) {
         $this->work_service       = $work_service ?: new WorkEntryService();
         $this->task_service       = $task_service ?: new TaskService();
         $this->task_time_service  = $task_time_service ?: new TaskTimeService();
         $this->report_service     = $report_service ?: new WorkReportService();
         $this->suggestion_service = $suggestion_service ?: new WorkSuggestionService();
+        $this->work_type_service  = $work_type_service ?: new WorkTypeService();
+        $this->feature_settings   = $feature_settings ?: new FeatureSettings();
     }
 
     public function activity_types( $request ) {
-        return new WP_REST_Response( array( 'activity_types' => $this->work_service->activityTypes() ), 200 );
+        return new WP_REST_Response( array( 'activity_types' => $this->work_service->activityTypes( get_current_user_id() ) ), 200 );
+    }
+
+    public function create_activity_type( $request ) {
+        $data = $request->get_json_params();
+        $data = is_array( $data ) ? $data : array();
+        $type = $this->work_type_service->create( $data['label'] ?? '', get_current_user_id() );
+        return is_wp_error( $type ) ? $type : new WP_REST_Response( array( 'activity_type' => $type ), 201 );
+    }
+
+    public function update_activity_type( $request ) {
+        $data = $request->get_json_params();
+        $data = is_array( $data ) ? $data : array();
+        $changes = array();
+        if ( array_key_exists( 'label', $data ) ) {
+            $changes['label'] = $data['label'];
+        }
+        if ( array_key_exists( 'is_active', $data ) ) {
+            $changes['is_active'] = $data['is_active'];
+        }
+        $type = $this->work_type_service->update( $request['key'], $changes, get_current_user_id() );
+        return is_wp_error( $type ) ? $type : new WP_REST_Response( array( 'activity_type' => $type ), 200 );
+    }
+
+    public function delete_activity_type( $request ) {
+        $type = $this->work_type_service->archive( $request['key'], get_current_user_id() );
+        return is_wp_error( $type ) ? $type : new WP_REST_Response( array( 'activity_type' => $type ), 200 );
     }
 
     public function list_my_entries( $request ) {
@@ -194,10 +226,16 @@ final class WorkRouteHandler {
         $actual_seconds = array_key_exists( 'actual_seconds', $data ) && null !== $data['actual_seconds'] ? absint( $data['actual_seconds'] ) : null;
         $task = $this->task_service->getTaskForAuthorization( (int) $request['id'] );
 
-        if ( $no_personal_work && ! $this->canCompleteWithoutPersonalTime( $task, get_current_user_id() ) ) {
+        $work_log_enabled = $this->feature_settings->workLogEnabled();
+        if ( ! $work_log_enabled ) {
+            $not_tracked = true;
+            $actual_seconds = null;
+            $no_personal_work = true;
+        }
+        if ( $work_log_enabled && $no_personal_work && ! $this->canCompleteWithoutPersonalTime( $task, get_current_user_id() ) ) {
             return new WP_Error( 'rest_forbidden', __( 'Only a non-assignee supervisor, task creator, or administrator can complete without recording personal work.', 'pandatask' ), array( 'status' => 403 ) );
         }
-        if ( ! $no_personal_work && ! $not_tracked && null === $actual_seconds ) {
+        if ( $work_log_enabled && ! $no_personal_work && ! $not_tracked && null === $actual_seconds ) {
             return new WP_Error( 'pandatask_actual_time_required', __( 'Provide actual time, choose Not tracked, or use the supervisor completion option.', 'pandatask' ), array( 'status' => 422 ) );
         }
         $result = $this->task_service->completeTask(
@@ -280,7 +318,8 @@ final class WorkRouteHandler {
                 return array( $today->modify( 'first day of this month' )->format( 'Y-m-d' ), $today->modify( 'last day of this month' )->format( 'Y-m-d' ) );
             case 'last_month':
                 $start = $today->modify( 'first day of last month' );
-                return array( $start->format( 'Y-m-d' ), $start->modify( 'last day of this month' )->format( 'Y-m-d' ) );
+                $end   = $today->modify( 'last day of last month' );
+                return array( $start->format( 'Y-m-d' ), $end->format( 'Y-m-d' ) );
             case 'last_30_days':
                 return array( $today->modify( '-29 days' )->format( 'Y-m-d' ), $today->format( 'Y-m-d' ) );
             case 'custom':

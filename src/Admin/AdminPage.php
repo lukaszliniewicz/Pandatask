@@ -133,8 +133,29 @@ class AdminPage {
     public function register_settings() {
         register_setting(
             'pandatask_settings_group',
+            'pandatask_feature_settings',
+            array( 'sanitize_callback' => array( $this, 'sanitize_feature_settings' ) )
+        );
+
+        register_setting(
+            'pandatask_settings_group',
             'pandatask_bug_tracker_settings',
             array( 'sanitize_callback' => array( $this, 'sanitize_bug_tracker_settings' ) )
+        );
+
+        add_settings_section(
+            'pandatask_feature_section',
+            __( 'Feature Settings', 'pandatask' ),
+            null,
+            'pandatask-settings'
+        );
+
+        add_settings_field(
+            'pandatask_work_log_enabled',
+            __( 'Work Log', 'pandatask' ),
+            array( $this, 'render_work_log_enabled_field' ),
+            'pandatask-settings',
+            'pandatask_feature_section'
         );
 
         add_settings_section(
@@ -167,6 +188,28 @@ class AdminPage {
             'pandatask-settings',
             'pandatask_bug_tracker_section'
         );
+    }
+
+    public function sanitize_feature_settings( $input ) {
+        $input = is_array( $input ) ? $input : array();
+
+        return array(
+            'work_log_enabled' => empty( $input['work_log_enabled'] ) ? 0 : 1,
+        );
+    }
+
+    public function render_work_log_enabled_field() {
+        $settings = get_option( 'pandatask_feature_settings', array() );
+        $enabled  = ! is_array( $settings ) || ! array_key_exists( 'work_log_enabled', $settings )
+            ? true
+            : (bool) $settings['work_log_enabled'];
+        ?>
+        <label for="pandatask-work-log-enabled">
+            <input type="checkbox" id="pandatask-work-log-enabled" name="pandatask_feature_settings[work_log_enabled]" value="1" <?php checked( $enabled ); ?> />
+            <?php esc_html_e( 'Enable work logging and task time tracking', 'pandatask' ); ?>
+        </label>
+        <p class="description"><?php esc_html_e( 'When disabled, existing work data is preserved and completing tasks does not ask for personal time.', 'pandatask' ); ?></p>
+        <?php
     }
 
     public function sanitize_bug_tracker_settings( $input ) {

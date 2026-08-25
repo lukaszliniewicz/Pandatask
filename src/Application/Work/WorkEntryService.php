@@ -6,7 +6,6 @@ use Exception;
 use Throwable;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
-use Pandatask\Domain\Work\ActivityTypes;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
 use Pandatask\Infrastructure\Persistence\WorkAuditRepository;
@@ -24,7 +23,9 @@ final class WorkEntryService {
     private $audit_repository;
     private $task_time_service;
 
-    public function __construct( $repository = null, $task_repository = null, $occurrence_repository = null, $task_access_policy = null, $audit_repository = null, $task_time_service = null, $board_access_policy = null ) {
+    private $work_type_service;
+
+    public function __construct( $repository = null, $task_repository = null, $occurrence_repository = null, $task_access_policy = null, $audit_repository = null, $task_time_service = null, $board_access_policy = null, $work_type_service = null ) {
         $this->repository            = $repository ?: new WorkEntryRepository();
         $this->task_repository       = $task_repository ?: new TaskRepository();
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceRepository();
@@ -32,14 +33,11 @@ final class WorkEntryService {
         $this->board_access_policy   = $board_access_policy ?: new BoardAccessPolicy();
         $this->audit_repository      = $audit_repository ?: new WorkAuditRepository();
         $this->task_time_service     = $task_time_service ?: new TaskTimeService();
+        $this->work_type_service     = $work_type_service ?: new WorkTypeService();
     }
 
-    public function activityTypes() {
-        $types = array();
-        foreach ( ActivityTypes::all() as $key => $label ) {
-            $types[] = array( 'key' => $key, 'label' => $label );
-        }
-        return $types;
+    public function activityTypes( $user_id = null ) {
+        return $this->work_type_service->all( $user_id );
     }
 
     public function getEntriesForUser( $user_id, $start_date = '', $end_date = '', $limit = 200, $offset = 0 ) {
@@ -89,7 +87,7 @@ final class WorkEntryService {
     }
 
     private function createEntryInternal( array $input, $actor_id, $kind, $source_key, $source_url ) {
-        $normalized = $this->normalizeEntry( $input, $actor_id, $kind, $source_key, $source_url );
+        $normalized = $this->normalizeEntry( $input, $actor_id, $kind, $source_key, $source_url, false );
         if ( is_wp_error( $normalized ) ) {
             return $normalized;
         }
@@ -176,12 +174,14 @@ final class WorkEntryService {
                 (array) $current->allocations
             ),
         );
+        $merged_input = array_merge( $merged, $input );
         $normalized = $this->normalizeEntry(
-            array_merge( $merged, $input ),
+            $merged_input,
             $actor_id,
             (string) $current->kind,
             $current->source_key ?? null,
-            $current->source_url ?? null
+            $current->source_url ?? null,
+            (string) $merged_input['activity_type'] === (string) $current->activity_type
         );
         if ( is_wp_error( $normalized ) ) {
             return $normalized;
@@ -264,14 +264,17 @@ final class WorkEntryService {
         return true;
     }
 
-    private function normalizeEntry( array $input, $actor_id, $kind = 'manual', $source_key = null, $source_url = null ) {
+    private function normalizeEntry( array $input, $actor_id, $kind = 'manual', $source_key = null, $source_url = null, $allow_inactive_type = false ) {
         $user_id = isset( $input['user_id'] ) ? absint( $input['user_id'] ) : (int) $actor_id;
         if ( $user_id <= 0 || ( $user_id !== (int) $actor_id && ! user_can( $actor_id, 'manage_options' ) ) ) {
             return new WP_Error( 'rest_forbidden', __( 'You cannot log work for that user.', 'pandatask' ), array( 'status' => 403 ) );
         }
         $activity_type = sanitize_key( $input['activity_type'] ?? '' );
-        if ( 'residual' !== $kind && ! ActivityTypes::isValid( $activity_type ) ) {
-            return new WP_Error( 'rest_invalid_param', __( 'Choose a valid activity type.', 'pandatask' ), array( 'status' => 422 ) );
+        $type_is_valid = $allow_inactive_type
+            ? $this->work_type_service->isKnown( $activity_type, $user_id )
+            : $this->work_type_service->isActive( $activity_type, $user_id );
+        if ( 'residual' !== $kind && ! $type_is_valid ) {
+            return new WP_Error( 'rest_invalid_param', __( 'Choose an active work type.', 'pandatask' ), array( 'status' => 422 ) );
         }
         $duration = absint( $input['duration_seconds'] ?? 0 );
         if ( $duration <= 0 ) {
@@ -370,7 +373,7 @@ final class WorkEntryService {
         $entry = array(
             'user_id'          => $user_id,
             'created_by'       => (int) $actor_id,
-            'title'            => sanitize_text_field( $input['title'] ?? ActivityTypes::label( $activity_type ) ),
+            'title'            => sanitize_text_field( $input['title'] ?? $this->work_type_service->label( $activity_type, $user_id ) ),
             'notes'            => isset( $input['notes'] ) ? wp_kses_post( $input['notes'] ) : null,
             'activity_type'    => 'residual' === $kind ? null : $activity_type,
             'capacity'         => in_array( sanitize_key( $input['capacity'] ?? '' ), array( 'paid', 'volunteer', 'other' ), true ) ? sanitize_key( $input['capacity'] ) : null,

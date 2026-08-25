@@ -4,7 +4,10 @@ import WorkEntryForm from './WorkEntryForm';
 import { buildSuggestionAllocationOverride } from '../../workLogModel.mjs';
 
 const formatDuration = ( seconds ) => {
-	const totalMinutes = Math.max( 0, Math.round( Number( seconds || 0 ) / 60 ) );
+	const totalMinutes = Math.max(
+		0,
+		Math.round( Number( seconds || 0 ) / 60 )
+	);
 	const hours = Math.floor( totalMinutes / 60 );
 	const minutes = totalMinutes % 60;
 	if ( hours && minutes ) return `${ hours }h ${ minutes }m`;
@@ -13,12 +16,38 @@ const formatDuration = ( seconds ) => {
 };
 
 const WorkSuggestionsPanel = ( { filters = {} } ) => {
-	const { data: suggestions = [], isLoading } = useWorkSuggestions( filters );
+	const {
+		data: suggestions = [],
+		isLoading,
+		isError,
+		refetch,
+	} = useWorkSuggestions( filters );
 	const { confirmSuggestion, dismissSuggestion } = useWorkMutations();
 	const [ adjustingKey, setAdjustingKey ] = useState( '' );
 	const [ error, setError ] = useState( '' );
 
-	if ( isLoading || suggestions.length === 0 ) return null;
+	if ( isLoading ) {
+		return (
+			<div className="pandat69-work-suggestions is-status" role="status">
+				Checking connected sources for possible work…
+			</div>
+		);
+	}
+	if ( isError ) {
+		return (
+			<div className="pandat69-work-suggestions is-status">
+				<span>Connected work suggestions could not be checked.</span>
+				<button
+					type="button"
+					className="pandat69-button pandat69-compact-control"
+					onClick={ () => refetch() }
+				>
+					Try again
+				</button>
+			</div>
+		);
+	}
+	if ( suggestions.length === 0 ) return null;
 
 	const keyFor = ( suggestion ) =>
 		`${ suggestion.provider_key }:${ suggestion.external_key }`;
@@ -88,17 +117,28 @@ const WorkSuggestionsPanel = ( { filters = {} } ) => {
 	};
 
 	return (
-		<section className="pandat69-work-suggestions" aria-labelledby="pandat69-work-suggestions-heading">
+		<section
+			className="pandat69-work-suggestions"
+			aria-labelledby="pandat69-work-suggestions-heading"
+		>
 			<div className="pandat69-work-suggestions-header">
 				<div>
 					<h3 id="pandat69-work-suggestions-heading">
 						Needs confirmation <span>({ suggestions.length })</span>
 					</h3>
-					<p>Possible work from connected providers. Nothing here counts toward your totals until you confirm it.</p>
+					<p>
+						{
+							'Possible work from connected providers. Nothing here counts toward your totals until you confirm it.'
+						}
+					</p>
 				</div>
 			</div>
 
-			{ error && <div className="pandat69-error" role="alert">{ error }</div> }
+			{ error && (
+				<div className="pandat69-error" role="alert">
+					{ error }
+				</div>
+			) }
 
 			<ul className="pandat69-work-suggestion-list">
 				{ suggestions.map( ( suggestion ) => {
@@ -113,9 +153,14 @@ const WorkSuggestionsPanel = ( { filters = {} } ) => {
 										compact
 										initialValues={ suggestion }
 										onSubmitOverride={ ( payload ) =>
-											confirmAdjusted( suggestion, payload )
+											confirmAdjusted(
+												suggestion,
+												payload
+											)
 										}
-										isSubmitting={ confirmSuggestion.isPending }
+										isSubmitting={
+											confirmSuggestion.isPending
+										}
 										submitLabel="Confirm adjusted"
 										allocationHint="Allocate any part of this work to tasks if useful. When the provider supplied a group allocation, any remaining time stays with that group."
 									/>
@@ -132,34 +177,61 @@ const WorkSuggestionsPanel = ( { filters = {} } ) => {
 									<div className="pandat69-work-suggestion-main">
 										<strong>{ suggestion.title }</strong>
 										<span>
-											{ suggestion.work_date } · { formatDuration( suggestion.duration_seconds ) } · { suggestion.provider_label }
+											{ suggestion.work_date } ·{ ' ' }
+											{ formatDuration(
+												suggestion.duration_seconds
+											) }{ ' ' }
+											· { suggestion.provider_label }
 										</span>
-										{ suggestion.reason && <small>{ suggestion.reason }</small> }
+										{ suggestion.reason && (
+											<small>{ suggestion.reason }</small>
+										) }
 										{ suggestion.source_url && (
-											<a href={ suggestion.source_url } target="_blank" rel="noreferrer">Open source</a>
+											<a
+												href={ suggestion.source_url }
+												target="_blank"
+												rel="noreferrer"
+											>
+												Open source
+											</a>
 										) }
 									</div>
 									<div className="pandat69-work-suggestion-actions">
 										<button
 											type="button"
 											className="pandat69-button pandat69-button-primary"
-											disabled={ confirmSuggestion.isPending || dismissSuggestion.isPending }
-											onClick={ () => confirm( suggestion ) }
+											disabled={
+												confirmSuggestion.isPending ||
+												dismissSuggestion.isPending
+											}
+											onClick={ () =>
+												confirm( suggestion )
+											}
 										>
-											Confirm { formatDuration( suggestion.duration_seconds ) }
+											Confirm{ ' ' }
+											{ formatDuration(
+												suggestion.duration_seconds
+											) }
 										</button>
 										<button
 											type="button"
 											className="pandat69-button"
-											onClick={ () => setAdjustingKey( suggestionKey ) }
+											onClick={ () =>
+												setAdjustingKey( suggestionKey )
+											}
 										>
 											Adjust
 										</button>
 										<button
 											type="button"
 											className="pandat69-button"
-											disabled={ confirmSuggestion.isPending || dismissSuggestion.isPending }
-											onClick={ () => dismiss( suggestion ) }
+											disabled={
+												confirmSuggestion.isPending ||
+												dismissSuggestion.isPending
+											}
+											onClick={ () =>
+												dismiss( suggestion )
+											}
 										>
 											Didn't attend
 										</button>

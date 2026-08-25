@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.22
+Stable tag: 1.0.23
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,14 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.23 =
+
+* Make Work Log a default-on module with server-enforced disablement, task completion fallback, and consistent desktop and compact navigation.
+* Add a task-or-work quick action and shared work-entry modal, including board defaults, task refinement, editable entries, and responsive feedback states.
+* Add user-managed work types with stable keys, rename, archive, and restore while keeping task categories distinct.
+* Redesign the dedicated Work Log and report summary with paginated history, readable labels, actionable unresolved completions, and clearer allocation breakdowns.
+* Present generated reconciliation residuals as task-linked "Other task time", exclude them from work-type and capacity classifications, and correct last-month report boundaries.
 
 = 1.0.22 =
 

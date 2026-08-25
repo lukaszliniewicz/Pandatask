@@ -3,7 +3,6 @@
 namespace Pandatask\Application\Work;
 
 use Throwable;
-use Pandatask\Domain\Work\ActivityTypes;
 use Pandatask\Infrastructure\Persistence\WorkEntryRepository;
 use Pandatask\Infrastructure\Persistence\WorkSuggestionDecisionRepository;
 use WP_Error;
@@ -13,11 +12,13 @@ final class WorkSuggestionService {
     private $decision_repository;
     private $work_service;
     private $work_repository;
+    private $work_type_service;
 
-    public function __construct( $decision_repository = null, $work_service = null, $work_repository = null ) {
+    public function __construct( $decision_repository = null, $work_service = null, $work_repository = null, $work_type_service = null ) {
         $this->decision_repository = $decision_repository ?: new WorkSuggestionDecisionRepository();
         $this->work_service        = $work_service ?: new WorkEntryService();
         $this->work_repository     = $work_repository ?: new WorkEntryRepository();
+        $this->work_type_service   = $work_type_service ?: new WorkTypeService();
     }
 
     public function listForUser( $user_id, array $context = array() ) {
@@ -43,7 +44,7 @@ final class WorkSuggestionService {
                 continue;
             }
             foreach ( $items as $item ) {
-                $candidate = $this->normalizeCandidate( $provider_key, $provider, $item );
+                $candidate = $this->normalizeCandidate( $provider_key, $provider, $item, $user_id );
                 if ( ! $candidate ) {
                     continue;
                 }
@@ -204,11 +205,11 @@ final class WorkSuggestionService {
         if ( is_wp_error( $item ) ) {
             return $item;
         }
-        $candidate = $this->normalizeCandidate( $provider_key, $provider, $item );
+        $candidate = $this->normalizeCandidate( $provider_key, $provider, $item, $user_id );
         return $candidate ?: new WP_Error( 'pandatask_work_suggestion_not_found', __( 'That work suggestion is no longer available.', 'pandatask' ), array( 'status' => 404 ) );
     }
 
-    private function normalizeCandidate( $provider_key, array $provider, $item ) {
+    private function normalizeCandidate( $provider_key, array $provider, $item, $user_id = null ) {
         if ( ! is_array( $item ) ) {
             return null;
         }
@@ -217,14 +218,14 @@ final class WorkSuggestionService {
         $work_date = sanitize_text_field( (string) ( $item['work_date'] ?? '' ) );
         $duration = absint( $item['duration_seconds'] ?? 0 );
         $date = \DateTimeImmutable::createFromFormat( '!Y-m-d', $work_date, wp_timezone() );
-        if ( '' === $external_key || strlen( $external_key ) > 191 || ! ActivityTypes::isValid( $activity_type ) || $duration <= 0 || ! $date || $date->format( 'Y-m-d' ) !== $work_date ) {
+        if ( '' === $external_key || strlen( $external_key ) > 191 || ! $this->work_type_service->isActive( $activity_type, $user_id ) || $duration <= 0 || ! $date || $date->format( 'Y-m-d' ) !== $work_date ) {
             return null;
         }
         return array(
             'provider_key'     => $provider_key,
             'provider_label'   => $provider['label'],
             'external_key'     => $external_key,
-            'title'            => sanitize_text_field( $item['title'] ?? ActivityTypes::label( $activity_type ) ),
+            'title'            => sanitize_text_field( $item['title'] ?? $this->work_type_service->label( $activity_type, $user_id ) ),
             'reason'           => sanitize_text_field( $item['reason'] ?? '' ),
             'notes'            => isset( $item['notes'] ) ? wp_kses_post( $item['notes'] ) : null,
             'activity_type'    => $activity_type,

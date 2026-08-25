@@ -9,11 +9,82 @@ import {
     workAllocationTargetLabel,
 } from '../src/workLogModel.mjs';
 import { getBoardTabs, isBoardTabAvailable } from '../src/boardTabs.mjs';
+import {
+    formatWorkDuration,
+    getBoardLabel,
+    getWorkAllocationLabel,
+    getWorkEntryPresentation,
+    normalizeWorkBreakdown,
+} from '../src/workReportModel.mjs';
 
 test('personal work-log tab availability comes from the canonical board tab model', () => {
     assert.equal(isBoardTabAvailable('work', true), true);
     assert.equal(isBoardTabAvailable('work', false), false);
-    assert.deepEqual(getBoardTabs(true).filter((tab) => tab.id === 'work').map((tab) => tab.label), ['Work Log']);
+    assert.equal(isBoardTabAvailable('work', true, { workLogEnabled: false }), false);
+    assert.deepEqual(
+        getBoardTabs(true)
+            .filter(tab => tab.id === 'work')
+            .map(tab => tab.label),
+        ['Work Log']
+    );
+});
+
+test('work reports replace raw keys and merge rows with the same useful label', () => {
+    const rows = normalizeWorkBreakdown(
+        [
+            {
+                activity_type: 'deep_work',
+                kind: 'entry',
+                duration_seconds: 1800,
+            },
+            {
+                activity_type: 'deep_work',
+                kind: 'entry',
+                duration_seconds: 900,
+            },
+            { activity_type: null, kind: 'residual', duration_seconds: 3600 },
+        ],
+        {
+            dimension: 'activity',
+            activityTypes: [{ key: 'deep_work', label: 'Deep work' }],
+        }
+    );
+    assert.deepEqual(rows, [{ label: 'Deep work', duration_seconds: 2700 }]);
+    assert.equal(formatWorkDuration(2700), '45m');
+});
+
+test('generated other task time is excluded from work-type and capacity classifications', () => {
+    const rows = [
+        { name: null, kind: 'residual', duration_seconds: 3600 },
+        { name: null, kind: 'manual', duration_seconds: 1800 },
+    ];
+    assert.deepEqual(normalizeWorkBreakdown(rows, { dimension: 'capacity' }), [
+        { label: 'Not specified', duration_seconds: 1800 },
+    ]);
+});
+
+test('residual entries present their task as primary context and offer refinement data', () => {
+    const presentation = getWorkEntryPresentation({
+        kind: 'residual',
+        title: 'Unitemised task time',
+        allocations: [{ task_id_snapshot: 42, task_name_snapshot: 'Funding proposal' }],
+    });
+    assert.deepEqual(presentation, {
+        isResidual: true,
+        title: 'Funding proposal',
+        typeLabel: 'Other task time',
+        contextLabel: 'Funding proposal',
+        task: { id: 42, name: 'Funding proposal' },
+    });
+});
+
+test('board report labels prefer user-facing board names over storage keys', () => {
+    assert.equal(getBoardLabel('group_10', [{ id: 'group_10', name: 'Test group' }]), 'Test group');
+    assert.equal(getBoardLabel('user_8'), 'Private tasks');
+    assert.equal(
+        getWorkAllocationLabel({ board_name_snapshot: 'group_10' }, [{ id: 'group_10', name: 'Test group' }]),
+        'Test group'
+    );
 });
 
 test('split allocations preserve one entry duration and expose unallocated remainder', () => {
@@ -64,9 +135,7 @@ test('work allocation model rejects duplicate and excessive allocations', () => 
 });
 
 test('residual handling is preserved in the allocation payload', () => {
-    assert.deepEqual(buildAllocationPayload([
-        { taskId: 10, minutes: 15, residualHandling: 'refine_residual' },
-    ]), [
+    assert.deepEqual(buildAllocationPayload([{ taskId: 10, minutes: 15, residualHandling: 'refine_residual' }]), [
         { task_id: 10, seconds: 900, residual_handling: 'refine_residual' },
     ]);
 });
@@ -74,7 +143,12 @@ test('residual handling is preserved in the allocation payload', () => {
 test('work allocation model supports board-only and mixed task/board allocations', () => {
     const allocations = [
         { targetType: 'task', taskId: 10, minutes: 30, residualHandling: '' },
-        { targetType: 'board', boardName: 'group_10', minutes: 45, residualHandling: '' },
+        {
+            targetType: 'board',
+            boardName: 'group_10',
+            minutes: 45,
+            residualHandling: '',
+        },
     ];
     assert.equal(validateAllocationDrafts(5400, allocations), '');
     assert.deepEqual(buildAllocationPayload(allocations), [
@@ -105,14 +179,7 @@ test('suggestion adjustment keeps provider board time as the task-allocation rem
 });
 
 test('suggestion adjustment preserves provider defaults when no task allocation is supplied', () => {
-    assert.equal(
-        buildSuggestionAllocationOverride(
-            3600,
-            [{ board_name: 'group_10', seconds: 3600 }],
-            []
-        ),
-        null
-    );
+    assert.equal(buildSuggestionAllocationOverride(3600, [{ board_name: 'group_10', seconds: 3600 }], []), null);
 });
 
 test('board-only allocations render as boards rather than fake tasks', () => {

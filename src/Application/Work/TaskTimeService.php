@@ -266,7 +266,7 @@ final class TaskTimeService {
             return new WP_Error(
                 'pandatask_residual_intent_required',
                 $has_residual
-                    ? __( 'This task has unitemised time. Choose whether the new detail refines that residual or is additional work.', 'pandatask' )
+                    ? __( 'This task has other task time. Choose whether the new detail refines that amount or is additional work.', 'pandatask' )
                     : __( 'This task time was already resolved. Confirm that the new detail is additional work.', 'pandatask' ),
                 array( 'status' => 409 )
             );
@@ -276,7 +276,7 @@ final class TaskTimeService {
             if ( ! $has_residual ) {
                 return new WP_Error(
                     'pandatask_no_residual_to_refine',
-                    __( 'There is no remaining unitemised time to refine. Mark this as additional work instead.', 'pandatask' ),
+                    __( 'There is no remaining other task time to refine. Mark this as additional work instead.', 'pandatask' ),
                     array( 'status' => 422 )
                 );
             }
@@ -284,7 +284,7 @@ final class TaskTimeService {
             if ( $specific + (int) $seconds > (int) $latest->declared_actual_seconds ) {
                 return new WP_Error(
                     'pandatask_refinement_exceeds_residual',
-                    __( 'The detailed time exceeds the remaining unitemised time. Split it or mark the new work as additional.', 'pandatask' ),
+                    __( 'The detailed time exceeds the remaining other task time. Split it or mark the new work as additional.', 'pandatask' ),
                     array( 'status' => 422 )
                 );
             }
@@ -345,7 +345,7 @@ final class TaskTimeService {
         $entry_data = array(
             'user_id'          => (int) $user_id,
             'created_by'       => max( 0, (int) $actor_id ),
-            'title'            => __( 'Unitemised task time', 'pandatask' ),
+            'title'            => __( 'Other task time', 'pandatask' ),
             'notes'            => null,
             'activity_type'    => null,
             'capacity'         => null,
