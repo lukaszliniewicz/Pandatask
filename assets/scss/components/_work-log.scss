@@ -742,6 +742,14 @@
 .pandat69-work-sharing-dialog {
 	display: grid;
 	gap: 16px;
+
+	.pandat69-modal-actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 10px;
+		padding-top: 2px;
+	}
 }
 
 .pandat69-work-sharing-warning {

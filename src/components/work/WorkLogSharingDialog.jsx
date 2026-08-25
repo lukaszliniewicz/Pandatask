@@ -141,15 +141,14 @@ const WorkLogSharingDialog = ( { isOpen, onClose } ) => {
 						type="button"
 						className="pandat69-button pandat69-button-primary"
 						disabled={
-							sharingQuery.isLoading || updateSharing.isPending
+							sharingQuery.isLoading ||
+							sharingQuery.isError ||
+							! sharingQuery.data ||
+							updateSharing.isPending
 						}
 						onClick={ save }
 					>
-						{ updateSharing.isPending
-							? 'Saving…'
-							: `Save sharing${
-								selected.length ? ` (${ selected.length })` : ''
-							}` }
+						{ updateSharing.isPending ? 'Sharing…' : 'Share' }
 					</button>
 				</div>
 			</div>
