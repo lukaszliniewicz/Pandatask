@@ -92,7 +92,7 @@ final class WorkEntryRepository {
             $params[] = $end_date;
         }
         $sql .= ' ORDER BY work_date DESC, id DESC LIMIT %d OFFSET %d';
-        $params[] = max( 1, min( 500, (int) $limit ) );
+        $params[] = max( 1, min( 501, (int) $limit ) );
         $params[] = max( 0, (int) $offset );
         $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ) );
         $this->hydrateAllocations( $rows );

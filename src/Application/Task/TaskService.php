@@ -4,6 +4,7 @@ namespace Pandatask\Application\Task;
 
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Comment\CommentService;
+use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
@@ -18,11 +19,14 @@ final class TaskService {
 
     private $mutation_service;
 
-    public function __construct( $repository = null, $board_service = null, $comment_service = null, $mutation_service = null ) {
+    private $board_access_policy;
+
+    public function __construct( $repository = null, $board_service = null, $comment_service = null, $mutation_service = null, $board_access_policy = null ) {
         $this->repository       = $repository ?: new TaskRepository();
         $this->board_service    = $board_service ?: new BoardService();
         $this->comment_service  = $comment_service ?: new CommentService();
         $this->mutation_service = $mutation_service ?: new TaskMutationService();
+        $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
     }
 
     public function isTaskBlocked( $task_id ) {
@@ -122,6 +126,50 @@ final class TaskService {
 
         $tasks = $this->repository->findForUserAcrossBoards( $user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit, $offset );
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
+
+        return $this->decorateWorkspaceTasksForViewer( $tasks );
+    }
+
+    /**
+     * Return the tasks an actor may read across every board, including tasks where
+     * they participate directly even when the board is otherwise private.
+     *
+     * This deliberately does not cache the collection: group membership and other
+     * board permissions can change independently of task/user cache versions.
+     */
+    public function getVisibleTasksForUser( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = null, $project_filter = null, $include_templates = true, $task_type_filter = '', $assigned_to_me = false, $limit = 0, $offset = 0 ) {
+        $user_id = (int) $user_id;
+        $readable_board_names = null;
+
+        if ( ! user_can( $user_id, 'manage_options' ) ) {
+            $readable_board_names = array();
+
+            foreach ( (array) $this->board_service->getAllBoardNames() as $board ) {
+                $board_name = sanitize_key( is_object( $board ) ? ( $board->id ?? '' ) : $board );
+
+                if ( '' !== $board_name && true === $this->board_access_policy->canReadBoard( $board_name, $user_id ) ) {
+                    $readable_board_names[] = $board_name;
+                }
+            }
+
+            $readable_board_names = array_values( array_unique( $readable_board_names ) );
+        }
+
+        $tasks = $this->repository->findVisibleForUser(
+            $user_id,
+            $readable_board_names,
+            $search,
+            $sort_by,
+            $sort_order,
+            $status_filter,
+            $archived,
+            $project_filter,
+            $include_templates,
+            $task_type_filter,
+            $assigned_to_me,
+            $limit,
+            $offset
+        );
 
         return $this->decorateWorkspaceTasksForViewer( $tasks );
     }

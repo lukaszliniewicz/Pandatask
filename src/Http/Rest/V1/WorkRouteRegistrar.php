@@ -132,6 +132,11 @@ final class WorkRouteRegistrar {
             '/work-entries/(?P<id>\\d+)',
             array(
                 array(
+                    'methods'             => 'GET',
+                    'callback'            => array( $this->handler, 'get_entry' ),
+                    'permission_callback' => array( $this, 'check_entry_manage_permission' ),
+                ),
+                array(
                     'methods'             => array( 'PATCH', 'POST' ),
                     'callback'            => array( $this->handler, 'update_entry' ),
                     'permission_callback' => array( $this, 'check_entry_manage_permission' ),

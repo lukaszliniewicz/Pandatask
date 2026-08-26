@@ -82,6 +82,71 @@ final class RouteRegistrar {
 
         register_rest_route(
             $this->namespace,
+            '/users/me/tasks',
+            array(
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => array( $this->task_route_handler, 'get_visible_tasks' ),
+                'permission_callback' => array( $this->permission_checker, 'check_user_logged_in_permission' ),
+                'args'                => array(
+                    'search' => array(
+                        'description'       => __( 'Search task names, descriptions, and assignees.', 'pandatask' ),
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ),
+                    'sort' => array(
+                        'description'       => __( 'Task sort field and direction, for example deadline_asc.', 'pandatask' ),
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                    ),
+                    'status_filter' => array(
+                        'description'       => __( 'Task status filter.', 'pandatask' ),
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                    ),
+                    'project_filter' => array(
+                        'description'       => __( 'Project ID, or none for tasks without a project.', 'pandatask' ),
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ),
+                    'archived' => array(
+                        'description'       => __( 'Archive filter: omit for all tasks, 0 for active tasks, or 1 for archived tasks.', 'pandatask' ),
+                        'type'              => 'integer',
+                        'enum'              => array( 0, 1 ),
+                        'sanitize_callback' => 'absint',
+                    ),
+                    'limit' => array(
+                        'description'       => __( 'Maximum tasks returned in this page.', 'pandatask' ),
+                        'type'              => 'integer',
+                        'minimum'           => 1,
+                        'maximum'           => 500,
+                        'sanitize_callback' => 'absint',
+                    ),
+                    'offset' => array(
+                        'description'       => __( 'Zero-based task offset.', 'pandatask' ),
+                        'type'              => 'integer',
+                        'default'           => 0,
+                        'minimum'           => 0,
+                        'sanitize_callback' => 'absint',
+                    ),
+                    'assigned_to_me' => array(
+                        'description' => __( 'Restrict to tasks assigned to the current user.', 'pandatask' ),
+                        'type'        => 'boolean',
+                    ),
+                    'include_templates' => array(
+                        'description' => __( 'Include recurring task templates.', 'pandatask' ),
+                        'type'        => 'boolean',
+                    ),
+                    'task_type_filter' => array(
+                        'description'       => __( 'Restrict to a task type.', 'pandatask' ),
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                    ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
             '/users',
             array(
                 'methods'             => WP_REST_Server::READABLE,

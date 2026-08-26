@@ -3,16 +3,17 @@ import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { PandataskClient } from './client.js';
 import { handled, toolOutputSchema } from './result.js';
-import { dryRunField, idempotencyKey, isoDate, positiveId } from './schemas.js';
+import { dryRunField, idempotencyKey, isoDate, periodSchema, positiveId } from './schemas.js';
 import { toolEnabledForServer } from './tool-profile.js';
 
 const readOnly: ToolAnnotations = { readOnlyHint: true, openWorldHint: false, destructiveHint: false, idempotentHint: true };
 const write: ToolAnnotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: false, idempotentHint: false };
+const destructive: ToolAnnotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: true, idempotentHint: true };
 
-const activityType = z.enum([
-  'meeting', 'call', 'correspondence', 'research', 'writing', 'development',
-  'planning', 'administration', 'event', 'travel', 'other',
-]);
+const activityType = z
+  .string()
+  .regex(/^[a-z0-9_-]{1,32}$/, 'Use a lowercase activity type key from work_type_list (letters, numbers, underscores, or hyphens).')
+  .describe('Activity type key. Call work_type_list first to discover built-in and custom keys; labels are not keys.');
 const residualHandling = z.enum(['refine_residual', 'additional']);
 const workAllocation = z.object({
   task_id: positiveId.optional().describe('Task receiving this portion of the work entry.'),
@@ -55,6 +56,49 @@ const workLogInput = z.object({
   }
 });
 
+const workUpdateInput = z.object({
+  entry_id: positiveId,
+  title: z.string().min(1).max(255).optional().describe('Replacement work-entry title.'),
+  notes: z.string().optional().describe('Replacement notes; use an empty string to clear notes.'),
+  activity_type: activityType.optional(),
+  work_date: isoDate.optional(),
+  duration_seconds: z.number().int().positive().optional().describe('Replacement total duration in seconds.'),
+  capacity: z.enum(['paid', 'volunteer', 'other']).nullable().optional().describe('Capacity classification, or null to clear it.'),
+  allocations: z
+    .array(workAllocation)
+    .max(50)
+    .optional()
+    .describe('Whole-set replacement for allocations. Supply [] to detach the entry from every task and board; residual_handling keeps current task-time semantics.'),
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
+}).superRefine((value, context) => {
+  const mutableFields = ['title', 'notes', 'activity_type', 'work_date', 'duration_seconds', 'capacity', 'allocations'] as const;
+  if (!mutableFields.some((field) => value[field] !== undefined)) {
+    context.addIssue({ code: 'custom', message: 'Provide at least one work-entry field to update.' });
+  }
+  if (value.allocations === undefined) return;
+
+  const targetKeys = value.allocations.map((allocation) => allocation.task_id ? `task:${allocation.task_id}` : `board:${allocation.board_name}`);
+  if (new Set(targetKeys).size !== targetKeys.length) {
+    context.addIssue({ code: 'custom', path: ['allocations'], message: 'A task or board can appear only once in a work entry.' });
+  }
+  if (value.duration_seconds !== undefined) {
+    const allocated = value.allocations.reduce((sum, allocation) => sum + allocation.seconds, 0);
+    if (allocated > value.duration_seconds) {
+      context.addIssue({ code: 'custom', path: ['allocations'], message: 'Allocated seconds cannot exceed duration_seconds.' });
+    }
+  }
+});
+
+const workTypeKey = activityType.describe('Work type key. Call work_type_list first to discover available keys.');
+const workTypeUpdateInput = z.object({
+  key: workTypeKey,
+  label: z.string().min(1).max(80).optional().describe('Replacement label shown to people using this work type.'),
+  is_active: z.boolean().optional().describe('Whether this work type can be selected for new entries.'),
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
+}).refine((value) => value.label !== undefined || value.is_active !== undefined, 'Provide label or is_active to update the work type.');
+
 const taskTimeLogInput = z.object({
   task_id: positiveId.describe('Task receiving the incremental time entry.'),
   duration_seconds: z.number().int().positive().describe('Additional time worked, in seconds. Repeated calls accumulate through separate work entries.'),
@@ -85,6 +129,11 @@ function register(
     outputSchema: toolOutputSchema,
     annotations,
   }, callback);
+}
+
+function mutationBody(input: Record<string, unknown>, excluded: readonly string[]): Record<string, unknown> {
+  const excludedKeys = new Set(excluded);
+  return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excludedKeys.has(key) && value !== undefined));
 }
 
 export function registerWorkTools(server: McpServer, client: PandataskClient): void {
@@ -171,6 +220,19 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
 
   register(
     server,
+    'task_work_get',
+    'Get task work',
+    'Gets work entries and time summaries for a task the authenticated user may read, including direct and descendant aggregates.',
+    z.object({ task_id: positiveId }),
+    readOnly,
+    async (input, extra) => client.request({
+      path: `/tasks/${Number(input.task_id)}/work`,
+      signal: extra.signal,
+    }),
+  );
+
+  register(
+    server,
     'work_log',
     'Log work',
     'Creates one factual work entry. Task and board allocations are optional, may be split, and may leave an explicitly unallocated remainder. activity_type describes how the work was done, not its project/category subject.',
@@ -231,14 +293,144 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
 
   register(
     server,
+    'work_get',
+    'Get work entry',
+    'Gets one work entry, including its allocation snapshots. Pandatask enforces whether the authenticated user may read it.',
+    z.object({ entry_id: positiveId }),
+    readOnly,
+    async (input, extra) => client.request({
+      path: `/work-entries/${Number(input.entry_id)}`,
+      signal: extra.signal,
+    }),
+  );
+
+  register(
+    server,
+    'work_update',
+    'Update work entry',
+    'Updates one factual work entry. Call work_get first before changing allocations: allocations replaces the complete allocation set, so preserve every allocation that should remain, use [] to detach from every task and board, and use residual_handling when refining or adding task time with existing residuals. Use work_type_list to discover valid activity_type keys.',
+    workUpdateInput,
+    write,
+    async (input, extra) => client.mutate({
+      method: 'PATCH',
+      path: `/work-entries/${Number(input.entry_id)}`,
+      body: mutationBody(input, ['entry_id', 'dry_run', 'idempotency_key']),
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
+    'work_delete',
+    'Delete work entry',
+    'Deletes one factual work entry from active logs and reports. This cannot delete residual time; use task_time_resolve for residuals. Confirm the entry ID before executing.',
+    z.object({
+      entry_id: positiveId,
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    destructive,
+    async (input, extra) => client.mutate({
+      method: 'DELETE',
+      path: `/work-entries/${Number(input.entry_id)}`,
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
+    'work_type_list',
+    'List work types',
+    'Lists the built-in and personal work type keys available for activity_type. Call this before logging or editing work when the key is not already known.',
+    z.object({}),
+    readOnly,
+    async (_input, extra) => client.request({ path: '/work/activity-types', signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'work_type_create',
+    'Create work type',
+    'Creates a personal work type category. The server generates its lowercase key; use work_type_list to retrieve it before logging work.',
+    z.object({
+      label: z.string().min(1).max(80).describe('Human-readable work type label.'),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => client.mutate({
+      method: 'POST',
+      path: '/work/activity-types',
+      body: { label: input.label },
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
+    'work_type_update',
+    'Update work type',
+    'Updates a personal or built-in work type label or active state. Use work_type_list to discover keys; archived types remain available on historical entries.',
+    workTypeUpdateInput,
+    write,
+    async (input, extra) => client.mutate({
+      method: 'PATCH',
+      path: `/work/activity-types/${encodeURIComponent(String(input.key))}`,
+      body: mutationBody(input, ['key', 'dry_run', 'idempotency_key']),
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
+    'work_type_archive',
+    'Archive work type',
+    'Archives a work type by deactivating it for new entries while preserving it for historical reporting. This is reversible through work_type_update with is_active=true.',
+    z.object({
+      key: workTypeKey,
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    destructive,
+    async (input, extra) => client.mutate({
+      method: 'DELETE',
+      path: `/work/activity-types/${encodeURIComponent(String(input.key))}`,
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+      signal: extra.signal,
+    }, Boolean(input.dry_run)),
+  );
+
+  register(
+    server,
     'work_report',
     'Get my work report',
     'Returns personal work totals without double-counting split allocations, including task-linked, board-only, unallocated and residual subsets plus activity/task/board/project/category/capacity breakdowns.',
-    z.object({ start_date: isoDate.optional(), end_date: isoDate.optional() }),
+    z
+      .object({
+        period: periodSchema.optional().describe('Named period. When omitted, Pandatask uses last_30_days.'),
+        start_date: isoDate.optional().describe('Custom period start date.'),
+        end_date: isoDate.optional().describe('Custom period end date.'),
+      })
+      .superRefine((value, context) => {
+        if (value.period === 'custom' && (!value.start_date || !value.end_date)) {
+          context.addIssue({ code: 'custom', path: ['period'], message: 'Custom reports require start_date and end_date.' });
+        }
+        if (value.start_date && value.end_date && value.start_date > value.end_date) {
+          context.addIssue({ code: 'custom', path: ['end_date'], message: 'end_date must be on or after start_date.' });
+        }
+      }),
     readOnly,
     async (input, extra) => client.request({
       path: '/users/me/work-report',
-      query: { start_date: input.start_date as string | undefined, end_date: input.end_date as string | undefined },
+      query: {
+        period: input.period as string | undefined,
+        start_date: input.start_date as string | undefined,
+        end_date: input.end_date as string | undefined,
+      },
       signal: extra.signal,
     }),
   );

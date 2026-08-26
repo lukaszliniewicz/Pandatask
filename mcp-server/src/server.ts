@@ -21,6 +21,8 @@ import {
   taskCreateData,
   taskListInput,
   taskListQuery,
+  taskListVisibleInput,
+  taskListVisibleQuery,
   taskMutableFields,
   taskUpdateData,
 } from './schemas.js';
@@ -28,7 +30,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -137,6 +139,20 @@ interface CollectedTasks {
   pages: number;
 }
 
+interface VisibleTaskCollection extends CollectedTasks {
+  pagination: {
+    limit: number;
+    offset: number;
+    returned: number;
+    total: number | null;
+    has_more: boolean;
+    next_offset: number | null;
+    pages: number;
+    truncated: boolean;
+    cap: number;
+  };
+}
+
 interface SiteMetadata extends Record<string, unknown> {
   today: string;
   timezone: string;
@@ -198,6 +214,79 @@ async function getAllTasks(
   }
 
   return { tasks, truncated: hasMore, pages };
+}
+
+function responseHasMore(payload: unknown, pageLength: number, requestedLimit: number): boolean {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const pagination = (payload as Record<string, unknown>).pagination;
+    if (pagination && typeof pagination === 'object' && !Array.isArray(pagination)) {
+      const hasMore = (pagination as Record<string, unknown>).has_more;
+      if (typeof hasMore === 'boolean') return hasMore;
+    }
+  }
+  return pageLength === requestedLimit;
+}
+
+function responseNextOffset(payload: unknown, currentOffset: number, pageLength: number): number {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const pagination = (payload as Record<string, unknown>).pagination;
+    if (pagination && typeof pagination === 'object' && !Array.isArray(pagination)) {
+      const nextOffset = Number((pagination as Record<string, unknown>).next_offset);
+      if (Number.isInteger(nextOffset) && nextOffset > currentOffset) return nextOffset;
+    }
+  }
+  return currentOffset + pageLength;
+}
+
+async function getAllVisibleTasks(
+  client: PandataskClient,
+  input: z.infer<typeof taskListVisibleInput>,
+  signal?: AbortSignal,
+): Promise<VisibleTaskCollection> {
+  const cap = Math.min(client.config.maxCollectionItems, 5000);
+  const requestedLimit = Number(input.limit);
+  const initialOffset = Number(input.offset);
+  const tasks: Record<string, unknown>[] = [];
+  let offset = initialOffset;
+  let pages = 0;
+  let hasMore = true;
+
+  // Fetch one item beyond the cap so an exact-cap response can still report whether
+  // the complete visible collection was truncated.
+  while (hasMore && tasks.length <= cap) {
+    const remaining = cap + 1 - tasks.length;
+    const limit = Math.min(requestedLimit, remaining, 500);
+    const payload = await client.request({
+      path: '/users/me/tasks',
+      query: taskListVisibleQuery({ ...input, limit, offset }),
+      signal,
+    });
+    const page = collection(payload, 'tasks');
+    tasks.push(...page);
+    pages += 1;
+    hasMore = responseHasMore(payload, page.length, limit);
+    offset = responseNextOffset(payload, offset, page.length);
+    if (page.length === 0 || tasks.length > cap) break;
+  }
+
+  const truncated = tasks.length > cap;
+  const combined = truncated ? tasks.slice(0, cap) : tasks;
+  return {
+    tasks: combined,
+    truncated,
+    pages,
+    pagination: {
+      limit: requestedLimit,
+      offset: initialOffset,
+      returned: combined.length,
+      total: truncated ? null : combined.length,
+      has_more: truncated,
+      next_offset: truncated ? initialOffset + combined.length : null,
+      pages,
+      truncated,
+      cap,
+    },
+  };
 }
 
 async function settledMutations(
@@ -537,6 +626,16 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     readOnly,
     async (input, extra) =>
       client.request({ path: boardPath(input.board_name, '/tasks'), query: taskListQuery(input), signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'task_list_visible',
+    'List all visible tasks',
+    'Lists every task visible to the authenticated user across boards. One MCP call follows REST pagination and combines the pages, using the same search, status, project, assignment, type, template, and sorting filters as task_list. By default it includes all statuses, both active and archived tasks, and recurring templates; set archived=false for active only or archived=true for archived only. The configured collection cap is surfaced as pagination.truncated=true with total=null.',
+    taskListVisibleInput,
+    readOnly,
+    async (input, extra) => getAllVisibleTasks(client, input, extra.signal),
   );
 
   register(

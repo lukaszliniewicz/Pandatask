@@ -183,6 +183,244 @@ test('task_time_log adds incremental task time without completing or resolving t
   assert.deepEqual(body.allocations, [{ task_id: 12, seconds: 2700 }]);
 });
 
+test('work logging tools expose endpoint previews and support replacing allocations', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response(JSON.stringify({}), { status: 200 }));
+
+  const update = await client.callTool({
+    name: 'work_update',
+    arguments: {
+      entry_id: 42,
+      title: 'Moved work',
+      activity_type: 'community-outreach',
+      duration_seconds: 5400,
+      capacity: null,
+      allocations: [{ task_id: 99, seconds: 5400, residual_handling: 'additional' }],
+      idempotency_key: 'work-update-42',
+    },
+  });
+  assert.equal(update.isError, undefined);
+  const updateEnvelope = update.structuredContent as Record<string, unknown>;
+  const updateRequest = (updateEnvelope.data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(updateRequest.method, 'PATCH');
+  assert.ok(String(updateRequest.url).endsWith('/work-entries/42'));
+  assert.deepEqual((updateRequest.body as Record<string, unknown>).allocations, [
+    { task_id: 99, seconds: 5400, residual_handling: 'additional' },
+  ]);
+  assert.equal((updateRequest.body as Record<string, unknown>).capacity, null);
+  assert.equal(updateRequest.idempotency_key, 'work-update-42');
+
+  const detach = await client.callTool({ name: 'work_update', arguments: { entry_id: 42, allocations: [] } });
+  assert.equal(detach.isError, undefined);
+  const detachEnvelope = detach.structuredContent as Record<string, unknown>;
+  const detachRequest = (detachEnvelope.data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.deepEqual((detachRequest.body as Record<string, unknown>).allocations, []);
+
+  const deleted = await client.callTool({
+    name: 'work_delete',
+    arguments: { entry_id: 42, idempotency_key: 'work-delete-42' },
+  });
+  assert.equal(deleted.isError, undefined);
+  const deleteEnvelope = deleted.structuredContent as Record<string, unknown>;
+  const deleteRequest = (deleteEnvelope.data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(deleteRequest.method, 'DELETE');
+  assert.ok(String(deleteRequest.url).endsWith('/work-entries/42'));
+  assert.equal(deleteRequest.idempotency_key, 'work-delete-42');
+});
+
+test('work read tools use the task and entry endpoints', async (t) => {
+  const calls: { method: string; path: string }[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input, init) => {
+    const url = new URL(String(input));
+    calls.push({ method: init?.method ?? 'GET', path: url.pathname });
+    return new Response(JSON.stringify({}), { status: 200 });
+  });
+
+  for (const [name, arguments_] of [
+    ['task_work_get', { task_id: 12 }],
+    ['work_get', { entry_id: 42 }],
+    ['work_type_list', {}],
+  ] as const) {
+    const result = await client.callTool({ name, arguments: arguments_ });
+    assert.equal(result.isError, undefined);
+  }
+
+  assert.deepEqual(calls, [
+    { method: 'GET', path: '/wp-json/pandatask/v1/tasks/12/work' },
+    { method: 'GET', path: '/wp-json/pandatask/v1/work-entries/42' },
+    { method: 'GET', path: '/wp-json/pandatask/v1/work/activity-types' },
+  ]);
+});
+
+test('work logging validates replacement allocations and accepts custom activity keys', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response(JSON.stringify({}), { status: 200 }));
+
+  const custom = await client.callTool({
+    name: 'task_time_log',
+    arguments: { task_id: 12, activity_type: 'community-outreach', duration_seconds: 900 },
+  });
+  assert.equal(custom.isError, undefined);
+
+  const duplicate = await client.callTool({
+    name: 'work_update',
+    arguments: {
+      entry_id: 42,
+      duration_seconds: 3600,
+      allocations: [{ task_id: 10, seconds: 1800 }, { task_id: 10, seconds: 1800 }],
+    },
+  });
+  assert.equal(duplicate.isError, true);
+
+  const overallocated = await client.callTool({
+    name: 'work_update',
+    arguments: {
+      entry_id: 42,
+      duration_seconds: 3600,
+      allocations: [{ task_id: 10, seconds: 2400 }, { board_name: 'group_10', seconds: 2400 }],
+    },
+  });
+  assert.equal(overallocated.isError, true);
+});
+
+test('work type tools use the activity type routes and reversible archive semantics', async (t) => {
+  const client = await connectedClient(t, config, async () => new Response(JSON.stringify({}), { status: 200 }));
+
+  const created = await client.callTool({
+    name: 'work_type_create',
+    arguments: { label: 'Community Outreach', idempotency_key: 'work-type-create-1' },
+  });
+  const createdRequest = ((created.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(createdRequest.method, 'POST');
+  assert.ok(String(createdRequest.url).endsWith('/work/activity-types'));
+  assert.deepEqual(createdRequest.body, { label: 'Community Outreach' });
+  assert.equal(createdRequest.idempotency_key, 'work-type-create-1');
+
+  const updated = await client.callTool({
+    name: 'work_type_update',
+    arguments: { key: 'community-outreach', label: 'Trustee outreach', is_active: false },
+  });
+  const updatedRequest = ((updated.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(updatedRequest.method, 'PATCH');
+  assert.ok(String(updatedRequest.url).endsWith('/work/activity-types/community-outreach'));
+  assert.deepEqual(updatedRequest.body, { label: 'Trustee outreach', is_active: false });
+
+  const archived = await client.callTool({ name: 'work_type_archive', arguments: { key: 'community-outreach' } });
+  const archivedRequest = ((archived.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(archivedRequest.method, 'DELETE');
+  assert.ok(String(archivedRequest.url).endsWith('/work/activity-types/community-outreach'));
+});
+
+test('task_list_visible uses one boardless request and work_report forwards named periods', async (t) => {
+  const calls: URL[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input) => {
+    const url = new URL(String(input));
+    calls.push(url);
+    if (url.pathname.endsWith('/tasks')) return new Response(JSON.stringify({ tasks: [] }), { status: 200 });
+    if (url.pathname.endsWith('/work-report')) return new Response(JSON.stringify({ report: {} }), { status: 200 });
+    return new Response(JSON.stringify({}), { status: 200 });
+  });
+
+  const visible = await client.callTool({
+    name: 'task_list_visible',
+    arguments: {
+      search: 'trustees',
+      status: 'all',
+      sort: 'name_asc',
+      archived: false,
+      assigned_to_me: true,
+      include_templates: false,
+      task_type: 'task',
+      limit: 25,
+      offset: 50,
+    },
+  });
+  assert.equal(visible.isError, undefined);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.pathname, '/wp-json/pandatask/v1/users/me/tasks');
+  assert.equal(calls[0]?.searchParams.get('search'), 'trustees');
+  assert.equal(calls[0]?.searchParams.get('assigned_to_me'), 'true');
+  assert.equal(calls[0]?.searchParams.get('private_only'), null);
+
+  await client.callTool({ name: 'work_report', arguments: { period: 'last_30_days' } });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1]?.pathname, '/wp-json/pandatask/v1/users/me/work-report');
+  assert.equal(calls[1]?.searchParams.get('period'), 'last_30_days');
+
+  await client.callTool({ name: 'work_report', arguments: {} });
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2]?.pathname, '/wp-json/pandatask/v1/users/me/work-report');
+  assert.equal(calls[2]?.searchParams.get('period'), null, 'Omitting period must preserve the REST API last-30-days default.');
+});
+
+test('task_list_visible aggregates pages with broad defaults and accurate metadata', async (t) => {
+  const calls: URL[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input) => {
+    const url = new URL(String(input));
+    calls.push(url);
+    if (!url.pathname.endsWith('/tasks')) return new Response(JSON.stringify({}), { status: 200 });
+
+    const offset = Number(url.searchParams.get('offset'));
+    if (offset === 0) {
+      return new Response(JSON.stringify({
+        tasks: [{ id: 101, name: 'First' }, { id: 102, name: 'Second' }],
+        pagination: { limit: 100, offset: 0, returned: 2, has_more: true, next_offset: 2 },
+      }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      tasks: [{ id: 103, name: 'Third' }],
+      pagination: { limit: 100, offset: 2, returned: 1, has_more: false, next_offset: null },
+    }), { status: 200 });
+  });
+
+  const result = await client.callTool({ name: 'task_list_visible', arguments: {} });
+  assert.equal(result.isError, undefined);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0]?.pathname, '/wp-json/pandatask/v1/users/me/tasks');
+  assert.equal(calls[0]?.searchParams.get('status_filter'), null, 'Default visible task listing must include every status.');
+  assert.equal(calls[0]?.searchParams.get('archived'), null, 'Omitting the archive filter must include active and archived tasks.');
+  assert.equal(calls[0]?.searchParams.get('include_templates'), 'true', 'Default visible task listing must include templates.');
+  assert.equal(calls[0]?.searchParams.get('private_only'), null);
+  assert.equal(calls[1]?.searchParams.get('offset'), '2');
+
+  const envelope = result.structuredContent as Record<string, unknown>;
+  const data = envelope.data as Record<string, unknown>;
+  assert.deepEqual((data.tasks as Record<string, unknown>[]).map((task) => task.id), [101, 102, 103]);
+  assert.deepEqual(data.pagination, {
+    limit: 100,
+    offset: 0,
+    returned: 3,
+    total: 3,
+    has_more: false,
+    next_offset: null,
+    pages: 2,
+    truncated: false,
+    cap: 1000,
+  });
+});
+
+test('task_list_visible surfaces truncation at the configured collection cap', async (t) => {
+  const calls: URL[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, maxCollectionItems: 2 }, async (input) => {
+    const url = new URL(String(input));
+    calls.push(url);
+    return new Response(JSON.stringify({
+      tasks: [{ id: 201 }, { id: 202 }, { id: 203 }],
+      pagination: { limit: 3, offset: 0, returned: 3, has_more: true, next_offset: 3 },
+    }), { status: 200 });
+  });
+
+  const result = await client.callTool({ name: 'task_list_visible', arguments: {} });
+  assert.equal(result.isError, undefined);
+  assert.equal(calls.length, 1);
+  const data = (result.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.deepEqual((data.tasks as Record<string, unknown>[]).map((task) => task.id), [201, 202]);
+  const pagination = data.pagination as Record<string, unknown>;
+  assert.equal(pagination.returned, 2);
+  assert.equal(pagination.total, null);
+  assert.equal(pagination.has_more, true);
+  assert.equal(pagination.truncated, true);
+  assert.equal(pagination.cap, 2);
+});
+
 test('task status tool keeps completion on the time-aware boundary', async (t) => {
   const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
   const tools = await client.listTools();
@@ -204,10 +442,19 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   assert.ok(coreNames.has('task_complete'));
   assert.ok(coreNames.has('task_time_resolve'));
   assert.ok(coreNames.has('task_time_log'));
+  assert.ok(coreNames.has('task_list_visible'));
+  assert.ok(coreNames.has('task_work_get'));
   assert.ok(coreNames.has('work_log'));
   assert.ok(coreNames.has('work_list'));
+  assert.ok(coreNames.has('work_get'));
+  assert.ok(coreNames.has('work_update'));
+  assert.ok(coreNames.has('work_delete'));
+  assert.ok(coreNames.has('work_type_list'));
+  assert.ok(coreNames.has('work_type_create'));
+  assert.ok(coreNames.has('work_type_update'));
+  assert.ok(coreNames.has('work_type_archive'));
   assert.ok(coreNames.has('work_report'));
-  assert.equal(coreNames.size, 25);
+  assert.equal(coreNames.size, 34);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 

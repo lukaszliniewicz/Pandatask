@@ -66,14 +66,34 @@ final class WorkRouteHandler {
     }
 
     public function list_my_entries( $request ) {
+        $limit = max( 1, min( 500, absint( $request['limit'] ?? 200 ) ) );
+        $offset = max( 0, absint( $request['offset'] ?? 0 ) );
         $entries = $this->work_service->getEntriesForUser(
             get_current_user_id(),
             sanitize_text_field( $request['start_date'] ?? '' ),
             sanitize_text_field( $request['end_date'] ?? '' ),
-            absint( $request['limit'] ?? 200 ),
-            absint( $request['offset'] ?? 0 )
+            $limit + 1,
+            $offset
         );
-        return new WP_REST_Response( array( 'entries' => $entries ), 200 );
+        $has_more = count( $entries ) > $limit;
+
+        if ( $has_more ) {
+            $entries = array_slice( $entries, 0, $limit );
+        }
+
+        return new WP_REST_Response(
+            array(
+                'entries' => $entries,
+                'pagination' => array(
+                    'limit'       => $limit,
+                    'offset'      => $offset,
+                    'returned'    => count( $entries ),
+                    'has_more'    => $has_more,
+                    'next_offset' => $has_more ? $offset + $limit : null,
+                ),
+            ),
+            200
+        );
     }
 
     public function list_my_suggestions( $request ) {
@@ -144,6 +164,16 @@ final class WorkRouteHandler {
         $data = $request->get_json_params();
         $entry = $this->work_service->updateEntry( (int) $request['id'], is_array( $data ) ? $data : array(), get_current_user_id() );
         return is_wp_error( $entry ) ? $entry : new WP_REST_Response( array( 'entry' => $entry ), 200 );
+    }
+
+    public function get_entry( $request ) {
+        $entry = $this->work_service->getEntry( (int) $request['id'] );
+
+        if ( ! $entry ) {
+            return new WP_Error( 'rest_not_found', __( 'Work entry not found.', 'pandatask' ), array( 'status' => 404 ) );
+        }
+
+        return new WP_REST_Response( array( 'entry' => $entry ), 200 );
     }
 
     public function delete_entry( $request ) {

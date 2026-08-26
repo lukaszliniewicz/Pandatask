@@ -124,7 +124,7 @@ See [`examples/opencode.json`](examples/opencode.json).
 - `PANDATASK_DRY_RUN=true` is a one-way global safety lock. A tool call cannot override it.
 - Every write tool also accepts `dry_run: true` for a single-call preview.
 - Create operations and administrator batches accept `idempotency_key`. WordPress stores successful keyed responses for 24 hours and safely replays retries; conflicting input or a concurrent in-flight use returns HTTP 409.
-- Independent workflow reads and writes use bounded concurrency, and task collections use REST pagination plus a configurable scan cap.
+- Independent workflow reads and writes use bounded concurrency, and task collections use REST pagination plus a configurable scan cap. `task_list_visible` follows all REST pages in one MCP call, combines them, and reports `pagination.total` when complete; when the cap is reached it returns `pagination.truncated=true` and `pagination.total=null` rather than claiming the collection is complete.
 - MCP cancellation signals are propagated to REST requests and reported with a stable `pandatask_request_cancelled` error code.
 
 A dry-run performs local schema and workflow preflight and sends no mutation. WordPress permissions, current record state, and cross-record references remain authoritative during execution. Direct previews contain the exact method, URL, query, JSON body, and non-secret idempotency key that would be used, but never the Authorization header:
@@ -160,6 +160,7 @@ Use these first to reduce model/tool round trips:
 - `board_deadline_review` — overdue and upcoming work.
 - `board_get_workload` — per-assignee load.
 - `daily_briefing` — cross-board summary for the authenticated user.
+- `task_list_visible` — all tasks visible to the authenticated user across boards, with REST pages combined in one MCP result and explicit cap/truncation metadata.
 - `project_plan` — create a project plus ordered dependency-aware tasks; dry-run previews the entire plan.
 - `task_bulk_update` — update up to 100 tasks with per-item results.
 - `task_archive_completed` — reversible board cleanup.
@@ -177,20 +178,20 @@ Because dependency IDs are resolved sequentially, large plans can take longer th
 
 The server owns its advertised surface so profiles behave consistently across Codex, Antigravity, OpenCode, and other clients:
 
-- `core` — 25 recommended workflows and common read/write tools, including first-class task completion, incremental task-time logging, and work logging.
-- `full` — 44 non-administrator granular and workflow tools.
-- `admin` — the complete 46-tool surface, including `board_list` and `batch_execute`.
+- `core` — 34 recommended workflows and common read/write tools, including first-class task completion, incremental task-time logging, work-entry editing, work-type management, and visible-task listing.
+- `full` — 53 non-administrator granular and workflow tools.
+- `admin` — the complete 55-tool surface, including `board_list` and `batch_execute`.
 
 Client-side allow/deny lists can narrow these profiles further.
 
 ## Granular tool groups
 
-The `admin` profile exposes 45 tools:
+The `admin` profile exposes 55 tools:
 
 - Connection/directory: `connection_check`, `user_search`.
 - Boards/workflows: `board_list`, `board_list_writable`, `board_get_context`, `board_get_summary`, `board_deadline_review`, `board_get_workload`, `daily_briefing`.
-- Tasks: `task_list`, `task_get`, `task_get_history`, `task_list_potential_parents`, `task_create`, `task_update`, `task_delete`, `task_set_status`, `task_set_archived`, `task_set_assignments`, `task_set_schedule`, `task_set_dependencies`, `task_create_subtask`, `task_move`, `task_bulk_update`, `task_archive_completed`.
-- Work/time: `task_complete`, `task_time_log`, `task_time_resolve`, `work_log`, `work_list`, `work_report`.
+- Tasks: `task_list`, `task_list_visible`, `task_get`, `task_get_history`, `task_list_potential_parents`, `task_create`, `task_update`, `task_delete`, `task_set_status`, `task_set_archived`, `task_set_assignments`, `task_set_schedule`, `task_set_dependencies`, `task_create_subtask`, `task_move`, `task_bulk_update`, `task_archive_completed`.
+- Work/time: `task_complete`, `task_time_log`, `task_time_resolve`, `task_work_get`, `work_log`, `work_list`, `work_get`, `work_update`, `work_delete`, `work_type_list`, `work_type_create`, `work_type_update`, `work_type_archive`, `work_report`.
 - Projects: `project_list`, `project_get`, `project_create`, `project_update`, `project_delete`, `project_plan`.
 - Categories: `category_list`, `category_create`, `category_delete`.
 - Comments: `comment_list`, `comment_create`, `comment_update`, `comment_delete`.

@@ -209,8 +209,7 @@ export const batchAction = z.discriminatedUnion('action', [
   }),
 ]);
 
-export const taskListInput = z.object({
-  board_name: boardName,
+const taskListFilterFields = {
   search: z.string().max(500).optional().describe('Case-insensitive search across task names and descriptions.'),
   status: z
     .enum(['all', 'pending', 'in-progress', 'done', 'missed_deadline', 'pending_in-progress'])
@@ -236,11 +235,31 @@ export const taskListInput = z.object({
   project_id: z.union([positiveId, z.literal('none')]).optional().describe('Project ID, or none for tasks without a project.'),
   archived: z.boolean().optional().default(false).describe('Return archived rather than active tasks.'),
   assigned_to_me: z.boolean().optional().describe('Restrict to tasks assigned to the authenticated user.'),
-  private_only: z.boolean().optional().describe('For user_ID boards, restrict the cross-board personal view to the private board itself.'),
   include_templates: z.boolean().optional().default(false).describe('Include recurring templates; false is recommended for actionable work.'),
   task_type: z.enum(['task', 'bug']).optional().describe('Restrict to tasks or bugs.'),
   limit: z.number().int().min(1).max(500).optional().default(100).describe('Maximum tasks returned in this page.'),
   offset: z.number().int().nonnegative().optional().default(0).describe('Zero-based task offset for pagination.'),
+};
+
+export const taskListInput = z.object({
+  board_name: boardName,
+  ...taskListFilterFields,
+  private_only: z.boolean().optional().describe('For user_ID boards, restrict the cross-board personal view to the private board itself.'),
+});
+
+export const taskListVisibleInput = z.object(taskListFilterFields).extend({
+  status: z
+    .enum(['all', 'pending', 'in-progress', 'done', 'missed_deadline', 'pending_in-progress'])
+    .optional()
+    .default('all')
+    .describe('Task status filter. Defaults to all statuses for the complete visible-task view.'),
+  archived: z
+    .boolean()
+    .optional()
+    .describe('Archive filter. Omit for active and archived tasks, false for active only, or true for archived only.'),
+  include_templates: z.boolean().optional().default(true).describe('Include recurring templates; defaults to true for the complete visible-task view.'),
+  limit: z.number().int().min(1).max(500).optional().default(100).describe('REST page size; all pages are combined into one MCP result.'),
+  offset: z.number().int().nonnegative().optional().default(0).describe('Initial REST offset before the server follows subsequent pages.'),
 });
 
 export function taskListQuery(input: z.infer<typeof taskListInput>): Record<string, string | number> {
@@ -249,9 +268,24 @@ export function taskListQuery(input: z.infer<typeof taskListInput>): Record<stri
     ...(input.status !== 'all' ? { status_filter: input.status } : {}),
     sort: input.sort,
     ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
-    archived: input.archived ? 1 : 0,
+    ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),
     ...(input.assigned_to_me !== undefined ? { assigned_to_me: String(input.assigned_to_me) } : {}),
     ...(input.private_only !== undefined ? { private_only: String(input.private_only) } : {}),
+    include_templates: String(input.include_templates),
+    ...(input.task_type ? { task_type_filter: input.task_type } : {}),
+    limit: input.limit,
+    offset: input.offset,
+  };
+}
+
+export function taskListVisibleQuery(input: z.infer<typeof taskListVisibleInput>): Record<string, string | number> {
+  return {
+    ...(input.search ? { search: input.search } : {}),
+    ...(input.status !== 'all' ? { status_filter: input.status } : {}),
+    sort: input.sort,
+    ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
+    ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),
+    ...(input.assigned_to_me !== undefined ? { assigned_to_me: String(input.assigned_to_me) } : {}),
     include_templates: String(input.include_templates),
     ...(input.task_type ? { task_type_filter: input.task_type } : {}),
     limit: input.limit,

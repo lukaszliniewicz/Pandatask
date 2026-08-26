@@ -576,6 +576,151 @@ final class TaskRepository {
         return $results;
     }
 
+    /**
+     * Find tasks readable through either an approved board or direct participation.
+     * A null board list is an administrator query and intentionally has no access
+     * predicate; an empty list still permits only direct participation.
+     */
+    public function findVisibleForUser( $user_id, $readable_board_names, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = null, $project_filter = null, $include_templates = true, $task_type_filter = '', $assigned_to_me = false, $limit = 0, $offset = 0 ) {
+        global $wpdb;
+
+        $prefix            = DatabaseContext::getDbPrefix();
+        $tasks_table       = $prefix . 'tasks';
+        $assignments_table = $prefix . 'assignments';
+        $users_table       = $wpdb->users;
+        $categories_table  = $prefix . 'categories';
+        $projects_table    = $prefix . 'projects';
+        $sql_select        = "SELECT t.*, c.name as category_name, p.name as project_name,
+             parent.name as parent_task_name,
+             parent.status as parent_task_status
+             FROM {$tasks_table} t
+             LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
+             LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
+             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id";
+        $sql_where         = ' WHERE 1 = 1';
+        $params            = array();
+        $user_id           = (int) $user_id;
+
+        if ( null !== $archived ) {
+            $sql_where .= ' AND t.archived = %d';
+            $params[] = (int) $archived;
+        }
+
+        if ( null !== $readable_board_names ) {
+            $readable_board_names = array_values( array_unique( array_filter( array_map( 'sanitize_key', (array) $readable_board_names ) ) ) );
+            $visibility_clauses = array(
+                't.creator_id = %d',
+                "EXISTS (SELECT 1 FROM {$assignments_table} visibility_assignment WHERE visibility_assignment.task_id = t.id AND visibility_assignment.user_id = %d)",
+            );
+            $visibility_params = array( $user_id, $user_id );
+
+            if ( ! empty( $readable_board_names ) ) {
+                $visibility_clauses[] = 't.board_name IN (' . implode( ', ', array_fill( 0, count( $readable_board_names ), '%s' ) ) . ')';
+                $visibility_params = array_merge( $visibility_params, $readable_board_names );
+            }
+
+            $sql_where .= ' AND (' . implode( ' OR ', $visibility_clauses ) . ')';
+            $params = array_merge( $params, $visibility_params );
+        }
+
+        if ( $assigned_to_me ) {
+            $sql_where .= " AND EXISTS (
+                SELECT 1 FROM {$assignments_table} assigned_to_actor
+                WHERE assigned_to_actor.task_id = t.id
+                  AND assigned_to_actor.user_id = %d
+                  AND (assigned_to_actor.role = 'assignee' OR assigned_to_actor.role IS NULL)
+            )";
+            $params[] = $user_id;
+        }
+
+        if ( ! $include_templates ) {
+            $sql_where .= ' AND t.is_recurring = 0';
+        }
+
+        if ( ! empty( $task_type_filter ) ) {
+            $sql_where .= ' AND t.task_type = %s';
+            $params[] = $task_type_filter;
+        }
+
+        if ( ! empty( $search ) ) {
+            $search_term = '%' . $wpdb->esc_like( $search ) . '%';
+            $sql_where .= " AND (
+                t.name LIKE %s
+                OR t.description LIKE %s
+                OR EXISTS (
+                    SELECT 1
+                    FROM {$assignments_table} search_assignment
+                    INNER JOIN {$users_table} search_user ON search_user.ID = search_assignment.user_id
+                    WHERE search_assignment.task_id = t.id
+                      AND search_user.display_name LIKE %s
+                )
+            )";
+            $params[] = $search_term;
+            $params[] = $search_term;
+            $params[] = $search_term;
+        }
+
+        if ( ! empty( $status_filter ) ) {
+            if ( 'pending_in-progress' === $status_filter ) {
+                $sql_where .= " AND t.status IN ('pending', 'in-progress')";
+            } elseif ( 'missed_deadline' === $status_filter ) {
+                $sql_where .= " AND t.status IN ('pending', 'in-progress') AND t.deadline IS NOT NULL AND t.deadline < %s";
+                $params[] = wp_date( 'Y-m-d' );
+            } else {
+                $sql_where .= ' AND t.status = %s';
+                $params[] = $status_filter;
+            }
+        }
+
+        if ( null !== $project_filter ) {
+            if ( is_numeric( $project_filter ) && $project_filter > 0 ) {
+                $sql_where .= ' AND t.project_id = %d';
+                $params[] = $project_filter;
+            } elseif ( 'none' === $project_filter ) {
+                $sql_where .= ' AND (t.project_id IS NULL OR t.project_id = 0)';
+            }
+        }
+
+        $allowed_sort_columns = array( 'name', 'priority', 'deadline', 'status', 'assigned_user_names', 'category_name', 'project_name', 'created_at' );
+
+        if ( in_array( $sort_by, $allowed_sort_columns, true ) ) {
+            $order = 'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC';
+
+            if ( 'assigned_user_names' === $sort_by ) {
+                $sql_order = " ORDER BY (
+                    SELECT MIN(sort_user.display_name)
+                    FROM {$assignments_table} sort_assignment
+                    INNER JOIN {$users_table} sort_user ON sort_user.ID = sort_assignment.user_id
+                    WHERE sort_assignment.task_id = t.id
+                      AND (sort_assignment.role = 'assignee' OR sort_assignment.role IS NULL)
+                ) {$order}, t.id {$order}";
+            } elseif ( 'category_name' === $sort_by ) {
+                $sql_order = " ORDER BY c.name {$order}, t.id {$order}";
+            } elseif ( 'project_name' === $sort_by ) {
+                $sql_order = " ORDER BY (p.name IS NULL OR p.name = '') ASC, p.name {$order}, t.name ASC, t.id ASC";
+            } else {
+                $sql_order = " ORDER BY t.{$sort_by} {$order}, t.id {$order}";
+            }
+        } else {
+            $sql_order = ' ORDER BY t.name ASC, t.id ASC';
+        }
+
+        if ( $limit > 0 ) {
+            $sql_order .= ' LIMIT %d OFFSET %d';
+            $params[] = min( 501, max( 1, (int) $limit ) );
+            $params[] = max( 0, (int) $offset );
+        }
+
+        $results = $wpdb->get_results( $wpdb->prepare( $sql_select . $sql_where . $sql_order, ...$params ) );
+        $this->hydrateTaskCollection( $results, $tasks_table );
+
+        foreach ( $results as $task ) {
+            $task->creator_id = $task->creator_id ? (int) $task->creator_id : 0;
+        }
+
+        return $results;
+    }
+
     public function findPotentialParentTasks( $board_name, $current_task_id = 0 ) {
         global $wpdb;
 

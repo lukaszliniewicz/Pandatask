@@ -135,6 +135,72 @@ final class TaskRouteHandler {
         );
     }
 
+    /**
+     * List every task the current user can read without requiring clients to walk
+     * boards one at a time. Direct task participation is honoured for private
+     * boards, matching TaskAccessPolicy::canReadTask().
+     */
+    public function get_visible_tasks( $request ) {
+        $params = $request->get_params();
+
+        $search            = $params['search'] ?? '';
+        $sort              = $params['sort'] ?? 'deadline_asc';
+        $status_filter     = $params['status_filter'] ?? '';
+        $project_filter    = $params['project_filter'] ?? null;
+        $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : null;
+        $include_templates = ! isset( $params['include_templates'] ) || rest_sanitize_boolean( $params['include_templates'] );
+        $task_type_filter  = $params['task_type_filter'] ?? '';
+        $assigned_to_me    = isset( $params['assigned_to_me'] ) && rest_sanitize_boolean( $params['assigned_to_me'] );
+        $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 500;
+        $offset            = max( 0, (int) ( $params['offset'] ?? 0 ) );
+        $last_underscore_pos = strrpos( $sort, '_' );
+
+        if ( false !== $last_underscore_pos ) {
+            $sort_by    = substr( $sort, 0, $last_underscore_pos );
+            $sort_order = substr( $sort, $last_underscore_pos + 1 );
+        } else {
+            $sort_by    = $sort;
+            $sort_order = 'asc';
+        }
+
+        $tasks = $this->task_service->getVisibleTasksForUser(
+            get_current_user_id(),
+            $search,
+            $sort_by,
+            'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC',
+            $status_filter,
+            $archived,
+            $project_filter,
+            $include_templates,
+            $task_type_filter,
+            $assigned_to_me,
+            $limit + 1,
+            $offset
+        );
+
+        $has_more = count( $tasks ) > $limit;
+
+        if ( $has_more ) {
+            $tasks = array_slice( $tasks, 0, $limit );
+        }
+
+        RequestHelper::renderTaskCollection( $tasks );
+
+        return new WP_REST_Response(
+            array(
+                'tasks'      => $tasks,
+                'pagination' => array(
+                    'limit'       => $limit,
+                    'offset'      => $offset,
+                    'returned'    => count( $tasks ),
+                    'has_more'    => $has_more,
+                    'next_offset' => $has_more ? $offset + $limit : null,
+                ),
+            ),
+            200
+        );
+    }
+
     public function create_task( $request ) {
         $params = RequestHelper::bodyParams( $request );
 

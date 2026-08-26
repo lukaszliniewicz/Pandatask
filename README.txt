@@ -96,6 +96,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 
 == Changelog ==
 
+= 1.0.26 =
+
+* Add complete MCP work-entry management with fetch, edit, delete, task attachment, detachment, reassignment, and custom work-type tools.
+* Add a one-call visible-task listing across readable boards with permission-aware REST pagination and explicit truncation feedback.
+* Preserve historical recurring-task occurrence snapshots and creator provenance during work-entry edits, and reject allocation/duration inconsistencies.
+
 = 1.0.24 =
 
 * Add explicit, member-controlled sharing of complete personal Work Logs with selected BuddyPress groups, protected by group-level enablement and live membership checks.

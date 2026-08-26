@@ -149,6 +149,7 @@ final class WorkEntryService {
                 return new WP_Error( 'pandatask_resolved_work_locked', __( 'Reopen and re-resolve the task before editing detailed work that has already been reconciled.', 'pandatask' ), array( 'status' => 409 ) );
             }
         }
+        $replaces_allocations = array_key_exists( 'allocations', $input );
         $merged = array(
             'user_id'        => $current->user_id,
             'title'          => $current->title,
@@ -161,19 +162,12 @@ final class WorkEntryService {
             'ended_at_utc'   => $current->ended_at_utc,
             'timezone'       => $current->timezone,
             'visibility'     => $current->visibility,
-            'allocations'    => array_map(
-                static function ( $allocation ) {
-                    $target = array( 'seconds' => $allocation->seconds );
-                    if ( ! empty( $allocation->task_id_snapshot ) ) {
-                        $target['task_id'] = (int) $allocation->task_id_snapshot;
-                    } elseif ( ! empty( $allocation->board_name_snapshot ) ) {
-                        $target['board_name'] = (string) $allocation->board_name_snapshot;
-                    }
-                    return $target;
-                },
-                (array) $current->allocations
-            ),
         );
+
+        if ( $replaces_allocations ) {
+            $merged['allocations'] = $input['allocations'];
+        }
+
         $merged_input = array_merge( $merged, $input );
         $normalized = $this->normalizeEntry(
             $merged_input,
@@ -187,20 +181,35 @@ final class WorkEntryService {
             return $normalized;
         }
 
+        $old_allocations = (array) $current->allocations;
+
+        if ( ! $replaces_allocations ) {
+            $normalized['allocations'] = $this->allocationSnapshots( $old_allocations );
+            $normalized['resolution_actions'] = array();
+
+            $allocated_seconds = array_sum( array_map( 'intval', wp_list_pluck( $normalized['allocations'], 'seconds' ) ) );
+            if ( $allocated_seconds > (int) $normalized['entry']['duration_seconds'] ) {
+                return new WP_Error( 'pandatask_overallocated_work', __( 'Allocated time cannot exceed the work entry duration.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+        }
+
         if ( ! DatabaseContext::beginTransaction() ) {
             return new WP_Error( 'pandatask_transaction_failed', __( 'The work entry could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
         }
         try {
             $entry_data = $normalized['entry'];
             unset( $entry_data['created_at'] );
+            unset( $entry_data['created_by'] );
             $entry_data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
             if ( ! $this->repository->update( $entry_id, $entry_data ) ) {
                 throw new Exception( 'Work entry update failed.' );
             }
-            if ( ! $this->repository->replaceAllocations( $entry_id, $normalized['allocations'] ) ) {
+            if ( $replaces_allocations && ! $this->repository->replaceAllocations( $entry_id, $normalized['allocations'] ) ) {
                 throw new Exception( 'Work allocation update failed.' );
             }
-            foreach ( $normalized['resolution_actions'] as $action ) {
+            $new_resolution_actions = $this->newOccurrenceResolutionActions( $old_allocations, $normalized['allocations'], $normalized['resolution_actions'] );
+
+            foreach ( $new_resolution_actions as $action ) {
                 $resolution = $this->task_time_service->applySpecificAddition(
                     $action['occurrence_id'],
                     $normalized['entry']['user_id'],
@@ -213,6 +222,20 @@ final class WorkEntryService {
                     return $resolution;
                 }
             }
+            if ( $replaces_allocations ) {
+                $reconciliation = $this->reconcileChangedOccurrences(
+                    $old_allocations,
+                    $normalized['allocations'],
+                    $normalized['entry']['user_id'],
+                    $actor_id,
+                    wp_list_pluck( $new_resolution_actions, 'occurrence_id' )
+                );
+
+                if ( is_wp_error( $reconciliation ) ) {
+                    DatabaseContext::rollback();
+                    return $reconciliation;
+                }
+            }
             if ( ! $this->audit_repository->record( 'work_entry', $entry_id, 'updated', $actor_id, $current, array( 'entry' => $entry_data, 'allocations' => $normalized['allocations'] ) ) ) {
                 throw new Exception( 'Work entry audit failed.' );
             }
@@ -223,10 +246,124 @@ final class WorkEntryService {
             DatabaseContext::rollback();
             return new WP_Error( 'pandatask_work_entry_failed', __( 'The work entry could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
         }
-        $old_allocations = (array) $current->allocations;
         $this->invalidateScopes( (int) $current->user_id, $old_allocations );
         $this->invalidateScopes( $normalized['entry']['user_id'], $normalized['allocations'] );
         return $this->repository->findById( $entry_id );
+    }
+
+    /** Preserve historical allocation snapshots when an edit does not replace them. */
+    private function allocationSnapshots( array $allocations ) {
+        $fields = array(
+            'occurrence_id',
+            'seconds',
+            'task_id_snapshot',
+            'task_name_snapshot',
+            'board_name_snapshot',
+            'project_id_snapshot',
+            'project_name_snapshot',
+            'category_id_snapshot',
+            'category_name_snapshot',
+        );
+        $snapshots = array();
+
+        foreach ( $allocations as $allocation ) {
+            $snapshot = array();
+
+            foreach ( $fields as $field ) {
+                $snapshot[ $field ] = is_object( $allocation )
+                    ? ( $allocation->{$field} ?? null )
+                    : ( $allocation[ $field ] ?? null );
+            }
+
+            $snapshot['occurrence_id'] = $snapshot['occurrence_id'] ? (int) $snapshot['occurrence_id'] : null;
+            $snapshot['seconds'] = (int) $snapshot['seconds'];
+            $snapshot['task_id_snapshot'] = $snapshot['task_id_snapshot'] ? (int) $snapshot['task_id_snapshot'] : null;
+            $snapshot['project_id_snapshot'] = $snapshot['project_id_snapshot'] ? (int) $snapshot['project_id_snapshot'] : null;
+            $snapshot['category_id_snapshot'] = $snapshot['category_id_snapshot'] ? (int) $snapshot['category_id_snapshot'] : null;
+            $snapshots[] = $snapshot;
+        }
+
+        return $snapshots;
+    }
+
+    /**
+     * Resolution actions generated by normalization describe new allocations. They
+     * must not re-apply existing allocation time when an explicit replacement is
+     * merely preserving an occurrence.
+     */
+    private function newOccurrenceResolutionActions( array $old_allocations, array $new_allocations, array $resolution_actions ) {
+        $old_seconds = $this->allocationSecondsByOccurrence( $old_allocations );
+        $new_seconds = $this->allocationSecondsByOccurrence( $new_allocations );
+        $actions = array();
+
+        foreach ( $resolution_actions as $action ) {
+            $occurrence_id = (int) ( $action['occurrence_id'] ?? 0 );
+
+            if ( $occurrence_id > 0 && empty( $old_seconds[ $occurrence_id ] ) && ! empty( $new_seconds[ $occurrence_id ] ) ) {
+                $actions[] = $action;
+            }
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Reconcile an occurrence by its durable ID after replacement removes or
+     * changes detail. Calling the task-level helper here would incorrectly resolve
+     * a later recurring occurrence for the same task.
+     */
+    private function reconcileChangedOccurrences( array $old_allocations, array $new_allocations, $user_id, $actor_id, array $already_reconciled = array() ) {
+        $old_seconds = $this->allocationSecondsByOccurrence( $old_allocations );
+        $new_seconds = $this->allocationSecondsByOccurrence( $new_allocations );
+        $occurrence_ids = array_values( array_unique( array_merge( array_keys( $old_seconds ), array_keys( $new_seconds ) ) ) );
+
+        foreach ( $occurrence_ids as $occurrence_id ) {
+            if ( in_array( (int) $occurrence_id, array_map( 'intval', $already_reconciled ), true ) ) {
+                continue;
+            }
+
+            if ( (int) ( $old_seconds[ $occurrence_id ] ?? 0 ) === (int) ( $new_seconds[ $occurrence_id ] ?? 0 ) ) {
+                continue;
+            }
+
+            $summary = $this->task_time_service->getOccurrenceSummary( (int) $occurrence_id, (int) $user_id );
+            $latest = $summary['resolution'] ?? null;
+
+            if ( ! $latest || ! in_array( $latest->state, array( 'unresolved', 'resolved', 'not_tracked' ), true ) ) {
+                continue;
+            }
+
+            $result = $this->task_time_service->resolveOccurrence(
+                (int) $occurrence_id,
+                (int) $user_id,
+                null === $latest->declared_actual_seconds ? null : (int) $latest->declared_actual_seconds,
+                'not_tracked' === $latest->state,
+                (int) $actor_id
+            );
+
+            if ( is_wp_error( $result ) ) {
+                return $result;
+            }
+        }
+
+        return true;
+    }
+
+    private function allocationSecondsByOccurrence( array $allocations ) {
+        $seconds_by_occurrence = array();
+
+        foreach ( $allocations as $allocation ) {
+            $occurrence_id = is_object( $allocation ) ? (int) ( $allocation->occurrence_id ?? 0 ) : (int) ( $allocation['occurrence_id'] ?? 0 );
+
+            if ( $occurrence_id <= 0 ) {
+                continue;
+            }
+
+            $seconds = is_object( $allocation ) ? (int) ( $allocation->seconds ?? 0 ) : (int) ( $allocation['seconds'] ?? 0 );
+            $seconds_by_occurrence[ $occurrence_id ] = ( $seconds_by_occurrence[ $occurrence_id ] ?? 0 ) + $seconds;
+        }
+
+        return $seconds_by_occurrence;
     }
 
     public function deleteEntry( $entry_id, $actor_id = null ) {

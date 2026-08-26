@@ -45,13 +45,12 @@ final class BoardRepository {
 
         $tasks_table     = DatabaseContext::getDbPrefix() . 'tasks';
         $boards          = array();
-        $standard_boards = $wpdb->get_results(
+        $task_boards = $wpdb->get_results(
             "SELECT DISTINCT board_name as id, board_name as name
-             FROM {$tasks_table}
-             WHERE board_name NOT LIKE 'group_%'"
+             FROM {$tasks_table}"
         );
 
-        foreach ( $standard_boards as $board ) {
+        foreach ( $task_boards as $board ) {
             $board->name          = ucwords( str_replace( '_', ' ', $board->name ) );
             $boards[ $board->id ] = $board;
         }
