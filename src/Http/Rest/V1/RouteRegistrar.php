@@ -94,7 +94,7 @@ final class RouteRegistrar {
                         'sanitize_callback' => 'sanitize_text_field',
                     ),
                     'sort' => array(
-                        'description'       => __( 'Task sort field and direction, for example deadline_asc.', 'pandatask' ),
+                        'description'       => __( 'Task sort field and direction, for example created_at_desc.', 'pandatask' ),
                         'type'              => 'string',
                         'sanitize_callback' => 'sanitize_key',
                     ),

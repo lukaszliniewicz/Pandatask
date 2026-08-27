@@ -12,7 +12,7 @@ const BugTracker = ({ boardName, defaultAssigneeId }) => {
     
     const { data: tasks, isLoading, isError, error } = useTasks({ 
         task_type_filter: 'bug',
-        sort: 'deadline_asc' 
+        sort: 'created_at_desc'
     });
 
     const handleTaskAction = (action, task) => {

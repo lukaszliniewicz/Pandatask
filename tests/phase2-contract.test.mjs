@@ -362,6 +362,8 @@ test('Frontend cache policy and typed API boundary are centralized', () => {
 	assert.match(taskHook, /queryKeys\.tasks\.list/);
 	assert.match(taskHook, /\{ params, signal \}/);
 	assert.match(taskHook, /params\.append\( 'limit', '500' \)/);
+	const boardController = fs.readFileSync(path.join(repoRoot, 'src/hooks/useBoardController.js'), 'utf8');
+	assert.match(boardController, /sort: 'created_at_desc'/);
 });
 
 test('Large frontend surfaces keep state, models, and render sections decomposed', () => {

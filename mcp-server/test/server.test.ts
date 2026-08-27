@@ -379,6 +379,7 @@ test('task_list_visible aggregates pages with broad defaults and accurate metada
   assert.equal(calls[0]?.searchParams.get('archived'), null, 'Omitting the archive filter must include active and archived tasks.');
   assert.equal(calls[0]?.searchParams.get('include_templates'), 'true', 'Default visible task listing must include templates.');
   assert.equal(calls[0]?.searchParams.get('private_only'), null);
+  assert.equal(calls[0]?.searchParams.get('sort'), 'created_at_desc', 'Default task ordering must show newly added tasks first.');
   assert.equal(calls[1]?.searchParams.get('offset'), '2');
 
   const envelope = result.structuredContent as Record<string, unknown>;

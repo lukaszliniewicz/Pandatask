@@ -230,7 +230,7 @@ const taskListFilterFields = {
       'status_desc',
     ])
     .optional()
-    .default('deadline_asc')
+    .default('created_at_desc')
     .describe('Stable server-side task ordering.'),
   project_id: z.union([positiveId, z.literal('none')]).optional().describe('Project ID, or none for tasks without a project.'),
   archived: z.boolean().optional().default(false).describe('Return archived rather than active tasks.'),

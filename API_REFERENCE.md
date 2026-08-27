@@ -239,7 +239,7 @@ Fields available when creating or updating tasks.
 -   **Query Parameters:**
     -   `search` (string, optional): Search tasks by name, description, or assignee.
     -   `status_filter` (string, optional): `pending`, `in-progress`, `done`, `missed_deadline`, or `pending_in-progress` (default).
-    -   `sort` (string, optional): Sort field and direction separated by an underscore, e.g. `deadline_asc` (default), `priority_desc`, `created_at_asc`, `name_asc`.
+    -   `sort` (string, optional): Sort field and direction separated by an underscore, e.g. `created_at_desc` (default), `priority_desc`, `created_at_asc`, `name_asc`.
     -   `project_filter` (integer, optional): Only tasks belonging to the given project ID.
     -   `archived` (integer, optional): Set to `1` to return archived (soft-deleted) tasks instead of active ones. Default: `0`.
     -   `private_only` (string, optional): On a `user_{ID}` board, `"true"` restricts the cross-board personal view to tasks stored on that private board.

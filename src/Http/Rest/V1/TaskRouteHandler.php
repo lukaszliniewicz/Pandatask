@@ -69,7 +69,7 @@ final class TaskRouteHandler {
         $params     = $request->get_params();
 
         $search            = $params['search'] ?? '';
-        $sort              = $params['sort'] ?? 'deadline_asc';
+        $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? 'pending_in-progress';
         $project_filter    = $params['project_filter'] ?? null;
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : 0;
@@ -144,7 +144,7 @@ final class TaskRouteHandler {
         $params = $request->get_params();
 
         $search            = $params['search'] ?? '';
-        $sort              = $params['sort'] ?? 'deadline_asc';
+        $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? '';
         $project_filter    = $params['project_filter'] ?? null;
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : null;

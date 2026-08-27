@@ -12,7 +12,7 @@ import { useTasks } from './useTasks';
 
 const INITIAL_FILTERS = {
 	search: '',
-	sort: 'deadline_asc',
+	sort: 'created_at_desc',
 	status: 'pending_in-progress',
 	project: 'all',
 	onlyMyTasks: false,

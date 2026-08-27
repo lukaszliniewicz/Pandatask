@@ -199,7 +199,7 @@ async function getAllTasks(
         archived: options.archived ? 1 : 0,
         include_templates: String(options.includeTemplates ?? false),
         private_only: options.privateOnly === undefined ? undefined : String(options.privateOnly),
-        sort: 'deadline_asc',
+        sort: 'created_at_desc',
         limit,
         offset,
       },
