@@ -31,7 +31,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -890,28 +890,232 @@ export function createPandataskServer(client: PandataskClient): McpServer {
       ),
   );
 
+  const taskMoveFields = {
+    task_id: positiveId,
+    destination_board: boardName,
+    mode: z.enum(['strict', 'reset_incompatible']).optional().default('strict').describe('Strict refuses incompatible board-scoped values; reset_incompatible safely clears or filters them.'),
+    project_id: z.number().int().nonnegative().optional().describe('Optional destination project override; 0 clears it.'),
+    category_id: z.number().int().nonnegative().optional().describe('Optional destination category override; 0 clears it.'),
+    parent_task_id: z.number().int().nonnegative().optional().describe('Optional destination parent override; 0 clears it.'),
+    predecessors: idList.optional().describe('Optional destination predecessor list.'),
+    assigned_persons: idList.optional().describe('Optional destination assignee list.'),
+    supervisor_persons: idList.optional().describe('Optional destination supervisor list.'),
+    change_comment: z.string().max(2000).optional().describe('Audit-history explanation for moving the task.'),
+  };
+
+  register(
+    server,
+    'task_move_preview',
+    'Preview task move',
+    'Checks a cross-board task move against destination projects, categories, hierarchy, dependencies and people without mutating anything. Use this before a non-trivial move.',
+    z.object(taskMoveFields),
+    readOnly,
+    async (input, extra) =>
+      client.request({
+        method: 'POST',
+        path: `/tasks/${input.task_id}/move-preview`,
+        body: mutationBody(input, ['task_id']),
+        signal: extra.signal,
+      }),
+  );
+
   register(
     server,
     'task_move',
     'Move task to another board',
-    'Moves one task to a destination board. Assignment and relationship validation is enforced by Pandatask.',
-    z.object({
-      task_id: positiveId,
-      destination_board: boardName,
-      change_comment: z.string().max(2000).optional().describe('Audit-history explanation for moving the task.'),
-      dry_run: dryRunField,
-    }),
+    'Atomically moves an existing task while preserving its ID, history, comments, attachments, work and lineage. Use task_move_preview first when board-scoped metadata may be incompatible.',
+    z.object({ ...taskMoveFields, dry_run: dryRunField, idempotency_key: idempotencyKey }),
     write,
-    async ({ task_id, destination_board, change_comment, dry_run }, extra) =>
+    async (input, extra) =>
       client.mutate(
         {
-          method: 'PATCH',
-          path: `/tasks/${task_id}`,
-          body: { board_name: destination_board, ...(change_comment ? { change_comment } : {}) },
+          method: 'POST',
+          path: `/tasks/${input.task_id}/move`,
+          body: mutationBody(input, ['task_id', 'dry_run', 'idempotency_key']),
+          idempotencyKey: input.idempotency_key,
           signal: extra.signal,
         },
-        dry_run,
+        input.dry_run,
       ),
+  );
+
+  register(
+    server,
+    'task_reopen',
+    'Reopen completed task',
+    'Explicitly reopens a genuinely completed task for corrective rework. The previous completion and resolved actual remain historical facts; Pandatask creates a new work occurrence. Do not use this merely for a later related request; use follow-up work/task instead.',
+    z.object({
+      task_id: positiveId,
+      status: z.enum(['pending', 'in-progress']).optional().default('in-progress'),
+      reason: z.string().min(1).max(2000).describe('Required audit reason explaining why the original task was not truly finished or needs corrective rework.'),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => client.mutate({
+      method: 'POST',
+      path: `/tasks/${input.task_id}/reopen`,
+      body: { status: input.status, reason: input.reason },
+      idempotencyKey: input.idempotency_key,
+      signal: extra.signal,
+    }, input.dry_run),
+  );
+
+  register(
+    server,
+    'task_follow_up_list',
+    'List task follow-ups',
+    'Lists readable tasks causally created as follow-ups to a source task.',
+    z.object({ task_id: positiveId }),
+    readOnly,
+    async (input, extra) => client.request({ path: `/tasks/${input.task_id}/follow-ups`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'task_follow_up_create',
+    'Create task follow-up',
+    'Creates a new task causally linked to a completed or existing source task while leaving the source status unchanged. Use for a meaningful new deliverable rather than reopening the original.',
+    z.object({
+      task_id: positiveId.describe('Source task ID.'),
+      name: z.string().min(1).max(255).optional(),
+      description: z.string().optional(),
+      description_format: z.enum(['html', 'markdown', 'plain']).optional().default('html'),
+      board_name: boardName.optional().describe('Destination board; defaults to the source board.'),
+      priority: z.number().int().min(1).max(10).optional(),
+      project_id: z.number().int().nonnegative().optional(),
+      category_id: z.number().int().nonnegative().optional(),
+      parent_task_id: z.number().int().nonnegative().optional(),
+      start_date: clearableDate.optional(),
+      deadline: clearableDate.optional(),
+      assigned_persons: idList.optional(),
+      supervisor_persons: idList.optional(),
+      trigger: z.string().max(2000).optional().describe('Requester/date/message URL or short reason that triggered the follow-up.'),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => {
+      const body = normalizeTaskDescriptionBody(mutationBody(input, ['task_id', 'dry_run', 'idempotency_key']));
+      return client.mutate({
+        method: 'POST',
+        path: `/tasks/${input.task_id}/follow-ups`,
+        body,
+        idempotencyKey: input.idempotency_key,
+        signal: extra.signal,
+      }, input.dry_run);
+    },
+  );
+
+  register(
+    server,
+    'inbox_list',
+    'List personal inbox',
+    'Lists unclassified normal tasks in the authenticated user’s Inbox, or a delegated owner Inbox when owner_user_id is supplied. Contributor-only delegation cannot read.',
+    z.object({
+      owner_user_id: positiveId.optional(),
+      search: z.string().max(500).optional(),
+      status: z.enum(['all', 'pending', 'in-progress', 'done', 'pending_in-progress', 'missed_deadline']).optional().default('all'),
+      limit: z.number().int().min(1).max(500).optional().default(100),
+      offset: z.number().int().nonnegative().optional().default(0),
+    }),
+    readOnly,
+    async (input, extra) => client.request({
+      path: input.owner_user_id ? `/users/${input.owner_user_id}/inbox` : '/users/me/inbox',
+      query: { search: input.search, status: input.status, limit: input.limit, offset: input.offset },
+      signal: extra.signal,
+    }),
+  );
+
+  register(
+    server,
+    'inbox_capture',
+    'Capture to personal inbox',
+    'Quickly captures a normal task into the authenticated user’s Inbox, or another user’s Inbox when explicitly delegated as contributor/triager. Classification can happen later.',
+    z.object({
+      owner_user_id: positiveId.optional(),
+      name: z.string().min(1).max(255),
+      description: z.string().optional(),
+      description_format: z.enum(['html', 'markdown', 'plain']).optional().default('html'),
+      source_url: z.string().url().optional(),
+      source_title: z.string().max(255).optional(),
+      capture_source: z.string().regex(/^[a-z0-9_-]{1,32}$/).optional().default('mcp'),
+      priority: z.number().int().min(1).max(10).optional().default(5),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => {
+      const body = normalizeTaskDescriptionBody(mutationBody(input, ['owner_user_id', 'dry_run', 'idempotency_key']));
+      return client.mutate({
+        method: 'POST',
+        path: input.owner_user_id ? `/users/${input.owner_user_id}/inbox` : '/users/me/inbox',
+        body,
+        idempotencyKey: input.idempotency_key,
+        signal: extra.signal,
+      }, input.dry_run);
+    },
+  );
+
+  register(
+    server,
+    'inbox_set_state',
+    'Set inbox triage state',
+    'Marks an Inbox task untriaged or reviewed without changing its work status.',
+    z.object({
+      task_id: positiveId,
+      state: z.enum(['untriaged', 'reviewed']),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => client.mutate({
+      method: 'POST',
+      path: `/tasks/${input.task_id}/inbox-state`,
+      body: { state: input.state },
+      idempotencyKey: input.idempotency_key,
+      signal: extra.signal,
+    }, input.dry_run),
+  );
+
+  register(
+    server,
+    'inbox_shared_with_me',
+    'List delegated inboxes',
+    'Lists personal inboxes delegated to the authenticated user and whether the role permits reading or only submitting.',
+    z.object({}),
+    readOnly,
+    async (_input, extra) => client.request({ path: '/users/me/inbox/shared-with-me', signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'inbox_delegate_list',
+    'List inbox delegates',
+    'Lists people explicitly allowed to contribute to or triage the authenticated user’s personal Inbox.',
+    z.object({}),
+    readOnly,
+    async (_input, extra) => client.request({ path: '/users/me/inbox/delegates', signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'inbox_delegate_set',
+    'Set inbox delegates',
+    'Replaces the authenticated user’s explicit Inbox delegation list. contributor can submit but not read; triager can read/enrich/move subject to destination-board permissions.',
+    z.object({
+      delegates: z.array(z.object({ user_id: positiveId, role: z.enum(['contributor', 'triager']) })).max(100),
+      dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
+    }),
+    write,
+    async (input, extra) => client.mutate({
+      method: 'PUT',
+      path: '/users/me/inbox/delegates',
+      body: { delegates: input.delegates },
+      idempotencyKey: input.idempotency_key,
+      signal: extra.signal,
+    }, input.dry_run),
   );
 
   const bulkUpdateItem = z.object({ task_id: positiveId, changes: taskUpdateData });

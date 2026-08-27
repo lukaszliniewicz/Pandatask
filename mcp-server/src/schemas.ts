@@ -269,7 +269,7 @@ export const taskListVisibleInput = z.object(taskListFilterFields).extend({
 export function taskListQuery(input: z.infer<typeof taskListInput>): Record<string, string | number> {
   return {
     ...(input.search ? { search: input.search } : {}),
-    ...(input.status !== 'all' ? { status_filter: input.status } : {}),
+    status_filter: input.status,
     sort: input.sort,
     ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
     ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),
@@ -285,7 +285,7 @@ export function taskListQuery(input: z.infer<typeof taskListInput>): Record<stri
 export function taskListVisibleQuery(input: z.infer<typeof taskListVisibleInput>): Record<string, string | number> {
   return {
     ...(input.search ? { search: input.search } : {}),
-    ...(input.status !== 'all' ? { status_filter: input.status } : {}),
+    status_filter: input.status,
     sort: input.sort,
     ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
     ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),

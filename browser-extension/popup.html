@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pandatask Capture</title><link rel="stylesheet" href="style.css"></head>
+<body class="popup-page">
+  <main>
+    <form id="capture-form">
+      <label>Title<input id="title" required></label>
+      <label>Destination<select id="destination"><option value="inbox">My Inbox</option></select></label>
+      <details><summary>Details</summary>
+        <label>Note<textarea id="note" rows="4"></textarea></label>
+        <label class="check"><input id="include-selection" type="checkbox" checked> Include selected text</label>
+        <label class="check"><input id="include-url" type="checkbox" checked> Include page URL</label>
+      </details>
+      <div class="actions"><button type="button" id="settings">Settings</button><button type="submit" id="capture">Capture</button></div>
+      <p id="status" role="status"></p>
+    </form>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

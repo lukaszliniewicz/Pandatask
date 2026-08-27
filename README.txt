@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.27
+Stable tag: 1.0.28
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,9 +20,9 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 
 *   **Multiple boards** – Each shortcode instance with a unique `board_name` creates a separate board with its own tasks, categories, and projects.
 *   **Five view modes** – Compact list (with subtask tree and drag-and-drop reparenting), full list (with inline actions), Kanban (drag between columns), monthly calendar, and a dependency-aware Gantt with parent roll-ups and an unscheduled-work tray.
-*   **Five tabs** – All Tasks, Projects (grouped task view), Overview (week/month timeline), Archive (soft-deleted tasks), Report (per-period statistics).
+*   **Board and personal workspace tabs** – All Tasks, Projects, Overview, Archive, and Report on boards, with Inbox and Work Log added to personal workspaces.
 *   **Task hierarchy** – Tasks can have same-board parent-child relationships (subtasks). Subtasks inherit the parent's project, including descendant cascades when the project changes; parent board moves are blocked until children are moved or detached.
-*   **Task dependencies** – Tasks can list predecessors. A task is blocked until all predecessors are done. Completing a task auto-starts its successors.
+*   **Task dependencies and lifecycle** – Tasks can list predecessors. Completion has an explicit work-accounting boundary, while reopen, post-completion work, and causal follow-up tasks remain distinct auditable operations.
 *   **Recurring tasks** – Weekly, bi-weekly, custom weekdays, or monthly. A daily cron rolls over completed instances to the next occurrence.
 *   **Deadline management** – Fixed dates or relative duration (days after start). Per-task deadline reminders with configurable lead time.
 *   **User roles** – Assignees (responsible) and supervisors (oversight). Both receive notifications.
@@ -37,7 +37,9 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 *   **Bug tracker shortcode** – `[pandatask_bug_tracker board_name="..."]` renders a standalone bug list and submission form.
 *   **Reports** – Tab showing tasks added, completed, and missed deadlines for configurable periods, plus workload distribution per user.
 *   **AI assistant** – Admin page that generates structured prompts for LLMs based on board context (projects, categories, users, API schema). Paste the LLM's JSON response to execute batch operations.
-*   **REST API** – Full CRUD for tasks, projects, categories, and comments, plus batch execution and report endpoints.
+*   **REST API** – Full CRUD plus explicit task move/preview, lifecycle, Inbox, work-accounting, batch, and report endpoints.
+*   **Personal Inbox and quick capture** – Capture normal tasks before classifying them, delegate submit-only or triage access, and move items to writable boards without changing task identity.
+*   **Browser quick capture** – An optional Manifest V3 extension in the source repository captures the current page or selection into My Inbox or a writable board.
 *   **Caching** – Transient-based with version invalidation per board and per user. All mutations clear relevant caches.
 
 = BuddyPress integration =
@@ -95,6 +97,16 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.28 =
+
+* Add a first-class personal Inbox for frictionless quick capture, with separate triage state, contributor/triager delegation, capture provenance, and atomic movement into writable boards.
+* Add a thin Manifest V3 browser extension for capturing the current page, selected text, and source URL into My Inbox or directly into a writable board.
+* Add explicit move preview/reset semantics that preserve task identity, history, comments, attachments, work records, and follow-up lineage while validating destination-scoped metadata and permissions.
+* Add explicit Reopen, causal follow-up tasks, and post-completion follow-up work so later work does not rewrite historical completion facts or resolved occurrence time.
+* Allow task completion/time resolution to classify residual time or itemise previously unlogged work by activity and capacity while preserving exact reconciliation invariants.
+* Fix MCP/REST `status=all` semantics, protect Inbox/provenance/lineage metadata behind dedicated APIs, and refresh only open occurrence snapshots when active tasks move or are reclassified.
+* Keep the initial frontend lean by lazy-loading Inbox, completion, and completed-task lifecycle UI; main JS remains within the existing 73 KiB gzip budget.
 
 = 1.0.27 =
 

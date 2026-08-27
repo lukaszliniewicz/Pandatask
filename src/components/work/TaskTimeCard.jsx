@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useTaskWork, useWorkMutations } from '../../hooks/useWorkLog';
 import WorkEntryForm from './WorkEntryForm';
 
+const CompletionWorkBreakdownFields = React.lazy(() => import('./CompletionWorkBreakdownFields'));
+const CompletedTaskLifecycle = React.lazy(() => import('./CompletedTaskLifecycle'));
+
 const formatDuration = ( seconds ) => {
 	if ( seconds == null ) return '—';
 	const minutes = Math.round( Number( seconds ) / 60 );
@@ -21,20 +24,26 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 		Math.round( ( Number( specificSeconds || 0 ) % 3600 ) / 60 )
 	);
 	const [ notTracked, setNotTracked ] = useState( false );
+	const [ workItems, setWorkItems ] = useState( [] );
+	const [ residual, setResidual ] = useState( { activity_type: '', capacity: '' } );
 	const [ error, setError ] = useState( '' );
+
+	const actualSeconds = Math.max(
+		0,
+		Number( hours || 0 ) * 3600 + Number( minutes || 0 ) * 60
+	);
 
 	const submit = async ( event ) => {
 		event.preventDefault();
 		setError( '' );
-		const actualSeconds = Math.max(
-			0,
-			Number( hours || 0 ) * 3600 + Number( minutes || 0 ) * 60
-		);
 		try {
+			const { serializeCompletionWorkItems, serializeResidualClassification } = await import('./completionWorkModel.mjs');
 			await resolveTaskTime.mutateAsync( {
 				taskId,
 				actualSeconds: notTracked ? null : actualSeconds,
 				notTracked,
+				workItems: notTracked ? [] : serializeCompletionWorkItems( workItems, actualSeconds - Number( specificSeconds || 0 ) ),
+				residual: notTracked ? {} : serializeResidualClassification( residual ),
 			} );
 		} catch ( err ) {
 			setError(
@@ -92,6 +101,19 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 					</label>
 				</div>
 			) }
+			{ ! notTracked && (
+				<React.Suspense fallback={ null }>
+<CompletionWorkBreakdownFields
+					actualSeconds={ actualSeconds }
+					specificSeconds={ specificSeconds }
+					workItems={ workItems }
+					onWorkItemsChange={ setWorkItems }
+					residual={ residual }
+					onResidualChange={ setResidual }
+					disabled={ resolveTaskTime.isPending }
+				/>
+</React.Suspense>
+			) }
 			{ error && (
 				<div className="pandat69-error" role="alert">
 					{ error }
@@ -108,7 +130,7 @@ const TimeResolutionForm = ( { taskId, specificSeconds } ) => {
 	);
 };
 
-const TaskTimeCard = ( { task } ) => {
+const TaskTimeCard = ( { task, onNavigate } ) => {
 	const { data, isLoading } = useTaskWork( task.id );
 	const [ logging, setLogging ] = useState( false );
 	const resolution = data?.my_time?.resolution;
@@ -126,19 +148,26 @@ const TaskTimeCard = ( { task } ) => {
 	return (
 		<section className="pandat69-task-time-card">
 			<div className="pandat69-task-time-header">
-				<h3>Time</h3>
-				<button
-					type="button"
-					className="pandat69-button"
-					onClick={ () => setLogging( ( value ) => ! value ) }
-				>
-					{ logging
-						? 'Close logger'
-						: task.status === 'done'
-						? 'Log additional work'
-						: 'Add time' }
-				</button>
+				<h3>Time & lifecycle</h3>
+				<div className="pandat69-task-time-actions">
+					<button
+						type="button"
+						className="pandat69-button"
+						onClick={ () => setLogging( ( value ) => ! value ) }
+					>
+						{ logging
+							? 'Close logger'
+							: task.status === 'done'
+							? 'Log follow-up work'
+							: 'Add time' }
+					</button>
+				</div>
 			</div>
+			{ task.status === 'done' && (
+				<React.Suspense fallback={ null }>
+					<CompletedTaskLifecycle task={ task } onNavigate={ onNavigate } />
+				</React.Suspense>
+			) }
 			{ isLoading ? (
 				<div className="pandat69-loading">Loading time…</div>
 			) : (
@@ -177,6 +206,28 @@ const TaskTimeCard = ( { task } ) => {
 								<small>Other task time</small>
 							</span>
 						) }
+					{ task.status === 'done' && (
+						<>
+							<span>
+								<strong>{ formatDuration( aggregate?.original_occurrence_seconds || 0 ) }</strong>
+								<small>Original occurrence</small>
+							</span>
+							<span>
+								<strong>{ formatDuration( aggregate?.post_completion_seconds || 0 ) }</strong>
+								<small>Post-completion follow-up</small>
+							</span>
+							{ Number( aggregate?.follow_up_task_count || 0 ) > 0 && (
+								<span>
+									<strong>{ formatDuration( aggregate?.follow_up_task_seconds || 0 ) }</strong>
+									<small>Follow-up tasks</small>
+								</span>
+							) }
+							<span>
+								<strong>{ formatDuration( aggregate?.related_work_seconds || 0 ) }</strong>
+								<small>Related-work total</small>
+							</span>
+						</>
+					) }
 					<span>
 						<strong>
 							{ formatDuration( aggregate?.direct_seconds || 0 ) }

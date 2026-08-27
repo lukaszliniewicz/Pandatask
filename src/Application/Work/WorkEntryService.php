@@ -51,14 +51,35 @@ final class WorkEntryService {
     public function getTaskAggregate( $task_id ) {
         $task = $this->task_repository->findById( (int) $task_id );
         if ( ! $task ) {
-            return array( 'direct_seconds' => 0, 'including_subtasks_seconds' => 0, 'descendant_count' => 0 );
+            return array(
+                'direct_seconds' => 0,
+                'including_subtasks_seconds' => 0,
+                'descendant_count' => 0,
+                'original_occurrence_seconds' => 0,
+                'post_completion_seconds' => 0,
+                'follow_up_task_seconds' => 0,
+                'related_work_seconds' => 0,
+                'follow_up_task_count' => 0,
+            );
         }
+
         $descendants = $this->task_repository->findDescendantProjectRecords( (int) $task_id, $task->board_name );
         $descendant_ids = array_values( array_map( 'intval', wp_list_pluck( $descendants, 'id' ) ) );
+        $follow_ups = $this->task_repository->findFollowUps( (int) $task_id );
+        $follow_up_ids = $this->followUpLineageIds( (int) $task_id, $follow_ups );
+        $original_seconds = $this->repository->allocatedSecondsForTaskIdsByContext( array( (int) $task_id ), 'occurrence' );
+        $post_completion_seconds = $this->repository->allocatedSecondsForTaskIdsByContext( array( (int) $task_id ), 'post_completion' );
+        $follow_up_seconds = $this->repository->allocatedSecondsForTaskIds( $follow_up_ids );
+
         return array(
-            'direct_seconds'             => $this->repository->allocatedSecondsForTaskIds( array( (int) $task_id ) ),
-            'including_subtasks_seconds' => $this->repository->allocatedSecondsForTaskIds( array_merge( array( (int) $task_id ), $descendant_ids ) ),
-            'descendant_count'           => count( $descendant_ids ),
+            'direct_seconds'              => $this->repository->allocatedSecondsForTaskIds( array( (int) $task_id ) ),
+            'including_subtasks_seconds'  => $this->repository->allocatedSecondsForTaskIds( array_merge( array( (int) $task_id ), $descendant_ids ) ),
+            'descendant_count'            => count( $descendant_ids ),
+            'original_occurrence_seconds' => $original_seconds,
+            'post_completion_seconds'     => $post_completion_seconds,
+            'follow_up_task_seconds'      => $follow_up_seconds,
+            'related_work_seconds'        => $original_seconds + $post_completion_seconds + $follow_up_seconds,
+            'follow_up_task_count'        => count( $follow_up_ids ),
         );
     }
 
@@ -252,9 +273,34 @@ final class WorkEntryService {
     }
 
     /** Preserve historical allocation snapshots when an edit does not replace them. */
+    /** Return unique recursive follow-up lineage without traversing subtask hierarchy. */
+    private function followUpLineageIds( $source_task_id, array $direct_follow_ups = array() ) {
+        $seen = array( (int) $source_task_id => true );
+        $queue = $direct_follow_ups ?: $this->task_repository->findFollowUps( (int) $source_task_id );
+        $ids = array();
+
+        while ( $queue ) {
+            $task = array_shift( $queue );
+            $task_id = (int) ( $task->id ?? 0 );
+            if ( $task_id <= 0 || isset( $seen[ $task_id ] ) ) {
+                continue;
+            }
+            $seen[ $task_id ] = true;
+            $ids[] = $task_id;
+            foreach ( $this->task_repository->findFollowUps( $task_id ) as $child ) {
+                if ( ! isset( $seen[ (int) $child->id ] ) ) {
+                    $queue[] = $child;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
     private function allocationSnapshots( array $allocations ) {
         $fields = array(
             'occurrence_id',
+            'allocation_context',
             'seconds',
             'task_id_snapshot',
             'task_name_snapshot',
@@ -455,8 +501,16 @@ final class WorkEntryService {
                     return new WP_Error( 'rest_invalid_reference', __( 'An allocated task no longer exists.', 'pandatask' ), array( 'status' => 422 ) );
                 }
                 $occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+                $allocation_context = sanitize_key( $allocation_input['context'] ?? 'occurrence' );
+                if ( ! in_array( $allocation_context, array( 'occurrence', 'post_completion' ), true ) ) {
+                    return new WP_Error( 'rest_invalid_param', __( 'Task work context must be occurrence or post_completion.', 'pandatask' ), array( 'status' => 422 ) );
+                }
+                if ( 'post_completion' === $allocation_context && 'done' !== $task->status ) {
+                    return new WP_Error( 'pandatask_post_completion_requires_done_task', __( 'Post-completion work can only be logged against a completed task.', 'pandatask' ), array( 'status' => 422 ) );
+                }
+
                 $residual_mode = sanitize_key( $allocation_input['residual_handling'] ?? '' );
-                if ( $occurrence ) {
+                if ( $occurrence && 'post_completion' !== $allocation_context ) {
                     $validation = $this->task_time_service->validateSpecificAddition( (int) $occurrence->id, $user_id, $seconds, $residual_mode );
                     if ( is_wp_error( $validation ) ) {
                         return $validation;
@@ -468,7 +522,8 @@ final class WorkEntryService {
                     );
                 }
                 $allocations[] = array(
-                    'occurrence_id'          => $occurrence ? (int) $occurrence->id : null,
+                    'occurrence_id'          => $occurrence && 'post_completion' !== $allocation_context ? (int) $occurrence->id : null,
+                    'allocation_context'     => $allocation_context,
                     'seconds'                => $seconds,
                     'task_id_snapshot'       => $task_id,
                     'task_name_snapshot'     => $task->name,
@@ -490,6 +545,7 @@ final class WorkEntryService {
                 }
                 $allocations[] = array(
                     'occurrence_id'          => null,
+                    'allocation_context'     => 'board',
                     'seconds'                => $seconds,
                     'task_id_snapshot'       => null,
                     'task_name_snapshot'     => null,

@@ -48,6 +48,25 @@ final class WorkOccurrenceLifecycleService {
         return $this->audit_repository->record( 'task_work_occurrence', $occurrence_id, 'state_' . $state, $actor_id, $before, $after );
     }
 
+    public function refreshOpenSnapshot( $occurrence_id, $task, $actor_id = 0 ) {
+        $before = $this->repository->findById( (int) $occurrence_id );
+        if ( ! $before || 'open' !== $before->state ) {
+            return true;
+        }
+        if ( ! $this->repository->refreshOpenSnapshot( (int) $occurrence_id, $task ) ) {
+            return false;
+        }
+        $after = $this->repository->findById( (int) $occurrence_id );
+        return $this->audit_repository->record(
+            'task_work_occurrence',
+            (int) $occurrence_id,
+            'snapshot_refreshed',
+            (int) $actor_id,
+            $before,
+            $after
+        );
+    }
+
     public function setCurrentOccurrence( $task_id, $occurrence_id ) {
         return $this->repository->setCurrentOccurrence( $task_id, $occurrence_id );
     }

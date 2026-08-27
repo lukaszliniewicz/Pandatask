@@ -71,6 +71,9 @@ final class TaskRouteHandler {
         $search            = $params['search'] ?? '';
         $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? 'pending_in-progress';
+        if ( 'all' === $status_filter ) {
+            $status_filter = '';
+        }
         $project_filter    = $params['project_filter'] ?? null;
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : 0;
         $private_only      = isset( $params['private_only'] ) && rest_sanitize_boolean( $params['private_only'] );
@@ -146,6 +149,9 @@ final class TaskRouteHandler {
         $search            = $params['search'] ?? '';
         $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? '';
+        if ( 'all' === $status_filter ) {
+            $status_filter = '';
+        }
         $project_filter    = $params['project_filter'] ?? null;
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : null;
         $include_templates = ! isset( $params['include_templates'] ) || rest_sanitize_boolean( $params['include_templates'] );

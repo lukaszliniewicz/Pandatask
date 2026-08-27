@@ -3,6 +3,7 @@ export const BOARD_TABS = Object.freeze( [
 	{ id: 'projects', label: 'Projects', icon: 'folder' },
 	{ id: 'overview', label: 'Overview', icon: 'bar-chart' },
 	{ id: 'archive', label: 'Archive', icon: 'archive' },
+	{ id: 'inbox', label: 'Inbox', icon: 'inbox', userBoardOnly: true },
 	{ id: 'work', label: 'Work Log', icon: 'history', userBoardOnly: true },
 	{ id: 'report', label: 'Report', icon: 'bar-chart' },
 ] );

@@ -230,12 +230,18 @@ export const useWorkMutations = () => {
 			taskId,
 			actualSeconds = null,
 			notTracked = false,
+			workItems = [],
+			residual = {},
 		} ) => {
 			const response = await apiClient.post(
 				`tasks/${ taskId }/time-resolution`,
 				{
 					actual_seconds: actualSeconds,
 					not_tracked: notTracked,
+					...( workItems.length ? { work_items: workItems } : {} ),
+					...( Object.keys( residual || {} ).length
+						? { residual }
+						: {} ),
 				}
 			);
 			return response.time;
@@ -248,12 +254,18 @@ export const useWorkMutations = () => {
 			occurrenceId,
 			actualSeconds = null,
 			notTracked = false,
+			workItems = [],
+			residual = {},
 		} ) => {
 			const response = await apiClient.post(
 				`work-occurrences/${ occurrenceId }/time-resolution`,
 				{
 					actual_seconds: actualSeconds,
 					not_tracked: notTracked,
+					...( workItems.length ? { work_items: workItems } : {} ),
+					...( Object.keys( residual || {} ).length
+						? { residual }
+						: {} ),
 				}
 			);
 			return response.time;

@@ -65,6 +65,37 @@ final class TaskInvariantService {
             ? (int) $data['parent_task_id']
             : (int) ( $current_task->parent_task_id ?? 0 );
 
+        $follow_up_of_task_id = array_key_exists( 'follow_up_of_task_id', $data )
+            ? (int) $data['follow_up_of_task_id']
+            : (int) ( $current_task->follow_up_of_task_id ?? 0 );
+
+        if ( $follow_up_of_task_id > 0 ) {
+            $source_task = $this->task_repository->findById( $follow_up_of_task_id );
+            if ( ! $source_task || $follow_up_of_task_id === $task_id ) {
+                return new WP_Error(
+                    'rest_invalid_reference',
+                    __( 'The selected follow-up source task is invalid.', 'pandatask' ),
+                    array( 'status' => 422 )
+                );
+            }
+            $data['follow_up_of_task_id'] = $follow_up_of_task_id;
+        }
+
+        $inbox_state = array_key_exists( 'inbox_state', $data )
+            ? $data['inbox_state']
+            : ( $current_task->inbox_state ?? null );
+        if ( null !== $inbox_state && '' !== $inbox_state ) {
+            $inbox_state = sanitize_key( $inbox_state );
+            if ( ! in_array( $inbox_state, array( 'untriaged', 'reviewed' ), true ) || ! preg_match( '/^user_\d+$/', $board_name ) ) {
+                return new WP_Error(
+                    'rest_invalid_inbox_state',
+                    __( 'Inbox items must live on a personal user board and use an allowed triage state.', 'pandatask' ),
+                    array( 'status' => 422 )
+                );
+            }
+            $data['inbox_state'] = $inbox_state;
+        }
+
         if ( $parent_task_id > 0 ) {
             $parents = $this->task_repository->findBoardTaskRecordsByIds( $board_name, array( $parent_task_id ) );
             $parent = $parents[ $parent_task_id ] ?? null;

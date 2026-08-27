@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.18';
+    private const DB_VERSION = '1.0.19';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -39,6 +39,7 @@ final class DatabaseLifecycle {
         $table_work_audit_log      = $prefix . 'work_audit_log';
         $table_work_suggestion_decisions = $prefix . 'work_suggestion_decisions';
         $table_work_log_group_shares = $prefix . 'work_log_group_shares';
+        $table_inbox_delegates       = $prefix . 'inbox_delegates';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -67,6 +68,10 @@ final class DatabaseLifecycle {
             notify_days_before INT UNSIGNED NOT NULL DEFAULT 3,
             archived TINYINT(1) NOT NULL DEFAULT 0,
             parent_task_id BIGINT(20) UNSIGNED NULL,
+            follow_up_of_task_id BIGINT(20) UNSIGNED NULL,
+            inbox_state VARCHAR(20) NULL,
+            capture_source VARCHAR(32) NULL,
+            capture_url VARCHAR(2048) NULL,
             completed_at DATETIME NULL,
             is_recurring TINYINT(1) NOT NULL DEFAULT 0,
             recurrence_frequency VARCHAR(20) NULL,
@@ -96,6 +101,9 @@ final class DatabaseLifecycle {
             KEY completed_at (completed_at),
             KEY archived (archived),
             KEY parent_task_id (parent_task_id),
+            KEY follow_up_of_task_id (follow_up_of_task_id),
+            KEY inbox_state (inbox_state),
+            KEY board_inbox_created (board_name, inbox_state, created_at),
             KEY is_recurring (is_recurring),
             KEY missed_deadline_notified (missed_deadline_notified),
             KEY board_active_status_deadline (board_name, archived, status, deadline),
@@ -305,6 +313,7 @@ final class DatabaseLifecycle {
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             work_entry_id BIGINT(20) UNSIGNED NOT NULL,
             occurrence_id BIGINT(20) UNSIGNED NULL,
+            allocation_context VARCHAR(32) NOT NULL DEFAULT 'occurrence',
             seconds INT UNSIGNED NOT NULL,
             task_id_snapshot BIGINT(20) UNSIGNED NULL,
             task_name_snapshot VARCHAR(255) NULL,
@@ -318,6 +327,7 @@ final class DatabaseLifecycle {
             PRIMARY KEY  (id),
             KEY work_entry_id (work_entry_id),
             KEY occurrence_id (occurrence_id),
+            KEY allocation_context (allocation_context),
             KEY task_id_snapshot (task_id_snapshot),
             KEY board_date_scope (board_name_snapshot, work_entry_id),
             KEY project_id_snapshot (project_id_snapshot),
@@ -392,6 +402,20 @@ final class DatabaseLifecycle {
         ) $charset_collate;";
         dbDelta( $sql_work_log_group_shares );
 
+        $sql_inbox_delegates = "CREATE TABLE $table_inbox_delegates (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            owner_user_id BIGINT(20) UNSIGNED NOT NULL,
+            user_id BIGINT(20) UNSIGNED NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'contributor',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY owner_user (owner_user_id, user_id),
+            KEY user_owner (user_id, owner_user_id),
+            KEY owner_role (owner_user_id, role)
+        ) $charset_collate;";
+        dbDelta( $sql_inbox_delegates );
+
         return true;
     }
 
@@ -429,6 +453,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_audit_log',
             $prefix . 'work_suggestion_decisions',
             $prefix . 'work_log_group_shares',
+            $prefix . 'inbox_delegates',
         );
 
         foreach ( $required_tables as $table ) {
@@ -440,10 +465,16 @@ final class DatabaseLifecycle {
         $tasks_table = $prefix . 'tasks';
         $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 
-        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id' ) as $column ) {
+        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id', 'follow_up_of_task_id', 'inbox_state', 'capture_source', 'capture_url' ) as $column ) {
             if ( ! in_array( $column, $task_columns, true ) ) {
                 return false;
             }
+        }
+
+        $work_allocations_table = $prefix . 'work_allocations';
+        $work_allocation_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$work_allocations_table}" ), 'Field' );
+        if ( ! in_array( 'allocation_context', $work_allocation_columns, true ) ) {
+            return false;
         }
 
         $required_indexes = array(
@@ -454,6 +485,9 @@ final class DatabaseLifecycle {
                 'missed_deadline_queue',
                 'recurring_rollover',
                 'project_active_tasks',
+                'follow_up_of_task_id',
+                'inbox_state',
+                'board_inbox_created',
             ),
             $prefix . 'comments' => array( 'task_created_id' ),
             $prefix . 'task_history' => array( 'task_changed' ),
@@ -461,11 +495,12 @@ final class DatabaseLifecycle {
             $prefix . 'board_events' => array( 'source_activity', 'board_created', 'task_id', 'actor_id', 'event_type' ),
             $prefix . 'task_work_occurrences' => array( 'task_sequence', 'occurrence_key', 'creator_id_snapshot', 'task_state', 'board_state', 'opened_at' ),
             $prefix . 'work_entries' => array( 'source_key', 'user_date', 'activity_type', 'kind', 'deleted_at' ),
-            $prefix . 'work_allocations' => array( 'work_entry_id', 'occurrence_id', 'task_id_snapshot', 'board_date_scope', 'project_id_snapshot', 'category_id_snapshot' ),
+            $prefix . 'work_allocations' => array( 'work_entry_id', 'occurrence_id', 'allocation_context', 'task_id_snapshot', 'board_date_scope', 'project_id_snapshot', 'category_id_snapshot' ),
             $prefix . 'task_time_resolutions' => array( 'occurrence_user_revision', 'occurrence_user', 'state', 'residual_entry_id' ),
             $prefix . 'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
             $prefix . 'work_suggestion_decisions' => array( 'user_provider_external', 'user_decision', 'work_entry_id' ),
             $prefix . 'work_log_group_shares' => array( 'user_group', 'group_user', 'user_id', 'group_id' ),
+            $prefix . 'inbox_delegates' => array( 'owner_user', 'user_owner', 'owner_role' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {
@@ -501,6 +536,7 @@ final class DatabaseLifecycle {
         $history = $prefix . 'task_history';
         $occurrences = $prefix . 'task_work_occurrences';
         $time_resolutions = $prefix . 'task_time_resolutions';
+        $work_allocations = $prefix . 'work_allocations';
         $users = $wpdb->users;
 
         try {
@@ -553,6 +589,20 @@ final class DatabaseLifecycle {
                  SET child.parent_task_id = NULL, child.updated_at = UTC_TIMESTAMP()
                  WHERE child.parent_task_id IS NOT NULL
                    AND (parent.id IS NULL OR parent.board_name <> child.board_name)",
+                "UPDATE {$tasks} followup
+                 LEFT JOIN {$tasks} source ON source.id = followup.follow_up_of_task_id
+                 SET followup.follow_up_of_task_id = NULL, followup.updated_at = UTC_TIMESTAMP()
+                 WHERE followup.follow_up_of_task_id IS NOT NULL
+                   AND (source.id IS NULL OR source.id = followup.id)",
+                "UPDATE {$tasks}
+                 SET inbox_state = NULL
+                 WHERE inbox_state IS NOT NULL AND board_name NOT REGEXP '^user_[0-9]+$'",
+                "UPDATE {$work_allocations}
+                 SET allocation_context = CASE
+                    WHEN occurrence_id IS NULL AND task_id_snapshot IS NULL THEN 'board'
+                    ELSE 'occurrence'
+                 END
+                 WHERE allocation_context IS NULL OR allocation_context = '' OR (allocation_context = 'occurrence' AND occurrence_id IS NULL AND task_id_snapshot IS NULL)",
                 "UPDATE {$tasks} task
                  LEFT JOIN {$users} user_record ON user_record.ID = task.creator_id
                  SET task.creator_id = NULL

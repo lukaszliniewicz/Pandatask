@@ -257,8 +257,8 @@ if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.18', '<' ) ) {
-    $failures[] = 'Expected a loaded plugin with database schema 1.0.18 or newer.';
+if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.19', '<' ) ) {
+    $failures[] = 'Expected a loaded plugin with database schema 1.0.19 or newer.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

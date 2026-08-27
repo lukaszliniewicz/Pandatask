@@ -56,6 +56,11 @@ function get_current_user_id() {
     return 99;
 }
 
+function get_userdata( $user_id ) {
+    $user_id = (int) $user_id;
+    return $user_id > 0 ? (object) array( 'ID' => $user_id, 'display_name' => 'User ' . $user_id ) : false;
+}
+
 function user_can( $user_id, $capability ) {
     global $pandatask_test_caps;
     return ! empty( $pandatask_test_caps[ (int) $user_id ][ $capability ] );
@@ -87,11 +92,13 @@ function assert_same( $expected, $actual, $message ) {
 }
 
 require_once __DIR__ . '/../src/Application/Security/PublicBugSubmissionPolicy.php';
+require_once __DIR__ . '/../src/Application/Security/InboxAccessPolicy.php';
 require_once __DIR__ . '/../src/Application/Security/TaskAccessPolicy.php';
 require_once __DIR__ . '/../src/Application/Security/CommentAccessPolicy.php';
 
 use Pandatask\Application\Security\CommentAccessPolicy;
 use Pandatask\Application\Security\PublicBugSubmissionPolicy;
+use Pandatask\Application\Security\InboxAccessPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
 
 $pandatask_test_options['pandatask_bug_tracker_settings'] = array(
@@ -145,7 +152,13 @@ $board_policy = new class() {
     }
 };
 
-$task_policy = new TaskAccessPolicy( $task_service, $board_policy );
+$inbox_repository = new class() {
+    public function roleFor( $owner_user_id, $user_id ) {
+        return 8 === (int) $owner_user_id && 9 === (int) $user_id ? 'triager' : null;
+    }
+};
+$inbox_policy = new InboxAccessPolicy( $inbox_repository );
+$task_policy = new TaskAccessPolicy( $task_service, $board_policy, $inbox_policy );
 assert_same( true, $task_policy->canReadTask( 41, 4 ), 'Assignees should be able to read their task.' );
 assert_same( true, $task_policy->canUpdateTask( 41, 4 ), 'Assignees should be able to update their task.' );
 assert_same( false, $task_policy->canDeleteTask( 41, 4 ), 'Assignees should not automatically be able to delete tasks.' );
@@ -163,6 +176,25 @@ assert_same( true, $task_policy->canMoveTask( 41, 7 ), 'Board managers should be
 $unrelated_read_result = $task_policy->canReadTask( 41, 8 );
 assert_same( true, $unrelated_read_result instanceof WP_Error || false === $unrelated_read_result, 'Unrelated users should not receive read access.' );
 assert_same( true, $task_policy->canReadTask( 999, 4 ) instanceof WP_Error, 'Missing tasks should return a not-found error.' );
+
+$inbox_task = (object) array(
+    'id'                  => 42,
+    'board_name'          => 'user_8',
+    'creator_id'          => 8,
+    'assigned_user_ids'   => array( 8 ),
+    'supervisor_user_ids' => array(),
+    'inbox_state'         => 'untriaged',
+);
+$inbox_task_service = new class( $inbox_task ) {
+    private $task;
+    public function __construct( $task ) { $this->task = $task; }
+    public function getTaskForAuthorization( $task_id ) { return 42 === (int) $task_id ? $this->task : null; }
+};
+$inbox_task_policy = new TaskAccessPolicy( $inbox_task_service, $board_policy, $inbox_policy );
+assert_same( true, $inbox_task_policy->canReadTask( 42, 9 ), 'Inbox triagers should be able to read delegated inbox tasks.' );
+assert_same( true, $inbox_task_policy->canUpdateTask( 42, 9 ), 'Inbox triagers should be able to edit delegated inbox tasks.' );
+assert_same( true, $inbox_task_policy->canMoveTask( 42, 9 ), 'Inbox triagers should be able to initiate a move, subject to destination-board permission.' );
+assert_same( false, true === $inbox_task_policy->canDeleteTask( 42, 9 ), 'Inbox triage must not grant task deletion authority.' );
 
 $comment_service = new class() {
     public function getComment( $comment_id ) {

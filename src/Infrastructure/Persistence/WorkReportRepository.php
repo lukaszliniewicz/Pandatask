@@ -102,6 +102,19 @@ final class WorkReportRepository {
                 $end_date
             )
         );
+        $post_completion = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE entry.user_id = %d AND entry.deleted_at IS NULL
+                   AND allocation.allocation_context = 'post_completion'
+                   AND entry.work_date BETWEEN %s AND %s",
+                (int) $user_id,
+                $start_date,
+                $end_date
+            )
+        );
         $task_breakdown = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT allocation.task_id_snapshot AS id, allocation.task_name_snapshot AS name,
@@ -177,6 +190,7 @@ final class WorkReportRepository {
             'board_only_seconds'     => $board_only,
             'unallocated_seconds'    => max( 0, $total - $allocated ),
             'residual_seconds'       => $residual,
+            'post_completion_seconds' => $post_completion,
             'breakdown'              => $rows,
             'activity_breakdown'     => $rows,
             'task_breakdown'         => $task_breakdown,
@@ -237,6 +251,18 @@ final class WorkReportRepository {
                  INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
                  WHERE allocation.board_name_snapshot = %s
                    AND allocation.task_id_snapshot IS NULL
+                   AND entry.deleted_at IS NULL
+                   AND entry.work_date BETWEEN %s AND %s",
+                $board_name, $start_date, $end_date
+            )
+        );
+        $post_completion = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(allocation.seconds), 0)
+                 FROM {$allocations} allocation
+                 INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                 WHERE allocation.board_name_snapshot = %s
+                   AND allocation.allocation_context = 'post_completion'
                    AND entry.deleted_at IS NULL
                    AND entry.work_date BETWEEN %s AND %s",
                 $board_name, $start_date, $end_date
@@ -308,6 +334,7 @@ final class WorkReportRepository {
             'board_only_seconds'     => $board_only,
             'unallocated_seconds'    => 0,
             'residual_seconds'       => $residual,
+            'post_completion_seconds' => $post_completion,
             'breakdown'              => $rows,
             'activity_breakdown'     => $rows,
             'task_breakdown'         => $task_breakdown,

@@ -7,6 +7,7 @@ import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 const ReportView = lazyWithRetry(() => import('../ReportView'));
 const WorkLogView = lazyWithRetry(() => import('../WorkLogView'));
+const InboxView = lazyWithRetry(() => import('../InboxView'));
 
 const BoardContent = ({ controller }) => (
     <div className="pandat69-tabs">
@@ -41,6 +42,17 @@ const BoardContent = ({ controller }) => (
             )}
             {controller.currentTab === 'archive' && <ArchiveView onTaskAction={controller.handleTaskAction} />}
             {controller.currentTab === 'overview' && <OverviewView onTaskAction={controller.handleTaskAction} />}
+            {controller.currentTab === 'inbox' && controller.isUserBoard && (
+                <Suspense
+                    fallback={
+                        <div className="pandat69-loading" role="status">
+                            Loading Inbox…
+                        </div>
+                    }
+                >
+                    <InboxView onOpenTask={controller.openTask} />
+                </Suspense>
+            )}
             {controller.currentTab === 'work' && controller.isUserBoard && controller.workLogEnabled && (
                 <Suspense
                     fallback={

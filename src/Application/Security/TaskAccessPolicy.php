@@ -11,9 +11,12 @@ final class TaskAccessPolicy {
 
     private $board_access_policy;
 
-    public function __construct( $task_service = null, $board_access_policy = null ) {
+    private $inbox_access_policy;
+
+    public function __construct( $task_service = null, $board_access_policy = null, $inbox_access_policy = null ) {
         $this->task_service        = $task_service ?: new TaskService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
+        $this->inbox_access_policy = $inbox_access_policy ?: new InboxAccessPolicy();
     }
 
     public function canReadTask( $task_id, $user_id = null ) {
@@ -37,6 +40,10 @@ final class TaskAccessPolicy {
             return true;
         }
 
+        if ( $this->canTriageInboxTask( $task, $user_id ) ) {
+            return true;
+        }
+
         return $this->board_access_policy->canReadBoard( $task->board_name, $user_id );
     }
 
@@ -49,7 +56,7 @@ final class TaskAccessPolicy {
 
         $user_id = null === $user_id ? get_current_user_id() : (int) $user_id;
 
-        if ( user_can( $user_id, 'manage_options' ) || $this->isTaskParticipant( $task, $user_id ) ) {
+        if ( user_can( $user_id, 'manage_options' ) || $this->isTaskParticipant( $task, $user_id ) || $this->canTriageInboxTask( $task, $user_id ) ) {
             return true;
         }
 
@@ -114,7 +121,7 @@ final class TaskAccessPolicy {
 
         $user_id = null === $user_id ? get_current_user_id() : (int) $user_id;
 
-        if ( user_can( $user_id, 'manage_options' ) ) {
+        if ( user_can( $user_id, 'manage_options' ) || $this->canTriageInboxTask( $task, $user_id ) ) {
             return true;
         }
 
@@ -129,6 +136,19 @@ final class TaskAccessPolicy {
         return $this->containsUserId( $task->assigned_user_ids ?? array(), $user_id )
             || $this->containsUserId( $task->supervisor_user_ids ?? array(), $user_id )
             || ( isset( $task->creator_id ) && (int) $task->creator_id === $user_id );
+    }
+
+    private function canTriageInboxTask( $task, $user_id ) {
+        if ( empty( $task->inbox_state ) ) {
+            return false;
+        }
+
+        $owner_user_id = InboxAccessPolicy::ownerFromBoardName( $task->board_name );
+        if ( $owner_user_id <= 0 ) {
+            return false;
+        }
+
+        return true === $this->inbox_access_policy->canTriageInbox( $owner_user_id, $user_id );
     }
 
     private function containsUserId( $user_ids, $user_id ) {

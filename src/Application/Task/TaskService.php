@@ -49,24 +49,46 @@ final class TaskService {
         return $this->mutation_service->completeTask( $task_id, $completion, $change_comment, $actor_id );
     }
 
+    public function reopenTask( $task_id, $status, $reason, $actor_id = null ) {
+        $actor_id = null === $actor_id ? get_current_user_id() : (int) $actor_id;
+        $status = sanitize_key( $status );
+        $reason = sanitize_textarea_field( $reason );
+
+        if ( ! in_array( $status, array( 'pending', 'in-progress' ), true ) ) {
+            return new \WP_Error( 'rest_invalid_param', __( 'A reopened task must return to pending or in progress.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+        if ( '' === $reason ) {
+            return new \WP_Error( 'pandatask_reopen_reason_required', __( 'Explain why the completed task is being reopened.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        return $this->mutation_service->updateTask(
+            (int) $task_id,
+            array( 'status' => $status ),
+            $reason,
+            $actor_id,
+            null,
+            'reopen'
+        );
+    }
+
     public function deleteTask( $task_id, $delete_scope = null ) {
         return $this->mutation_service->deleteTask( (int) $task_id, $delete_scope );
     }
 
-    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0 ) {
+    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null ) {
         $version       = DatabaseContext::getBoardCacheVersion( $board_name, 'tasks' );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_tasks_{$board_name}_{$version}_{$args_key}";
         $cached_tasks  = get_transient( $transient_key );
 
         if ( false !== $cached_tasks ) {
-            return ProtectedAttachmentService::prepareTasks( $this->cloneTasks( $cached_tasks ) );
+            return $this->decorateWorkspaceTasksForViewer( $cached_tasks );
         }
 
-        $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id, $limit, $offset );
+        $tasks = $this->repository->findForBoard( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $user_id, $limit, $offset, $inbox_filter );
         set_transient( $transient_key, $tasks, HOUR_IN_SECONDS );
 
-        return ProtectedAttachmentService::prepareTasks( $this->cloneTasks( $tasks ) );
+        return $this->decorateWorkspaceTasksForViewer( $tasks );
     }
 
     public function getTask( $task_id ) {
@@ -88,6 +110,15 @@ final class TaskService {
         set_transient( $transient_key, $task, 12 * HOUR_IN_SECONDS );
 
         return $this->decorateTaskForViewer( $task );
+    }
+
+    public function getFollowUps( $task_id ) {
+        return $this->decorateWorkspaceTasksForViewer( $this->repository->findFollowUps( (int) $task_id ) );
+    }
+
+    public function getInboxTasks( $owner_user_id, $search = '', $status_filter = '', $limit = 100, $offset = 0 ) {
+        $tasks = $this->repository->findInboxForOwner( (int) $owner_user_id, $search, $status_filter, $limit, $offset );
+        return $this->decorateWorkspaceTasksForViewer( $tasks );
     }
 
     public function getTaskByName( $board_name, $task_name ) {
@@ -195,6 +226,7 @@ final class TaskService {
         $task->comments = $this->comment_service->getComments( $task->id, $task );
         $task->history = array();
         $task->description = $task->description ?? '';
+        $this->protectFollowUpSourceForViewer( $task, get_current_user_id() );
 
         return ProtectedAttachmentService::prepareTask( $task );
     }
@@ -209,9 +241,47 @@ final class TaskService {
             }
 
             $task->board_display_name = $display_names[ $task->board_name ];
+            $this->protectFollowUpSourceForViewer( $task, get_current_user_id() );
         }
 
         return ProtectedAttachmentService::prepareTasks( $tasks );
+    }
+
+
+    /** Keep cross-board causal lineage without exposing unreadable source details. */
+    private function protectFollowUpSourceForViewer( $task, $viewer_id ) {
+        $source_id = (int) ( $task->follow_up_of_task_id ?? 0 );
+        if ( $source_id <= 0 ) {
+            return;
+        }
+
+        $source = $this->repository->findAccessRecordById( $source_id );
+        $can_read = $source && $this->canViewerReadTaskRecord( $source, (int) $viewer_id );
+        $task->follow_up_source_restricted = ! $can_read;
+
+        if ( ! $can_read ) {
+            $task->follow_up_of_task_name = null;
+        }
+    }
+
+    private function canViewerReadTaskRecord( $task, $viewer_id ) {
+        if ( $viewer_id <= 0 ) {
+            return false;
+        }
+        if ( user_can( $viewer_id, 'manage_options' ) ) {
+            return true;
+        }
+        if ( (int) ( $task->creator_id ?? 0 ) === $viewer_id ) {
+            return true;
+        }
+        if ( in_array( $viewer_id, array_map( 'intval', (array) ( $task->assigned_user_ids ?? array() ) ), true ) ) {
+            return true;
+        }
+        if ( in_array( $viewer_id, array_map( 'intval', (array) ( $task->supervisor_user_ids ?? array() ) ), true ) ) {
+            return true;
+        }
+
+        return true === $this->board_access_policy->canReadBoard( $task->board_name, $viewer_id );
     }
 
     private function cloneTasks( $tasks ) {

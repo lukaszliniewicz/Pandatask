@@ -110,12 +110,16 @@ export const useTaskMutations = () => {
 			notTracked = false,
 			noPersonalWork = false,
 			changeComment = '',
+			workItems = [],
+			residual = {},
 		} ) => {
 			const response = await apiClient.post( `tasks/${ id }/complete`, {
 				actual_seconds: actualSeconds,
 				not_tracked: notTracked,
 				no_personal_work: noPersonalWork,
 				change_comment: changeComment,
+				...( workItems.length ? { work_items: workItems } : {} ),
+				...( Object.keys( residual || {} ).length ? { residual } : {} ),
 			} );
 			return response.task;
 		},
@@ -126,6 +130,32 @@ export const useTaskMutations = () => {
 			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
 			queryClient.invalidateQueries( {
 				queryKey: queryKeys.taskWork( id ),
+			} );
+			queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.reports.board( boardName ),
+			} );
+		},
+	} );
+
+	const reopenTask = useMutation( {
+		mutationFn: async ( { id, status = 'in-progress', reason } ) => {
+			const response = await apiClient.post( `tasks/${ id }/reopen`, {
+				status,
+				reason,
+			} );
+			return response.task;
+		},
+		onSettled: ( _, __, { id } ) => {
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.tasks.board( boardName ),
+			} );
+			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.taskWork( id ),
+			} );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.taskHistory( id ),
 			} );
 			queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } );
 			queryClient.invalidateQueries( {
@@ -188,5 +218,5 @@ export const useTaskMutations = () => {
 		},
 	} );
 
-	return { createTask, updateTask, completeTask, deleteTask };
+	return { createTask, updateTask, completeTask, reopenTask, deleteTask };
 };

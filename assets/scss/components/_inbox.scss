@@ -1,0 +1,125 @@
+.pandat69-inbox-view {
+	display: grid;
+	gap: 1rem;
+}
+
+.pandat69-inbox-header,
+.pandat69-inbox-capture-primary,
+.pandat69-inbox-toolbar,
+.pandat69-inbox-item-actions,
+.pandat69-task-time-actions,
+.pandat69-completion-residual-fields {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.pandat69-inbox-header,
+.pandat69-inbox-toolbar {
+	justify-content: space-between;
+}
+
+.pandat69-inbox-capture,
+.pandat69-inbox-delegation,
+.pandat69-inbox-item,
+.pandat69-completion-breakdown,
+.pandat69-move-preview {
+	border: 1px solid var(--pandatask-border);
+	border-radius: var(--pandatask-radius);
+	background: var(--pandatask-surface);
+	padding: 0.9rem;
+}
+
+.pandat69-inbox-capture-primary > .pandat69-input {
+	flex: 1 1 22rem;
+}
+
+.pandat69-inbox-list {
+	display: grid;
+	gap: 0.65rem;
+}
+
+.pandat69-inbox-item {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.pandat69-inbox-item.is-reviewed {
+	opacity: 0.8;
+}
+
+.pandat69-inbox-item-title,
+.pandat69-link-button {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--pandatask-primary);
+	cursor: pointer;
+	font: inherit;
+	font-weight: 600;
+	padding: 0;
+	text-align: left;
+}
+
+.pandat69-inbox-item-meta {
+	display: flex;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+	font-size: 0.85rem;
+	color: var(--pandatask-secondary);
+}
+
+.pandat69-inbox-delegate-role {
+	display: grid;
+	grid-template-columns: minmax(8rem, 1fr) minmax(13rem, 2fr);
+	align-items: center;
+	gap: 0.75rem;
+	margin: 0.6rem 0;
+}
+
+.pandat69-completion-breakdown {
+	margin: 0.75rem 0;
+}
+
+.pandat69-completion-work-item {
+	display: grid;
+	grid-template-columns: minmax(6rem, 0.7fr) minmax(10rem, 1.4fr) minmax(9rem, 1fr) auto;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 0.55rem;
+}
+
+.pandat69-completion-work-item > label:first-child {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.pandat69-completion-residual-fields {
+	margin-top: 0.75rem;
+}
+
+.pandat69-completion-residual-fields label {
+	flex: 1 1 12rem;
+}
+
+.pandat69-move-preview.is-valid {
+	border-color: var(--pandatask-success);
+}
+
+.pandat69-move-preview.has-conflicts {
+	border-color: var(--pandatask-warning);
+}
+
+@media (max-width: 640px) {
+
+	.pandat69-completion-work-item,
+	.pandat69-inbox-delegate-role {
+		grid-template-columns: 1fr;
+	}
+
+	.pandat69-inbox-capture-primary > * {
+		width: 100%;
+	}
+}

@@ -360,7 +360,7 @@ $assert(
 );
 
 $schema_source = file_get_contents( dirname( __DIR__ ) . '/src/Infrastructure/Setup/DatabaseLifecycle.php' );
-$assert( false !== strpos( $schema_source, "DB_VERSION = '1.0.18'" ), 'Database version must advance to 1.0.18 for work-log sharing.' );
+$assert( false !== strpos( $schema_source, "DB_VERSION = '1.0.19'" ), 'Database version must include the current work/inbox schema.' );
 foreach ( array( 'work_log_group_shares', 'user_group', 'group_user', 'KEY user_id', 'KEY group_id' ) as $schema_token ) {
     $assert( false !== strpos( $schema_source, $schema_token ), 'Work-log sharing schema contract is missing: ' . $schema_token );
 }

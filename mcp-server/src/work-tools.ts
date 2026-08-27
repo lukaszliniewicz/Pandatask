@@ -15,17 +15,38 @@ const activityType = z
   .regex(/^[a-z0-9_-]{1,32}$/, 'Use a lowercase activity type key from work_type_list (letters, numbers, underscores, or hyphens).')
   .describe('Activity type key. Call work_type_list first to discover built-in and custom keys; labels are not keys.');
 const residualHandling = z.enum(['refine_residual', 'additional']);
+const workCapacity = z.enum(['paid', 'volunteer', 'other']);
+const completionWorkItem = z.object({
+  duration_seconds: z.number().int().positive().describe('Seconds of previously unlogged work represented by this item.'),
+  activity_type: activityType,
+  capacity: workCapacity.optional(),
+  title: z.string().min(1).max(255).optional(),
+  notes: z.string().optional(),
+});
+const residualClassification = z.object({
+  activity_type: activityType.optional().describe('Optional classification for any remaining residual/unitemised time.'),
+  capacity: workCapacity.optional(),
+  title: z.string().min(1).max(255).optional(),
+  notes: z.string().optional(),
+});
 const workAllocation = z.object({
   task_id: positiveId.optional().describe('Task receiving this portion of the work entry.'),
   board_name: z.string().min(1).max(191).regex(/^[\w-]+$/).optional().describe('Board receiving this portion of standalone/ad-hoc work without inventing a task.'),
   seconds: z.number().int().positive().describe('Seconds allocated to this target.'),
-  residual_handling: residualHandling.optional().describe('For task allocations only, required when the task already has unitemised residual time: refine it or count this as additional work.'),
+  residual_handling: residualHandling.optional().describe('For occurrence-context task allocations only, required when the task already has unitemised residual time: refine it or count this as additional work.'),
+  context: z.enum(['occurrence', 'post_completion']).optional().describe('Use post_completion only for small factual work performed after a task was already completed; omitted means ordinary occurrence work.'),
 }).superRefine((value, context) => {
   if (Boolean(value.task_id) === Boolean(value.board_name)) {
     context.addIssue({ code: 'custom', message: 'Provide exactly one of task_id or board_name.' });
   }
   if (value.board_name && value.residual_handling) {
     context.addIssue({ code: 'custom', path: ['residual_handling'], message: 'residual_handling applies only to task allocations.' });
+  }
+  if (value.board_name && value.context && value.context !== 'occurrence') {
+    context.addIssue({ code: 'custom', path: ['context'], message: 'Task work context applies only to task allocations.' });
+  }
+  if (value.context === 'post_completion' && value.residual_handling) {
+    context.addIssue({ code: 'custom', path: ['residual_handling'], message: 'Post-completion work is outside occurrence reconciliation and must not use residual_handling.' });
   }
 });
 const workLogInput = z.object({
@@ -148,7 +169,10 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
       not_tracked: z.boolean().optional().default(false).describe('Explicitly records that actual time is unknown rather than zero.'),
       no_personal_work: z.boolean().optional().default(false).describe('Eligible non-assignee supervisors may complete without recording time for themselves.'),
       change_comment: z.string().max(2000).optional(),
+      work_items: z.array(completionWorkItem).max(20).optional().describe('Optional itemisation of the previously unlogged portion of actual time. Existing detailed work is not repeated here.'),
+      residual: residualClassification.optional().describe('Optional classification for any remaining residual time after detailed work and work_items.'),
       dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
     }).refine((value) => Boolean(value.no_personal_work) || value.not_tracked || value.actual_seconds !== undefined && value.actual_seconds !== null, {
       message: 'Provide actual_seconds, use not_tracked, or select the supervisor completion mode.',
     }),
@@ -161,7 +185,10 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
         not_tracked: Boolean(input.not_tracked),
         no_personal_work: Boolean(input.no_personal_work),
         ...(input.change_comment ? { change_comment: input.change_comment } : {}),
+        ...(input.work_items ? { work_items: input.work_items } : {}),
+        ...(input.residual ? { residual: input.residual } : {}),
       },
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
       signal: extra.signal,
     }, Boolean(input.dry_run)),
   );
@@ -175,7 +202,10 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
       task_id: positiveId,
       actual_seconds: z.number().int().nonnegative().nullable().optional().describe('Cumulative actual time for this occurrence in seconds.'),
       not_tracked: z.boolean().optional().default(false).describe('Explicitly records that actual time is unknown rather than zero.'),
+      work_items: z.array(completionWorkItem).max(20).optional().describe('Optional itemisation of previously unlogged work for this occurrence.'),
+      residual: residualClassification.optional().describe('Optional classification for any remaining residual time.'),
       dry_run: dryRunField,
+      idempotency_key: idempotencyKey,
     }).refine((value) => value.not_tracked || value.actual_seconds !== undefined && value.actual_seconds !== null, {
       message: 'Provide actual_seconds or set not_tracked=true.',
     }),
@@ -186,7 +216,10 @@ export function registerWorkTools(server: McpServer, client: PandataskClient): v
       body: {
         actual_seconds: input.actual_seconds ?? null,
         not_tracked: Boolean(input.not_tracked),
+        ...(input.work_items ? { work_items: input.work_items } : {}),
+        ...(input.residual ? { residual: input.residual } : {}),
       },
+      idempotencyKey: typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
       signal: extra.signal,
     }, Boolean(input.dry_run)),
   );

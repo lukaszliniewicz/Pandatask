@@ -164,6 +164,9 @@ Use these first to reduce model/tool round trips:
 - `project_plan` — create a project plus ordered dependency-aware tasks; dry-run previews the entire plan.
 - `task_bulk_update` — update up to 100 tasks with per-item results.
 - `task_archive_completed` — reversible board cleanup.
+- `task_move_preview` / `task_move` — preview and perform identity-preserving cross-board moves with explicit handling of incompatible board-scoped metadata.
+- `inbox_capture` / `inbox_list` — frictionless personal or delegated capture and triage before a task is classified onto a board.
+- `task_reopen` / `task_follow_up_create` — preserve completion history while distinguishing corrective rework from a genuinely new follow-up deliverable.
 - `batch_execute` — administrator-only mixed-action batch endpoint.
 
 `project_plan` validates the complete dependency graph before creating anything and publishes progress for clients that request it. Its dry-run uses explicit `$project.id` and `$tasks[n].id` placeholders. During execution:
@@ -188,7 +191,7 @@ Task descriptions are stored and returned as sanitized HTML. Task create/update 
 
 The server owns its advertised surface so profiles behave consistently across Codex, Antigravity, OpenCode, and other clients:
 
-- `core` — 34 recommended workflows and common read/write tools, including first-class task completion, incremental task-time logging, work-entry editing, work-type management, and visible-task listing.
+- `core` — 45 recommended workflows and common read/write tools, including first-class task completion, incremental task-time logging, work-entry editing, work-type management, and visible-task listing.
 - `full` — 53 non-administrator granular and workflow tools.
 - `admin` — the complete 55-tool surface, including `board_list` and `batch_execute`.
 
@@ -200,7 +203,8 @@ The `admin` profile exposes 55 tools:
 
 - Connection/directory: `connection_check`, `user_search`.
 - Boards/workflows: `board_list`, `board_list_writable`, `board_get_context`, `board_get_summary`, `board_deadline_review`, `board_get_workload`, `daily_briefing`.
-- Tasks: `task_list`, `task_list_visible`, `task_get`, `task_get_history`, `task_list_potential_parents`, `task_create`, `task_update`, `task_delete`, `task_set_status`, `task_set_archived`, `task_set_assignments`, `task_set_schedule`, `task_set_dependencies`, `task_create_subtask`, `task_move`, `task_bulk_update`, `task_archive_completed`.
+- Tasks/lifecycle: `task_list`, `task_list_visible`, `task_get`, `task_get_history`, `task_list_potential_parents`, `task_create`, `task_update`, `task_delete`, `task_set_status`, `task_set_archived`, `task_set_assignments`, `task_set_schedule`, `task_set_dependencies`, `task_create_subtask`, `task_move_preview`, `task_move`, `task_reopen`, `task_follow_up_list`, `task_follow_up_create`, `task_bulk_update`, `task_archive_completed`.
+- Inbox: `inbox_list`, `inbox_capture`, `inbox_set_state`, `inbox_shared_with_me`, `inbox_delegate_list`, `inbox_delegate_set`.
 - Work/time: `task_complete`, `task_time_log`, `task_time_resolve`, `task_work_get`, `work_log`, `work_list`, `work_get`, `work_update`, `work_delete`, `work_type_list`, `work_type_create`, `work_type_update`, `work_type_archive`, `work_report`.
 - Projects: `project_list`, `project_get`, `project_create`, `project_update`, `project_delete`, `project_plan`.
 - Categories: `category_list`, `category_create`, `category_delete`.

@@ -10,6 +10,10 @@ final class RestApi {
 
     private $work_route_registrar;
 
+    private $task_lifecycle_route_registrar;
+
+    private $inbox_route_registrar;
+
     public function __construct() {
         $permission_checker = new PermissionChecker();
         $schema_provider    = new SchemaProvider();
@@ -38,12 +42,16 @@ final class RestApi {
             $schema_provider
         );
         $this->work_route_registrar = new WorkRouteRegistrar( 'pandatask/v1', $permission_checker );
+        $this->task_lifecycle_route_registrar = new TaskLifecycleRouteRegistrar( 'pandatask/v1', $permission_checker );
+        $this->inbox_route_registrar = new InboxRouteRegistrar( 'pandatask/v1', $permission_checker );
     }
 
     public function registerRoutes() {
         IdempotencyMiddleware::register();
         $this->route_registrar->register();
         $this->work_route_registrar->register();
+        $this->task_lifecycle_route_registrar->register();
+        $this->inbox_route_registrar->register();
     }
 
     public function register_routes() {

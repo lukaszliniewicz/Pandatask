@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pandatask Quick Capture settings</title><link rel="stylesheet" href="style.css"></head>
+<body class="options-page">
+  <main>
+    <h1>Pandatask Quick Capture</h1>
+    <p>Use a dedicated WordPress Application Password. It is stored only in this browser profile's extension storage.</p>
+    <form id="settings-form">
+      <label>WordPress site URL<input id="site-url" type="url" placeholder="https://example.org" required></label>
+      <label>Username<input id="username" autocomplete="username" required></label>
+      <label>Application Password<input id="app-password" type="password" autocomplete="current-password" required></label>
+      <div class="actions"><button type="submit">Save and test</button></div>
+      <p id="status" role="status"></p>
+    </form>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

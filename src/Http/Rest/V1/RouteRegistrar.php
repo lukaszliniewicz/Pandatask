@@ -295,6 +295,54 @@ final class RouteRegistrar {
                             'required' => true,
                             'type'     => 'string',
                         ),
+                        'search' => array(
+                            'description'       => __( 'Search task names and descriptions.', 'pandatask' ),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ),
+                        'sort' => array(
+                            'description'       => __( 'Task sort field and direction, for example created_at_desc.', 'pandatask' ),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                        'status_filter' => array(
+                            'description'       => __( 'Task status filter: all, pending, in-progress, done, missed_deadline, or pending_in-progress.', 'pandatask' ),
+                            'type'              => 'string',
+                            'enum'              => array( 'all', 'pending', 'in-progress', 'done', 'missed_deadline', 'pending_in-progress' ),
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                        'project_filter' => array(
+                            'description'       => __( 'Project ID, or none for tasks without a project.', 'pandatask' ),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ),
+                        'archived' => array(
+                            'description'       => __( 'Return archived (1) or active (0) tasks.', 'pandatask' ),
+                            'type'              => 'integer',
+                            'enum'              => array( 0, 1 ),
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'assigned_to_me' => array(
+                            'description'       => __( 'Restrict to tasks assigned to the current user.', 'pandatask' ),
+                            'type'              => 'boolean',
+                            'sanitize_callback' => 'rest_sanitize_boolean',
+                        ),
+                        'private_only' => array(
+                            'description'       => __( 'For user workspaces, restrict to the private board rather than the cross-board view.', 'pandatask' ),
+                            'type'              => 'boolean',
+                            'sanitize_callback' => 'rest_sanitize_boolean',
+                        ),
+                        'include_templates' => array(
+                            'description'       => __( 'Include recurring templates.', 'pandatask' ),
+                            'type'              => 'boolean',
+                            'sanitize_callback' => 'rest_sanitize_boolean',
+                        ),
+                        'task_type_filter' => array(
+                            'description'       => __( 'Restrict to task or bug.', 'pandatask' ),
+                            'type'              => 'string',
+                            'enum'              => array( 'task', 'bug' ),
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
                         'limit'      => array(
                             'description'       => __( 'Maximum tasks returned in this page.', 'pandatask' ),
                             'type'              => 'integer',

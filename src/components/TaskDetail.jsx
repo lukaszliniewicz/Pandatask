@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTaskDetails } from '../hooks/useTaskDetails';
 import TaskComments from './task-detail/TaskComments';
 import TaskDetailDescription from './task-detail/TaskDetailDescription';
@@ -8,10 +8,12 @@ import TaskDetailSubtasks from './task-detail/TaskDetailSubtasks';
 import TaskHistory from './task-detail/TaskHistory';
 import TaskTimeCard from './work/TaskTimeCard';
 import { useConfig } from '../context/ConfigContext';
+import TaskMoveDialog from './TaskMoveDialog';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHeader = false }) => {
     const { features } = useConfig();
     const { data: task, isLoading, isError } = useTaskDetails(taskId);
+    const [isMoveOpen, setIsMoveOpen] = useState(false);
 
     if (isLoading)
         return (
@@ -40,14 +42,20 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHe
                 task={task}
                 onNavigate={handleNavigate}
                 onEdit={onEdit}
+                onMove={() => setIsMoveOpen(true)}
                 contextInModalHeader={contextInModalHeader}
             />
             <TaskDetailMetadata task={task} />
             <TaskDetailSubtasks task={task} onAddSubtask={onAddSubtask} onNavigate={handleNavigate} />
-            {features?.workLog !== false && <TaskTimeCard task={task} />}
+            {features?.workLog !== false && <TaskTimeCard task={task} onNavigate={handleNavigate} />}
             <TaskDetailDescription task={task} />
             <TaskComments task={task} />
             <TaskHistory taskId={task.id} />
+            <TaskMoveDialog
+                task={task}
+                isOpen={isMoveOpen}
+                onClose={() => setIsMoveOpen(false)}
+            />
         </article>
     );
 };

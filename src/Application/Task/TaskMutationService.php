@@ -78,6 +78,10 @@ final class TaskMutationService {
             'notify_deadline'          => isset( $data['notify_deadline'] ) ? $data['notify_deadline'] : 0,
             'notify_days_before'       => isset( $data['notify_days_before'] ) ? max( 1, min( 30, $data['notify_days_before'] ) ) : 3,
             'parent_task_id'           => ! empty( $data['parent_task_id'] ) ? $data['parent_task_id'] : null,
+            'follow_up_of_task_id'     => ! empty( $data['follow_up_of_task_id'] ) ? absint( $data['follow_up_of_task_id'] ) : null,
+            'inbox_state'              => ! empty( $data['inbox_state'] ) ? sanitize_key( $data['inbox_state'] ) : null,
+            'capture_source'           => ! empty( $data['capture_source'] ) ? substr( sanitize_key( $data['capture_source'] ), 0, 32 ) : null,
+            'capture_url'              => ! empty( $data['capture_url'] ) ? esc_url_raw( $data['capture_url'] ) : null,
             'is_recurring'             => $is_recurring,
             'recurrence_frequency'     => $is_recurring ? ( $data['recurrence_frequency'] ?? null ) : null,
             'recurrence_interval'      => $is_recurring ? ( $data['recurrence_interval'] ?? null ) : null,
@@ -242,6 +246,19 @@ final class TaskMutationService {
             return $data;
         }
 
+        if (
+            isset( $data['status'] )
+            && 'done' === $current_task->status
+            && 'done' !== $data['status']
+            && ! in_array( $lifecycle_operation, array( 'reopen', 'rollover', 'skip' ), true )
+        ) {
+            return new WP_Error(
+                'pandatask_reopen_required',
+                __( 'Completed tasks must be reopened through the explicit Reopen action so completion history is preserved.', 'pandatask' ),
+                array( 'status' => 409 )
+            );
+        }
+
         $current_project_id = $current_task->project_id ? (int) $current_task->project_id : null;
         $next_project_id = array_key_exists( 'project_id', $data ) && $data['project_id']
             ? (int) $data['project_id']
@@ -321,6 +338,10 @@ final class TaskMutationService {
             'notify_deadline',
             'notify_days_before',
             'parent_task_id',
+            'follow_up_of_task_id',
+            'inbox_state',
+            'capture_source',
+            'capture_url',
             'completed_at',
             'is_recurring',
             'recurrence_frequency',
@@ -377,10 +398,10 @@ final class TaskMutationService {
                         $update_data['deadline'] = $value;
                         $format[]                = '%s';
                     }
-                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for' ), true ) ) {
+                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for', 'inbox_state', 'capture_source', 'capture_url' ), true ) ) {
                     $update_data[ $key ] = $value;
                     $format[]            = '%s';
-                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id', 'estimated_effort_seconds' ), true ) ) {
+                } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'follow_up_of_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id', 'estimated_effort_seconds' ), true ) ) {
                     $update_data[ $key ] = ! empty( $value ) ? absint( $value ) : null;
                     $format[]            = is_null( $update_data[ $key ] ) ? '%s' : '%d';
                 } else {
@@ -561,6 +582,18 @@ final class TaskMutationService {
         }
 
         $current_occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+        $snapshot_fields = array( 'board_name', 'name', 'project_id', 'category_id', 'start_date', 'deadline', 'estimated_effort_seconds' );
+        if (
+            $current_occurrence
+            && 'open' === $current_occurrence->state
+            && array_intersect( $snapshot_fields, array_keys( $update_data ) )
+        ) {
+            $snapshot_task = $this->task_repository->findById( $task_id );
+            if ( ! $snapshot_task || ! $this->occurrence_repository->refreshOpenSnapshot( $current_occurrence->id, $snapshot_task, $actor_id ) ) {
+                throw new Exception( 'The open work occurrence snapshot could not be refreshed.' );
+            }
+            $current_occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
+        }
         $work_log_enabled = $this->feature_settings->workLogEnabled();
 
         if ( $is_completing && $current_occurrence ) {
@@ -579,7 +612,11 @@ final class TaskMutationService {
                         $completion_user_id,
                         $completion['actual_seconds'] ?? null,
                         ! empty( $completion['not_tracked'] ),
-                        $actor_id
+                        $actor_id,
+                        array(
+                            'work_items' => is_array( $completion['work_items'] ?? null ) ? $completion['work_items'] : array(),
+                            'residual'   => is_array( $completion['residual'] ?? null ) ? $completion['residual'] : array(),
+                        )
                     );
                     if ( is_wp_error( $resolution ) ) {
                         DatabaseContext::rollback();
@@ -597,12 +634,19 @@ final class TaskMutationService {
         }
 
         $is_reopening = isset( $update_data['status'] ) && 'done' !== $update_data['status'] && 'done' === $current_task->status;
-        if ( $is_reopening && $current_occurrence && ! in_array( $lifecycle_operation, array( 'rollover', 'skip' ), true ) ) {
-            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'open', $actor_id ) ) {
-                throw new Exception( 'The work occurrence could not be reopened.' );
+        if ( $is_reopening && $current_occurrence && 'reopen' === $lifecycle_operation ) {
+            $next_task = clone $current_task;
+            foreach ( $update_data as $field => $value ) {
+                $next_task->$field = $value;
             }
-            if ( $work_log_enabled && $actor_id > 0 && ! $this->task_time_service->reviseOnReopen( $task_id, $actor_id, $actor_id ) ) {
-                throw new Exception( 'The reopened task time could not be revised.' );
+            $next_occurrence_id = $this->occurrence_repository->createForTask(
+                $next_task,
+                $this->occurrence_repository->nextSequence( $task_id ),
+                'open',
+                $actor_id
+            );
+            if ( ! $next_occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $next_occurrence_id ) ) {
+                throw new Exception( 'The reopened work occurrence could not be created.' );
             }
         }
 
@@ -1107,6 +1151,7 @@ final class TaskMutationService {
             'notify_days_before',
             'archived',
             'parent_task_id',
+            'follow_up_of_task_id',
             'is_recurring',
             'recurrence_interval',
             'recurrence_anchor_day',

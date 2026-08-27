@@ -375,7 +375,7 @@ test('task_list_visible aggregates pages with broad defaults and accurate metada
   assert.equal(result.isError, undefined);
   assert.equal(calls.length, 2);
   assert.equal(calls[0]?.pathname, '/wp-json/pandatask/v1/users/me/tasks');
-  assert.equal(calls[0]?.searchParams.get('status_filter'), null, 'Default visible task listing must include every status.');
+  assert.equal(calls[0]?.searchParams.get('status_filter'), 'all', 'Default visible task listing must request every status explicitly.');
   assert.equal(calls[0]?.searchParams.get('archived'), null, 'Omitting the archive filter must include active and archived tasks.');
   assert.equal(calls[0]?.searchParams.get('include_templates'), 'true', 'Default visible task listing must include templates.');
   assert.equal(calls[0]?.searchParams.get('private_only'), null);
@@ -455,7 +455,7 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   assert.ok(coreNames.has('work_type_update'));
   assert.ok(coreNames.has('work_type_archive'));
   assert.ok(coreNames.has('work_report'));
-  assert.equal(coreNames.size, 34);
+  assert.equal(coreNames.size, 45);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 

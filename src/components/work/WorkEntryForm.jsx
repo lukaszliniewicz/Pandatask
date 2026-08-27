@@ -280,7 +280,7 @@ const WorkEntryForm = ({
 
     let payloadAllocations;
     if (task) {
-      if (isResolved && !residualHandling) {
+      if (task.status !== "done" && isResolved && !residualHandling) {
         setError(
           residualSeconds > 0
             ? "Choose whether this detail replaces existing other task time or is additional work."
@@ -292,7 +292,11 @@ const WorkEntryForm = ({
         {
           task_id: Number(task.id),
           seconds: durationSeconds,
-          ...(residualHandling ? { residual_handling: residualHandling } : {}),
+          ...(task.status === "done"
+            ? { context: "post_completion" }
+            : residualHandling
+              ? { residual_handling: residualHandling }
+              : {}),
         },
       ];
     } else {
@@ -470,7 +474,7 @@ const WorkEntryForm = ({
         </fieldset>
       )}
 
-      {task && isResolved && (
+      {task && task.status !== "done" && isResolved && (
         <div className="pandat69-form-field">
           <label htmlFor={`${formId}-residual-handling`}>
             Resolved task time

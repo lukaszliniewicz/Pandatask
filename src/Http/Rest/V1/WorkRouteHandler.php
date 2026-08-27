@@ -218,7 +218,8 @@ final class WorkRouteHandler {
             $user_id,
             $actual_seconds,
             $not_tracked,
-            $user_id
+            $user_id,
+            $this->completionOptions( $data )
         );
 
         return is_wp_error( $result )
@@ -243,7 +244,8 @@ final class WorkRouteHandler {
             get_current_user_id(),
             $actual_seconds,
             $not_tracked,
-            get_current_user_id()
+            get_current_user_id(),
+            $this->completionOptions( $data )
         );
 
         return is_wp_error( $result )
@@ -278,6 +280,8 @@ final class WorkRouteHandler {
                 'actual_seconds'           => $actual_seconds,
                 'not_tracked'              => $not_tracked,
                 'skip_personal_resolution' => $no_personal_work,
+                'work_items'               => is_array( $data['work_items'] ?? null ) ? $data['work_items'] : array(),
+                'residual'                 => is_array( $data['residual'] ?? null ) ? $data['residual'] : array(),
             ),
             sanitize_textarea_field( $data['change_comment'] ?? '' ),
             get_current_user_id()
@@ -347,6 +351,13 @@ final class WorkRouteHandler {
             absint( $request['offset'] ?? 0 )
         );
         return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    private function completionOptions( array $data ) {
+        return array(
+            'work_items' => is_array( $data['work_items'] ?? null ) ? $data['work_items'] : array(),
+            'residual'   => is_array( $data['residual'] ?? null ) ? $data['residual'] : array(),
+        );
     }
 
     private function workLogShareService() {

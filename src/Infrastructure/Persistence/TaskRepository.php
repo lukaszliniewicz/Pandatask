@@ -26,7 +26,7 @@ final class TaskRepository {
         return $count > 0;
     }
 
-    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0 ) {
+    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -37,11 +37,13 @@ final class TaskRepository {
         $projects_table    = $prefix . 'projects';
         $sql_select        = "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
-             parent.status as parent_task_status
+             parent.status as parent_task_status,
+             follow_source.name as follow_up_of_task_name
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
-             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id";
+             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
+             LEFT JOIN {$tasks_table} follow_source ON t.follow_up_of_task_id = follow_source.id";
         $sql_where         = ' WHERE t.board_name = %s AND t.archived = %d';
         $params            = array( $board_name, $archived );
 
@@ -57,6 +59,17 @@ final class TaskRepository {
         if ( ! empty( $task_type_filter ) ) {
             $sql_where .= ' AND t.task_type = %s';
             $params[]   = $task_type_filter;
+        }
+
+        if ( null !== $inbox_filter ) {
+            if ( 'any' === $inbox_filter ) {
+                $sql_where .= ' AND t.inbox_state IS NOT NULL';
+            } elseif ( 'none' === $inbox_filter ) {
+                $sql_where .= ' AND t.inbox_state IS NULL';
+            } else {
+                $sql_where .= ' AND t.inbox_state = %s';
+                $params[] = sanitize_key( $inbox_filter );
+            }
         }
 
         if ( ! empty( $search ) ) {
@@ -153,11 +166,13 @@ final class TaskRepository {
         $sql               = $wpdb->prepare(
             "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
+             follow_source.name as follow_up_of_task_name,
              creator.display_name as creator_name
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
              LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
+             LEFT JOIN {$tasks_table} follow_source ON t.follow_up_of_task_id = follow_source.id
              LEFT JOIN {$users_table} creator ON t.creator_id = creator.ID
              WHERE t.id = %d",
             $task_id
@@ -172,6 +187,56 @@ final class TaskRepository {
         $this->hydrateTaskCollection( array( $task ), $tasks_table );
 
         return $task;
+    }
+
+    /** Return active follow-up tasks that were causally created from the source task. */
+    public function findFollowUps( $task_id ) {
+        global $wpdb;
+
+        $prefix = DatabaseContext::getDbPrefix();
+        $tasks_table = $prefix . 'tasks';
+        $categories_table = $prefix . 'categories';
+        $projects_table = $prefix . 'projects';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT t.*, c.name as category_name, p.name as project_name,
+                 parent.name as parent_task_name,
+                 follow_source.name as follow_up_of_task_name
+                 FROM {$tasks_table} t
+                 LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
+                 LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
+                 LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
+                 LEFT JOIN {$tasks_table} follow_source ON t.follow_up_of_task_id = follow_source.id
+                 WHERE t.follow_up_of_task_id = %d AND t.archived = 0
+                 ORDER BY t.created_at ASC, t.id ASC",
+                (int) $task_id
+            )
+        );
+
+        $this->hydrateTaskCollection( $rows, $tasks_table );
+
+        return $rows;
+    }
+
+    public function findInboxForOwner( $owner_user_id, $search = '', $status_filter = '', $limit = 100, $offset = 0 ) {
+        return $this->findForBoard(
+            'user_' . (int) $owner_user_id,
+            $search,
+            'created_at',
+            'DESC',
+            $status_filter,
+            '',
+            '',
+            '',
+            0,
+            null,
+            false,
+            '',
+            null,
+            $limit,
+            $offset,
+            'any'
+        );
     }
 
     public function findHierarchyRecordById( $task_id ) {
@@ -248,7 +313,7 @@ final class TaskRepository {
         $assignments_table = $prefix . 'assignments';
         $task = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT t.id, t.board_name, t.creator_id
+                "SELECT t.id, t.board_name, t.creator_id, t.inbox_state, t.follow_up_of_task_id
                  FROM {$tasks_table} t
                  WHERE t.id = %d",
                 $task_id
@@ -517,6 +582,10 @@ final class TaskRepository {
             $archived
         );
 
+        // Inbox is a separate personal workflow surface. Items remain normal tasks,
+        // but do not duplicate themselves in the ordinary actionable Tasks view.
+        $sql .= ' AND t.inbox_state IS NULL';
+
         if ( ! $include_templates ) {
             $sql .= ' AND t.is_recurring = 0';
         }
@@ -592,11 +661,13 @@ final class TaskRepository {
         $projects_table    = $prefix . 'projects';
         $sql_select        = "SELECT t.*, c.name as category_name, p.name as project_name,
              parent.name as parent_task_name,
-             parent.status as parent_task_status
+             parent.status as parent_task_status,
+             follow_source.name as follow_up_of_task_name
              FROM {$tasks_table} t
              LEFT JOIN {$categories_table} c ON t.category_id = c.id AND c.board_name = t.board_name
              LEFT JOIN {$projects_table} p ON t.project_id = p.id AND p.board_name = t.board_name
-             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id";
+             LEFT JOIN {$tasks_table} parent ON t.parent_task_id = parent.id
+             LEFT JOIN {$tasks_table} follow_source ON t.follow_up_of_task_id = follow_source.id";
         $sql_where         = ' WHERE 1 = 1';
         $params            = array();
         $user_id           = (int) $user_id;

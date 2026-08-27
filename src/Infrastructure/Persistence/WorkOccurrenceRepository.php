@@ -116,6 +116,31 @@ final class WorkOccurrenceRepository {
         );
     }
 
+    /** Refresh mutable classification/schedule snapshots while an occurrence is still open. */
+    public function refreshOpenSnapshot( $occurrence_id, $task ) {
+        global $wpdb;
+        $table = DatabaseContext::getDbPrefix() . 'task_work_occurrences';
+        $data = array(
+            'creator_id_snapshot'      => ! empty( $task->creator_id ) ? (int) $task->creator_id : null,
+            'board_name_snapshot'      => $task->board_name,
+            'task_name_snapshot'       => $task->name,
+            'project_id_snapshot'      => ! empty( $task->project_id ) ? (int) $task->project_id : null,
+            'project_name_snapshot'    => $task->project_name ?? null,
+            'category_id_snapshot'     => ! empty( $task->category_id ) ? (int) $task->category_id : null,
+            'category_name_snapshot'   => $task->category_name ?? null,
+            'start_date_snapshot'      => $task->start_date ?? null,
+            'deadline_snapshot'        => $task->deadline ?? null,
+            'estimated_effort_seconds' => isset( $task->estimated_effort_seconds ) ? (int) $task->estimated_effort_seconds : null,
+            'updated_at'               => gmdate( 'Y-m-d H:i:s' ),
+        );
+
+        return false !== $wpdb->update(
+            $table,
+            $data,
+            array( 'id' => (int) $occurrence_id, 'state' => 'open' )
+        );
+    }
+
     public function setCurrentOccurrence( $task_id, $occurrence_id ) {
         global $wpdb;
         $tasks = DatabaseContext::getDbPrefix() . 'tasks';

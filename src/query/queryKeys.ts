@@ -17,6 +17,24 @@ export const queryKeys = {
 		[ ...root, 'task-history', Number( taskId ) ] as const,
 	taskWork: ( taskId: number | string ) =>
 		[ ...root, 'task-work', Number( taskId ) ] as const,
+	taskFollowUps: ( taskId: number | string ) =>
+		[ ...root, 'task-follow-ups', Number( taskId ) ] as const,
+	inbox: {
+		all: () => [ ...root, 'inbox' ] as const,
+		list: (
+			ownerUserId: number | string | null,
+			filters: Record< string, unknown > = {}
+		) =>
+			[
+				...root,
+				'inbox',
+				'list',
+				ownerUserId ? Number( ownerUserId ) : 'me',
+				filters,
+			] as const,
+		delegates: () => [ ...root, 'inbox', 'delegates' ] as const,
+		shared: () => [ ...root, 'inbox', 'shared-with-me' ] as const,
+	},
 	work: {
 		all: () => [ ...root, 'work' ] as const,
 		entries: ( filters: Record< string, unknown > = {} ) =>

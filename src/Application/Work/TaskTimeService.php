@@ -19,21 +19,24 @@ final class TaskTimeService {
     private $audit_repository;
     private $reconciler;
 
-    public function __construct( $work_repository = null, $time_repository = null, $occurrence_repository = null, $audit_repository = null, $reconciler = null ) {
+    private $work_type_service;
+
+    public function __construct( $work_repository = null, $time_repository = null, $occurrence_repository = null, $audit_repository = null, $reconciler = null, $work_type_service = null ) {
         $this->work_repository       = $work_repository ?: new WorkEntryRepository();
         $this->time_repository       = $time_repository ?: new TaskTimeRepository();
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceRepository();
         $this->audit_repository      = $audit_repository ?: new WorkAuditRepository();
         $this->reconciler            = $reconciler ?: new TimeReconciler();
+        $this->work_type_service     = $work_type_service ?: new WorkTypeService();
     }
 
-    public function resolveOccurrenceStandalone( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by ) {
+    public function resolveOccurrenceStandalone( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, array $options = array() ) {
         if ( ! DatabaseContext::beginTransaction() ) {
             return new WP_Error( 'pandatask_transaction_failed', __( 'Task time resolution could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
         try {
-            $result = $this->resolveOccurrence( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by );
+            $result = $this->resolveOccurrence( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, $options );
             if ( is_wp_error( $result ) ) {
                 DatabaseContext::rollback();
                 return $result;
@@ -48,13 +51,13 @@ final class TaskTimeService {
         }
     }
 
-    public function resolveCurrentOccurrenceStandalone( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by ) {
+    public function resolveCurrentOccurrenceStandalone( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, array $options = array() ) {
         if ( ! DatabaseContext::beginTransaction() ) {
             return new WP_Error( 'pandatask_transaction_failed', __( 'Task time resolution could not start a database transaction.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
         try {
-            $result = $this->resolveCurrentOccurrence( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by );
+            $result = $this->resolveCurrentOccurrence( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, $options );
             if ( is_wp_error( $result ) ) {
                 DatabaseContext::rollback();
                 return $result;
@@ -73,7 +76,7 @@ final class TaskTimeService {
      * Resolve a user's cumulative actual time for the task's current occurrence.
      * Must be called inside the task mutation transaction.
      */
-    public function resolveCurrentOccurrence( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by ) {
+    public function resolveCurrentOccurrence( $task_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, array $options = array() ) {
         $occurrence = $this->occurrence_repository->findCurrentForTask( (int) $task_id );
         if ( ! $occurrence ) {
             return new WP_Error( 'pandatask_occurrence_missing', __( 'The task has no active work occurrence.', 'pandatask' ), array( 'status' => 409 ) );
@@ -84,15 +87,33 @@ final class TaskTimeService {
             $user_id,
             $declared_actual_seconds,
             $not_tracked,
-            $resolved_by
+            $resolved_by,
+            $options
         );
     }
 
     /** Resolve a specific durable occurrence; callers must provide a transaction. */
-    public function resolveOccurrence( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by ) {
+    public function resolveOccurrence( $occurrence_id, $user_id, $declared_actual_seconds, $not_tracked, $resolved_by, array $options = array() ) {
         $occurrence = $this->occurrence_repository->findById( (int) $occurrence_id );
         if ( ! $occurrence ) {
             return new WP_Error( 'pandatask_occurrence_missing', __( 'The work occurrence no longer exists.', 'pandatask' ), array( 'status' => 409 ) );
+        }
+
+        $created_work_entry_ids = array();
+        if ( ! empty( $options['work_items'] ) ) {
+            if ( $not_tracked || null === $declared_actual_seconds ) {
+                return new WP_Error( 'pandatask_itemised_actual_required', __( 'Itemised completion work requires a cumulative actual time.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+            $created_work_entry_ids = $this->createCompletionWorkItems(
+                $occurrence,
+                (int) $user_id,
+                (array) $options['work_items'],
+                (int) $declared_actual_seconds,
+                (int) $resolved_by
+            );
+            if ( is_wp_error( $created_work_entry_ids ) ) {
+                return $created_work_entry_ids;
+            }
         }
 
         $specific = $this->work_repository->specificSecondsForOccurrenceUser( (int) $occurrence->id, (int) $user_id, true );
@@ -116,7 +137,7 @@ final class TaskTimeService {
             }
             $residual_entry_id = 0;
         } else {
-            $residual_entry_id = $this->saveResidualEntry( $occurrence, $user_id, $result['residual_seconds'], $resolved_by, $residual_entry_id );
+            $residual_entry_id = $this->saveResidualEntry( $occurrence, $user_id, $result['residual_seconds'], $resolved_by, $residual_entry_id, $options['residual'] ?? array() );
             if ( is_wp_error( $residual_entry_id ) ) {
                 return $residual_entry_id;
             }
@@ -138,7 +159,14 @@ final class TaskTimeService {
         if ( ! $this->audit_repository->record( 'task_time_resolution', $resolution_id, 'resolved', $resolved_by, $latest, $result ) ) {
             return new WP_Error( 'pandatask_work_audit_failed', __( 'Task time resolution could not be audited.', 'pandatask' ), array( 'status' => 500 ) );
         }
-        return array_merge( $result, array( 'resolution_id' => $resolution_id, 'occurrence_id' => (int) $occurrence->id ) );
+        return array_merge(
+            $result,
+            array(
+                'resolution_id'         => $resolution_id,
+                'occurrence_id'         => (int) $occurrence->id,
+                'created_work_entry_ids'=> $created_work_entry_ids,
+            )
+        );
     }
 
     public function canUserResolveOccurrence( $occurrence_id, $user_id ) {
@@ -340,15 +368,121 @@ final class TaskTimeService {
         );
     }
 
-    private function saveResidualEntry( $occurrence, $user_id, $seconds, $actor_id, $existing_id ) {
+    private function createCompletionWorkItems( $occurrence, $user_id, array $items, $declared_actual_seconds, $actor_id ) {
+        if ( count( $items ) > 20 ) {
+            return new WP_Error( 'rest_invalid_param', __( 'A completion can itemise at most 20 work entries.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        $existing_specific = $this->work_repository->specificSecondsForOccurrenceUser( (int) $occurrence->id, (int) $user_id, true );
+        $remaining = (int) $declared_actual_seconds - $existing_specific;
+        if ( $remaining < 0 ) {
+            return new WP_Error( 'pandatask_actual_below_specific', __( 'Actual time cannot be less than work already logged.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        $normalized = array();
+        $item_total = 0;
+        foreach ( $items as $item ) {
+            if ( ! is_array( $item ) ) {
+                return new WP_Error( 'rest_invalid_param', __( 'Each itemised work entry must be an object.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+            $seconds = absint( $item['duration_seconds'] ?? 0 );
+            $activity_type = sanitize_key( $item['activity_type'] ?? '' );
+            if ( $seconds <= 0 || ! $this->work_type_service->isActive( $activity_type, (int) $user_id ) ) {
+                return new WP_Error( 'rest_invalid_param', __( 'Each itemised entry requires positive duration and an active work type.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+            $capacity = sanitize_key( $item['capacity'] ?? '' );
+            $capacity = in_array( $capacity, array( 'paid', 'volunteer', 'other' ), true ) ? $capacity : null;
+            $normalized[] = array(
+                'duration_seconds' => $seconds,
+                'activity_type'    => $activity_type,
+                'capacity'         => $capacity,
+                'title'            => sanitize_text_field( $item['title'] ?? $this->work_type_service->label( $activity_type, (int) $user_id ) ),
+                'notes'            => isset( $item['notes'] ) ? wp_kses_post( $item['notes'] ) : null,
+            );
+            $item_total += $seconds;
+        }
+
+        if ( $item_total > $remaining ) {
+            return new WP_Error(
+                'pandatask_itemised_time_exceeds_remaining',
+                __( 'Itemised work exceeds the unlogged portion of the declared actual time.', 'pandatask' ),
+                array( 'status' => 422, 'remaining_seconds' => $remaining, 'itemised_seconds' => $item_total )
+            );
+        }
+
+        $created_ids = array();
         $now = gmdate( 'Y-m-d H:i:s' );
+        $work_date = $occurrence->completed_at ? substr( $occurrence->completed_at, 0, 10 ) : wp_date( 'Y-m-d' );
+        foreach ( $normalized as $item ) {
+            $entry_data = array(
+                'user_id'          => (int) $user_id,
+                'created_by'       => max( 0, (int) $actor_id ),
+                'title'            => $item['title'] ?: __( 'Work', 'pandatask' ),
+                'notes'            => $item['notes'],
+                'activity_type'    => $item['activity_type'],
+                'capacity'         => $item['capacity'],
+                'work_date'        => $work_date,
+                'duration_seconds' => (int) $item['duration_seconds'],
+                'kind'             => 'manual',
+                'visibility'       => 'private',
+                'created_at'       => $now,
+                'updated_at'       => $now,
+            );
+            $entry_id = $this->work_repository->insert( $entry_data );
+            if ( ! $entry_id ) {
+                return new WP_Error( 'pandatask_completion_work_failed', __( 'Itemised completion work could not be saved.', 'pandatask' ), array( 'status' => 500 ) );
+            }
+            $allocation = array(
+                'occurrence_id'          => (int) $occurrence->id,
+                'allocation_context'     => 'occurrence',
+                'seconds'                => (int) $item['duration_seconds'],
+                'task_id_snapshot'       => (int) $occurrence->task_id,
+                'task_name_snapshot'     => $occurrence->task_name_snapshot,
+                'board_name_snapshot'    => $occurrence->board_name_snapshot,
+                'project_id_snapshot'    => $occurrence->project_id_snapshot ?: null,
+                'project_name_snapshot'  => $occurrence->project_name_snapshot ?: null,
+                'category_id_snapshot'   => $occurrence->category_id_snapshot ?: null,
+                'category_name_snapshot' => $occurrence->category_name_snapshot ?: null,
+            );
+            if ( ! $this->work_repository->replaceAllocations( $entry_id, array( $allocation ) ) ) {
+                return new WP_Error( 'pandatask_completion_work_failed', __( 'Itemised completion work allocation could not be saved.', 'pandatask' ), array( 'status' => 500 ) );
+            }
+            if ( ! $this->audit_repository->record( 'work_entry', $entry_id, 'completion_item_created', $actor_id, null, array( 'entry' => $entry_data, 'allocations' => array( $allocation ) ) ) ) {
+                return new WP_Error( 'pandatask_work_audit_failed', __( 'Itemised completion work could not be audited.', 'pandatask' ), array( 'status' => 500 ) );
+            }
+            $created_ids[] = (int) $entry_id;
+        }
+
+        return $created_ids;
+    }
+
+    private function saveResidualEntry( $occurrence, $user_id, $seconds, $actor_id, $existing_id, array $classification = array() ) {
+        $now = gmdate( 'Y-m-d H:i:s' );
+        $existing_entry = $existing_id > 0 ? $this->work_repository->findById( $existing_id ) : null;
+        $activity_type = array_key_exists( 'activity_type', $classification )
+            ? sanitize_key( $classification['activity_type'] )
+            : sanitize_key( $existing_entry->activity_type ?? '' );
+        if ( $activity_type && ! $this->work_type_service->isActive( $activity_type, (int) $user_id ) && ! ( $existing_entry && $activity_type === (string) $existing_entry->activity_type ) ) {
+            return new WP_Error( 'rest_invalid_param', __( 'Choose an active work type for classified residual time.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+        $capacity = array_key_exists( 'capacity', $classification )
+            ? sanitize_key( $classification['capacity'] )
+            : sanitize_key( $existing_entry->capacity ?? '' );
+        $capacity = in_array( $capacity, array( 'paid', 'volunteer', 'other' ), true ) ? $capacity : null;
+        $title = array_key_exists( 'title', $classification )
+            ? sanitize_text_field( $classification['title'] )
+            : sanitize_text_field( $existing_entry->title ?? __( 'Other task time', 'pandatask' ) );
+        $notes = array_key_exists( 'notes', $classification )
+            ? wp_kses_post( $classification['notes'] )
+            : ( $existing_entry->notes ?? null );
+
         $entry_data = array(
             'user_id'          => (int) $user_id,
             'created_by'       => max( 0, (int) $actor_id ),
-            'title'            => __( 'Other task time', 'pandatask' ),
-            'notes'            => null,
-            'activity_type'    => null,
-            'capacity'         => null,
+            'title'            => $title ?: __( 'Other task time', 'pandatask' ),
+            'notes'            => $notes,
+            'activity_type'    => $activity_type ?: null,
+            'capacity'         => $capacity,
             'work_date'        => $occurrence->completed_at ? substr( $occurrence->completed_at, 0, 10 ) : wp_date( 'Y-m-d' ),
             'duration_seconds' => (int) $seconds,
             'kind'             => 'residual',
@@ -357,6 +491,7 @@ final class TaskTimeService {
         );
         $allocation = array(
             'occurrence_id'          => (int) $occurrence->id,
+            'allocation_context'     => 'occurrence',
             'seconds'                => (int) $seconds,
             'task_id_snapshot'       => (int) $occurrence->task_id,
             'task_name_snapshot'     => $occurrence->task_name_snapshot,

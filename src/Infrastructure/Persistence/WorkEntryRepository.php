@@ -158,6 +158,30 @@ final class WorkEntryRepository {
         );
     }
 
+    public function allocatedSecondsForTaskIdsByContext( array $task_ids, $context, $user_id = 0 ) {
+        global $wpdb;
+        $task_ids = array_values( array_unique( array_filter( array_map( 'absint', $task_ids ) ) ) );
+        if ( empty( $task_ids ) ) {
+            return 0;
+        }
+        $prefix = DatabaseContext::getDbPrefix();
+        $entries = $prefix . 'work_entries';
+        $allocations = $prefix . 'work_allocations';
+        $ids_sql = implode( ',', $task_ids );
+        $sql = "SELECT COALESCE(SUM(allocation.seconds), 0)
+                FROM {$allocations} allocation
+                INNER JOIN {$entries} entry ON entry.id = allocation.work_entry_id
+                WHERE allocation.task_id_snapshot IN ({$ids_sql})
+                  AND allocation.allocation_context = %s
+                  AND entry.deleted_at IS NULL";
+        $params = array( sanitize_key( $context ) );
+        if ( (int) $user_id > 0 ) {
+            $sql .= ' AND entry.user_id = %d';
+            $params[] = (int) $user_id;
+        }
+        return (int) $wpdb->get_var( $wpdb->prepare( $sql, ...$params ) );
+    }
+
     public function allocationSecondsForEntry( $entry_id ) {
         global $wpdb;
         $table = DatabaseContext::getDbPrefix() . 'work_allocations';
