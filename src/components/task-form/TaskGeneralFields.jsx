@@ -2,6 +2,7 @@ import React from 'react';
 import { Controller } from 'react-hook-form';
 import Icon from '../Icon';
 import TaskSelect from '../TaskSelect';
+import RichTaskDescriptionEditor from '../rich-text/RichTaskDescriptionEditor';
 
 const TaskGeneralFields = ({
     active,
@@ -79,7 +80,21 @@ const TaskGeneralFields = ({
 
         <div className="pandat69-form-field">
             <label htmlFor={`${fieldPrefix}-description`}>Description</label>
-            <textarea id={`${fieldPrefix}-description`} className="pandat69-textarea" rows="4" {...register('description')} />
+            <Controller
+                control={control}
+                name="description"
+                render={({ field: { onChange, value } }) => (
+                    <RichTaskDescriptionEditor
+                        id={`${fieldPrefix}-description`}
+                        value={value}
+                        onChange={onChange}
+                        aria-describedby={`${fieldPrefix}-description-help`}
+                    />
+                )}
+            />
+            <p id={`${fieldPrefix}-description-help`} className="pandat69-field-hint">
+                Rich text is stored as sanitized HTML. Markdown import is one-way; Mermaid diagrams remain editable.
+            </p>
         </div>
 
         <div className="pandat69-form-row">

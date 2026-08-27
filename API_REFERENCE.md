@@ -206,7 +206,7 @@ Fields available when creating or updating tasks.
 | :--- | :--- | :--- |
 | `id` | Integer | Unique ID (Read-only, required for updates) |
 | `name` | String | Task title (Required for creation) |
-| `description` | String | HTML or Text description |
+| `description` | String | Canonical sanitized HTML task description. Legacy plain/inline text remains accepted and is paragraph-formatted when rendered. |
 | `status` | String | `pending`, `in-progress`, `done` |
 | `priority` | Integer | 1 (Low) to 10 (High). Default: 5 |
 | `deadline` | String | `YYYY-MM-DD` |

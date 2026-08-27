@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.24
+Stable tag: 1.0.27
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,6 +95,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.27 =
+
+* Add a compact rich-text task-description editor with headings, lists, links, quotes, inline code, language-aware code blocks, tables, and one-way Markdown import.
+* Add editable Mermaid diagrams using the shared IARF canonical markup and strict, lazy client-side rendering with defensive SVG sanitization.
+* Preserve canonical block HTML without wpautop corruption, improve plain-text notification excerpts, and add MCP `description_format` support for HTML, Markdown, and plain-text task inputs.
 
 = 1.0.26 =
 

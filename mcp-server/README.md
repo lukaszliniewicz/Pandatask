@@ -174,6 +174,16 @@ Use these first to reduce model/tool round trips:
 
 Because dependency IDs are resolved sequentially, large plans can take longer than ordinary tools; configure a client tool timeout of at least 300 seconds.
 
+### Rich task descriptions
+
+Task descriptions are stored and returned as sanitized HTML. Task create/update inputs may also include `description_format`:
+
+- `html` - default/backward-compatible behavior; `description` is already HTML.
+- `markdown` - MCP converts Markdown to HTML before calling the REST API. Fenced `mermaid` blocks become editable canonical Mermaid figures, and fenced code keeps `language-*` metadata.
+- `plain` - MCP escapes the input and preserves paragraphs/line breaks as safe HTML.
+
+`description_format` is input metadata only and is never sent to WordPress or stored. It is supported by granular task create/update/subtask tools, task bulk updates, project plans, and task actions inside administrator batches. Mermaid init/config directives and click actions are rejected during MCP conversion.
+
 ## Tool profiles
 
 The server owns its advertised surface so profiles behave consistently across Codex, Antigravity, OpenCode, and other clients:

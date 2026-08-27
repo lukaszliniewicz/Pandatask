@@ -1,6 +1,6 @@
 {
   "name": "@iarf/pandatask-mcp-server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MCP server for managing Pandatask through its authenticated WordPress REST API",
   "license": "GPL-2.0-or-later",
   "type": "module",
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
+    "marked": "^18.0.11",
     "zod": "4.4.3"
   },
   "overrides": {

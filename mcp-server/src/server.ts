@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { PandataskApiError, PandataskClient, type JsonRecord, type MutationPreview, type RequestOptions } from './client.js';
 import { publicConfig } from './config.js';
 import { handled, PandataskWorkflowError, toolOutputSchema } from './result.js';
+import { normalizeBatchTaskDescriptions, normalizeTaskDescriptionBody } from './rich-content.js';
 import {
   batchAction,
   boardName,
@@ -30,7 +31,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.2.1';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -92,6 +93,10 @@ function boardPath(board: string, suffix: string): string {
 function mutationBody(input: Record<string, unknown>, excluded: readonly string[]): JsonRecord {
   const excludedKeys = new Set(excluded);
   return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excludedKeys.has(key) && value !== undefined));
+}
+
+function taskMutationBody(input: Record<string, unknown>, excluded: readonly string[]): JsonRecord {
+  return normalizeTaskDescriptionBody(mutationBody(input, excluded));
 }
 
 function effectiveDryRun(client: PandataskClient, input: { dry_run?: boolean }): boolean {
@@ -682,7 +687,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
         {
           method: 'POST',
           path: boardPath(input.board_name, '/tasks'),
-          body: mutationBody(input, ['board_name', 'dry_run', 'idempotency_key']),
+          body: taskMutationBody(input, ['board_name', 'dry_run', 'idempotency_key']),
           idempotencyKey: input.idempotency_key,
           signal: extra.signal,
         },
@@ -699,7 +704,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     taskUpdateData.safeExtend({ task_id: positiveId, dry_run: dryRunField }),
     write,
     async (input, extra) => {
-      const body = mutationBody(input, ['task_id', 'dry_run']);
+      const body = taskMutationBody(input, ['task_id', 'dry_run']);
       if (Object.keys(body).length === 0) throw new Error('Provide at least one task field to update.');
       if (body.status === 'done') throw new Error('Use task_complete when completing a task so actual time is resolved explicitly.');
       return client.mutate({ method: 'PATCH', path: `/tasks/${input.task_id}`, body, signal: extra.signal }, input.dry_run);
@@ -877,7 +882,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
         {
           method: 'POST',
           path: boardPath(input.board_name, '/tasks'),
-          body: mutationBody(input, ['board_name', 'dry_run', 'idempotency_key']),
+          body: taskMutationBody(input, ['board_name', 'dry_run', 'idempotency_key']),
           idempotencyKey: input.idempotency_key,
           signal: extra.signal,
         },
@@ -927,7 +932,11 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     async ({ updates, dry_run }, extra) => {
       const operations = updates.map(({ task_id, changes }) => ({
         id: task_id,
-        request: { method: 'PATCH' as const, path: `/tasks/${task_id}`, body: changes as JsonRecord },
+        request: {
+          method: 'PATCH' as const,
+          path: `/tasks/${task_id}`,
+          body: normalizeTaskDescriptionBody(changes as JsonRecord),
+        },
       }));
       if (effectiveDryRun(client, { dry_run })) {
         return { dry_run: true, requests: operations.map((item) => mutationPlan(client, item.request)) };
@@ -1102,8 +1111,9 @@ export function createPandataskServer(client: PandataskClient): McpServer {
             mutationPlan(client, projectRequest),
             ...tasks.map((task, index) => {
               const { depends_on_task_indexes, ...taskData } = task;
+              const normalizedTaskData = normalizeTaskDescriptionBody(taskData as JsonRecord);
               const symbolicBody: JsonRecord = {
-                ...taskData,
+                ...normalizedTaskData,
                 project_id: '$project.id',
                 predecessors: (depends_on_task_indexes ?? []).map((dependencyIndex) => `$tasks[${dependencyIndex}].id`),
               };
@@ -1133,8 +1143,9 @@ export function createPandataskServer(client: PandataskClient): McpServer {
       let taskFailure: { index: number; error: string } | null = null;
       for (const [index, task] of tasks.entries()) {
         const { depends_on_task_indexes = [], ...taskData } = task;
+        const normalizedTaskData = normalizeTaskDescriptionBody(taskData as JsonRecord);
         const body: JsonRecord = {
-          ...taskData,
+          ...normalizedTaskData,
           project_id: createdProjectId,
           predecessors: depends_on_task_indexes.map((dependencyIndex) => createdTaskIds[dependencyIndex] as number),
         };
@@ -1372,11 +1383,13 @@ export function createPandataskServer(client: PandataskClient): McpServer {
       idempotency_key: idempotencyKey,
     }),
     destructiveBatch,
-    async ({ actions, dry_run, idempotency_key }, extra) =>
-      client.mutate(
-        { method: 'POST', path: '/batch', body: { actions }, idempotencyKey: idempotency_key, signal: extra.signal },
+    async ({ actions, dry_run, idempotency_key }, extra) => {
+      const normalizedActions = normalizeBatchTaskDescriptions(actions);
+      return client.mutate(
+        { method: 'POST', path: '/batch', body: { actions: normalizedActions }, idempotencyKey: idempotency_key, signal: extra.signal },
         dry_run,
-      ),
+      );
+    },
   );
 
   server.registerResource(
@@ -1400,6 +1413,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
             '7. Use archive for reversible cleanup and delete only when permanent removal is intended.',
             '8. `PANDATASK_TOOL_PROFILE=core|full|admin` bounds the advertised tool surface; admin exposes administrator-only tools.',
             '9. Standard boards are scopes and appear after their first task; `group_*` and `user_*` boards follow WordPress/BuddyPress ownership.',
+            '10. Task descriptions are stored as sanitized HTML. For task create/update inputs, use `description_format=markdown` or `plain` when helpful; the MCP converts them to canonical HTML and supports fenced Mermaid diagrams.',
           ].join('\n'),
         },
       ],

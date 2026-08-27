@@ -478,3 +478,26 @@ test('Annotated task views expose project grouping and progressive disclosure co
 	assert.match(gantt, /pandat69-gantt-viewport-open/);
 	assert.match(modalLayer, /TaskDetailModalMeta/);
 });
+
+test('Task descriptions use one rich HTML and Mermaid contract across edit and read surfaces', () => {
+	const generalFields = fs.readFileSync(path.join(repoRoot, 'src/components/task-form/TaskGeneralFields.jsx'), 'utf8');
+	const editor = fs.readFileSync(path.join(repoRoot, 'src/components/rich-text/RichTaskDescriptionEditor.jsx'), 'utf8');
+	const taskItem = fs.readFileSync(path.join(repoRoot, 'src/components/TaskItem.jsx'), 'utf8');
+	const taskDetail = fs.readFileSync(path.join(repoRoot, 'src/components/task-detail/TaskDetailDescription.jsx'), 'utf8');
+	const requestHelper = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/Support/RequestHelper.php'), 'utf8');
+	const descriptionService = fs.readFileSync(path.join(repoRoot, 'src/Application/Task/TaskDescriptionService.php'), 'utf8');
+	const notifier = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Notifications/BuddyPressNotifier.php'), 'utf8');
+
+	assert.match(generalFields, /RichTaskDescriptionEditor/);
+	assert.match(editor, /convertMermaidMarkdownFences/);
+	assert.match(editor, /CodeBlock\.configure/);
+	assert.match(editor, /TableKit\.configure/);
+	assert.match(taskItem, /import\('\.\.\/rich-content\/renderMermaid'\)/);
+	assert.match(taskItem, /_rich-content\.scss/);
+	assert.match(taskDetail, /RichTaskDescription/);
+	assert.match(requestHelper, /TaskDescriptionService::render/);
+	assert.doesNotMatch(requestHelper, /wpautop\(\s*wp_kses_post/);
+	assert.match(descriptionService, /hasBlockMarkup/);
+	assert.match(descriptionService, /\[Diagram:/);
+	assert.match(notifier, /TaskDescriptionService::plainText/);
+});

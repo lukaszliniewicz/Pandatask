@@ -2,6 +2,8 @@
 
 namespace Pandatask\Http\Rest\V1\Support;
 
+use Pandatask\Application\Task\TaskDescriptionService;
+
 final class RequestHelper {
 
     public static function bodyParams( $request ) {
@@ -36,7 +38,7 @@ final class RequestHelper {
         $task->description_rendered = '';
 
         if ( ! empty( $task->description ) ) {
-            $task->description_rendered = wp_kses_post( wpautop( wp_kses_post( $task->description ) ) );
+            $task->description_rendered = TaskDescriptionService::render( $task->description );
         }
 
         return $task;

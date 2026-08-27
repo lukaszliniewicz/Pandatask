@@ -295,7 +295,7 @@ final class TaskInvariantService {
         }
 
         if ( array_key_exists( 'description', $data ) ) {
-            $data['description'] = wp_kses_post( $data['description'] );
+            $data['description'] = TaskDescriptionService::sanitize( $data['description'] );
         }
 
         if ( array_key_exists( 'bug_url', $data ) ) {

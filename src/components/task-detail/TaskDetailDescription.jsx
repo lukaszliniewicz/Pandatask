@@ -1,13 +1,13 @@
 import React from 'react';
+import RichTaskDescription from '../rich-text/RichTaskDescription';
 
 const TaskDetailDescription = ({ task }) => (
     <section className="pandat69-detail-description-box" aria-labelledby={`pandatask-description-${task.id}`}>
         <h3 id={`pandatask-description-${task.id}`}>Description</h3>
-        <div
+        <RichTaskDescription
             className="pandat69-description-content"
-            dangerouslySetInnerHTML={{
-                __html: task.description_rendered || '<em>No description provided.</em>'
-            }}
+            html={task.description_rendered || task.description}
+            emptyHtml="<em>No description provided.</em>"
         />
         {task.attachment_url && (
             <div className="pandat69-detail-attachment">

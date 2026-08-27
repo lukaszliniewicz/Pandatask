@@ -55,7 +55,11 @@ function validateDateOrder(
 
 export const taskMutableFields = {
   name: z.string().min(1).max(255).optional().describe('Short task title.'),
-  description: z.string().optional().describe('Detailed task description; HTML accepted by Pandatask is sanitized server-side.'),
+  description: z.string().optional().describe('Detailed task description. Stored/read content is canonical sanitized HTML.'),
+  description_format: z
+    .enum(['html', 'markdown', 'plain'])
+    .optional()
+    .describe('Input format for description in this operation. Defaults to html for backward compatibility; markdown and plain are converted to canonical HTML before the REST mutation.'),
   status: z.enum(['pending', 'in-progress', 'done']).optional().describe('Task workflow status.'),
   priority: z.number().int().min(1).max(10).optional().describe('Priority from 1 (lowest) to 10 (highest).'),
   estimated_effort_seconds: z.number().int().nonnegative().optional().describe('Optional expected effort in seconds.'),

@@ -5,6 +5,19 @@ const path = require('path');
 // `@wordpress/scripts` would normally look for `src/index.js`.
 module.exports = {
     ...defaultConfig,
+    module: {
+        ...defaultConfig.module,
+        rules: [
+            ...defaultConfig.module.rules,
+            {
+                test: /node_modules[\\/]mermaid[\\/]dist[\\/]mermaid\.min\.js$/,
+                type: 'asset/resource',
+                generator: {
+                    filename: 'assets/[name].[contenthash:8][ext]',
+                },
+            },
+        ],
+    },
     entry: {
         // We define 'main' as our entry point.
         // This will read `src/index.jsx` and output `build/main.js`

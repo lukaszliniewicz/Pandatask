@@ -3,6 +3,7 @@
 namespace Pandatask\Http\Rest\V1\Support;
 
 use DateTimeImmutable;
+use Pandatask\Application\Task\TaskDescriptionService;
 use WP_Error;
 
 /**
@@ -37,7 +38,7 @@ final class TaskInputNormalizer {
             'name'                      => $name,
             'status'                    => $status,
             'priority'                  => max( 1, min( 10, absint( $params['priority'] ?? 5 ) ) ),
-            'description'               => isset( $params['description'] ) ? wp_kses_post( $params['description'] ) : '',
+            'description'               => isset( $params['description'] ) ? TaskDescriptionService::sanitize( $params['description'] ) : '',
             'assigned_persons'          => RequestHelper::parseIdList( $params['assigned_persons'] ?? '' ),
             'supervisor_persons'        => RequestHelper::parseIdList( $params['supervisor_persons'] ?? '' ),
             'category_id'               => ! empty( $params['category_id'] ) ? absint( $params['category_id'] ) : null,
@@ -103,7 +104,7 @@ final class TaskInputNormalizer {
         }
 
         if ( array_key_exists( 'description', $params ) ) {
-            $data['description'] = wp_kses_post( $params['description'] );
+            $data['description'] = TaskDescriptionService::sanitize( $params['description'] );
         }
 
         if ( array_key_exists( 'status', $params ) ) {

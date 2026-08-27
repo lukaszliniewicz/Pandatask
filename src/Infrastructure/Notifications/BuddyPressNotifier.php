@@ -1,6 +1,8 @@
 <?php
 namespace Pandatask\Infrastructure\Notifications;
 
+use Pandatask\Application\Task\TaskDescriptionService;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -168,7 +170,7 @@ class BuddyPressNotifier {
                         __('%1$s mentioned you in the description of task "%2$s": %3$s', 'pandatask'),
                         $mentioner_name,
                         $task->name,
-                        '"' . wp_trim_words(strip_tags($task->description), 15, '...') . '"'
+                        '"' . wp_trim_words( TaskDescriptionService::plainText( $task->description ), 15, '...' ) . '"'
                     );
                 } else {
                     /* translators: 1: Mentioner's display name, 2: Task name. */

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTaskStatusTransition } from '../context/CompletionContext';
 import { parseDate } from '../utils';
 import Icon from './Icon';
@@ -8,6 +8,9 @@ const TaskItem = ({ task, onAction }) => {
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [showDescription, setShowDescription] = useState(false);
     const dropdownRef = useRef(null);
+    const descriptionRef = useRef(null);
+    const descriptionHtml = task.description_rendered || task.description || '';
+    const hasDescription = Boolean(descriptionHtml);
 
     useEffect(() => {
         if (!showStatusDropdown) return undefined;
@@ -20,6 +23,26 @@ const TaskItem = ({ task, onAction }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showStatusDropdown]);
+
+    useEffect(() => {
+        if (!showDescription || !descriptionRef.current) return undefined;
+        let cancelled = false;
+        const root = descriptionRef.current;
+
+        Promise.all([
+            import('../../assets/scss/components/_rich-content.scss'),
+            import('../rich-content/renderMermaid'),
+        ]).then(([, { renderMermaidFigures }]) => {
+            if (!cancelled) return renderMermaidFigures(root);
+            return undefined;
+        }).catch((error) => {
+            if (!cancelled) console.error('Failed to render rich task description:', error);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [descriptionHtml, showDescription]);
 
     const handleStatusChange = async (newStatus) => {
         if (isPending) return;
@@ -56,8 +79,6 @@ const TaskItem = ({ task, onAction }) => {
         e.stopPropagation();
         if (onAction) onAction(action, task);
     };
-
-    const hasDescription = !!(task.description || task.description_rendered);
 
     return (
         <li className={itemClasses} data-task-id={task.id}>
@@ -137,7 +158,7 @@ const TaskItem = ({ task, onAction }) => {
                 {showDescription && hasDescription && (
                     <div className="pandat69-task-description" style={{ marginTop: '15px', padding: '15px', background: '#f5f7fa', borderRadius: '4px', border: '1px solid #e0e5eb' }}>
                         <h4>Description</h4>
-                        <div dangerouslySetInnerHTML={{ __html: task.description_rendered || task.description }} />
+                        <div ref={descriptionRef} dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
                     </div>
                 )}
             </div>
