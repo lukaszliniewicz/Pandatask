@@ -73,7 +73,13 @@ final class InboxService {
             }
         }
 
-        $task_id = $this->mutation_service->createTask( $data );
+        $task_id = $this->mutation_service->createTask(
+            $data,
+            array(
+                'actor_id'   => (int) $actor_id,
+                'creator_id' => (int) $owner_user_id,
+            )
+        );
         if ( is_wp_error( $task_id ) ) {
             return $task_id;
         }

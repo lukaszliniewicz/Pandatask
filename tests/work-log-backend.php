@@ -244,7 +244,9 @@ $fake_report_repository = new class {
     }
 };
 $fake_entry_repository = new class {
+    public $calls = array();
     public function findForUser( $user_id, $start_date, $end_date, $limit, $offset ) {
+        $this->calls[] = array( (int) $limit, (int) $offset );
         return array(
             (object) array(
                 'id'               => 81,
@@ -319,6 +321,8 @@ $assert( ! is_wp_error( $presenters ) && 2 === count( $presenters['presenters'] 
 $assert( 1 === $fake_report_repository->batch_calls, 'Group presenter totals must be fetched with one batched aggregate query.' );
 $owner_log = $share_service->groupOwnerLog( 10, 7, '2026-08-01', '2026-08-31' );
 $assert( ! is_wp_error( $owner_log ) && isset( $owner_log['activity_types'], $owner_log['entries'], $owner_log['report'] ), 'Shared owner response is missing a required section.' );
+$assert( array( 201, 0 ) === $fake_entry_repository->calls[0], 'Shared owner log must query one look-ahead row for pagination.' );
+$assert( array( 'limit' => 200, 'offset' => 0, 'returned' => 1, 'has_more' => false, 'next_offset' => null ) === $owner_log['pagination'], 'Shared owner pagination metadata must describe a terminal page.' );
 $assert( ! array_key_exists( 'unresolved', $owner_log['report'] ) && ! array_key_exists( 'action', $owner_log['report'] ), 'Shared reports must omit unresolved/action state.' );
 $shared_entry = $owner_log['entries'][0];
 $assert( 'Shared entry' === $shared_entry['title'] && 'Visible detail' === $shared_entry['notes'], 'Shared entries must retain member-visible work-log detail.' );
@@ -329,6 +333,27 @@ foreach ( array( 'created_by', 'source_key', 'source_url', 'visibility', 'delete
 foreach ( array( 'id', 'work_entry_id', 'occurrence_id' ) as $private_allocation_key ) {
     $assert( ! array_key_exists( $private_allocation_key, $shared_entry['allocations'][0] ), 'Shared allocations must omit private/internal field: ' . $private_allocation_key );
 }
+$paginated_entry_repository = new class {
+    public $calls = array();
+    public function findForUser( $user_id, $start_date, $end_date, $limit, $offset ) {
+        $this->calls[] = array( (int) $limit, (int) $offset );
+        $rows = array();
+        for ( $index = 1; $index <= 4; $index++ ) {
+            $rows[] = (object) array(
+                'id'         => $index,
+                'user_id'    => (int) $user_id,
+                'title'      => 'Page entry ' . $index,
+                'allocations' => array(),
+            );
+        }
+        return array_slice( $rows, (int) $offset, (int) $limit );
+    }
+};
+$paginated_share_service = new WorkLogShareService( $share_repository, $fake_report_repository, $paginated_entry_repository, $fake_work_types, $feature_on, $share_policy );
+$paginated_owner_log = $paginated_share_service->groupOwnerLog( 10, 7, '2026-08-01', '2026-08-31', 2, 1 );
+$assert( ! is_wp_error( $paginated_owner_log ) && 2 === count( $paginated_owner_log['entries'] ), 'Shared owner pagination must return only the requested page size.' );
+$assert( array( 3, 1 ) === $paginated_entry_repository->calls[0], 'Shared owner pagination must request one look-ahead row at the requested offset.' );
+$assert( array( 'limit' => 2, 'offset' => 1, 'returned' => 2, 'has_more' => true, 'next_offset' => 3 ) === $paginated_owner_log['pagination'], 'Shared owner pagination metadata must expose the next page offset.' );
 
 $GLOBALS['pandatask_registered_routes'] = array();
 if ( ! function_exists( 'register_rest_route' ) ) {

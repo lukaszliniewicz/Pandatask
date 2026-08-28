@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import {
     buildAllocationPayload,
@@ -21,6 +22,26 @@ import {
     workLogCsv,
     workLogRangeForPreset,
 } from '../src/workLogUiModel.mjs';
+
+const workLogHookSource = fs.readFileSync(
+    new URL('../src/hooks/useWorkLog.js', import.meta.url),
+    'utf8',
+);
+
+test('shared work-log pagination follows explicit metadata with a legacy fallback', () => {
+    assert.match(workLogHookSource, /const pagination = lastPage\?\.pagination/);
+    assert.match(workLogHookSource, /typeof pagination\.has_more === 'boolean'/);
+    assert.match(workLogHookSource, /pagination\.next_offset/);
+    assert.match(workLogHookSource, /lastPage\.entries\s*\|\|\s*\[\]\s*\)\.length === pageSize/);
+});
+
+test('work-log mutations invalidate cached old and new task allocations', () => {
+    assert.match(workLogHookSource, /queryClient\.getQueriesData/);
+    assert.match(workLogHookSource, /taskIdsForCachedEntry/);
+    assert.match(workLogHookSource, /context\?\.taskIds/);
+    assert.match(workLogHookSource, /taskIdsFromAllocations\( entry\?\.allocations \)/);
+    assert.match(workLogHookSource, /taskIdsFromAllocations\( previousAllocations \)/);
+});
 
 test('personal work-log tab availability comes from the canonical board tab model', () => {
     assert.equal(isBoardTabAvailable('work', true), true);

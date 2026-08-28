@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     convertMermaidMarkdownFences,
+    normalizeMermaidContent,
     plainTextToHtml,
     serializeMermaidFigure,
     validateMermaidSource,
@@ -42,4 +43,16 @@ test('Mermaid source validation blocks configuration and click actions', () => {
     assert.match(validateMermaidSource('%%{init: {"theme":"dark"}}%%\nflowchart LR\nA --> B'), /init directives/);
     assert.match(validateMermaidSource('---\nconfig:\n  theme: dark\n---\nflowchart LR\nA --> B'), /frontmatter configuration/);
     assert.match(validateMermaidSource('flowchart LR\nA --> B\nclick A "https://example.com"'), /click actions/);
+});
+
+test('oversized Mermaid source is preserved for visible validation', () => {
+    const source = `flowchart LR\n${'A --> B\n'.repeat(10_001)}`;
+    const normalized = normalizeMermaidContent({ source });
+
+    assert.equal(normalized.source, source.trim());
+    assert.match(validateMermaidSource(normalized.source), /50,000 characters or fewer/);
+    assert.throws(
+        () => serializeMermaidFigure(normalized),
+        /50,000 characters or fewer/
+    );
 });

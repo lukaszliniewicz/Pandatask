@@ -4,6 +4,7 @@ $pandatask_test_options = array();
 $pandatask_test_caps    = array();
 $pandatask_test_transients = array();
 $pandatask_test_logged_in = false;
+$pandatask_test_post_types = array();
 
 define( 'MINUTE_IN_SECONDS', 60 );
 
@@ -66,6 +67,17 @@ function user_can( $user_id, $capability ) {
     return ! empty( $pandatask_test_caps[ (int) $user_id ][ $capability ] );
 }
 
+function current_user_can( $capability, ...$args ) {
+    global $pandatask_test_caps;
+    $object_key = $args ? $capability . ':' . (int) $args[0] : $capability;
+    return ! empty( $pandatask_test_caps[99][ $object_key ] ) || ! empty( $pandatask_test_caps[99][ $capability ] );
+}
+
+function get_post_type( $post_id ) {
+    global $pandatask_test_post_types;
+    return $pandatask_test_post_types[ (int) $post_id ] ?? false;
+}
+
 function __( $message ) {
     return $message;
 }
@@ -95,10 +107,12 @@ require_once __DIR__ . '/../src/Application/Security/PublicBugSubmissionPolicy.p
 require_once __DIR__ . '/../src/Application/Security/InboxAccessPolicy.php';
 require_once __DIR__ . '/../src/Application/Security/TaskAccessPolicy.php';
 require_once __DIR__ . '/../src/Application/Security/CommentAccessPolicy.php';
+require_once __DIR__ . '/../src/Application/Security/MediaAttachmentAccessPolicy.php';
 
 use Pandatask\Application\Security\CommentAccessPolicy;
 use Pandatask\Application\Security\PublicBugSubmissionPolicy;
 use Pandatask\Application\Security\InboxAccessPolicy;
+use Pandatask\Application\Security\MediaAttachmentAccessPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
 
 $pandatask_test_options['pandatask_bug_tracker_settings'] = array(
@@ -195,6 +209,20 @@ assert_same( true, $inbox_task_policy->canReadTask( 42, 9 ), 'Inbox triagers sho
 assert_same( true, $inbox_task_policy->canUpdateTask( 42, 9 ), 'Inbox triagers should be able to edit delegated inbox tasks.' );
 assert_same( true, $inbox_task_policy->canMoveTask( 42, 9 ), 'Inbox triagers should be able to initiate a move, subject to destination-board permission.' );
 assert_same( false, true === $inbox_task_policy->canDeleteTask( 42, 9 ), 'Inbox triage must not grant task deletion authority.' );
+
+$media_policy = new MediaAttachmentAccessPolicy();
+$pandatask_test_post_types[501] = 'attachment';
+$pandatask_test_caps[99] = array( 'upload_files' => true );
+$attachment_denied = $media_policy->authorize( 501 );
+assert_same( 'rest_forbidden_attachment', $attachment_denied->code ?? null, 'Media attachments must require object-level edit permission.' );
+assert_same( 403, $attachment_denied->data['status'] ?? null, 'Unauthorized Media attachments should return HTTP 403 semantics.' );
+$pandatask_test_caps[99]['edit_post:501'] = true;
+assert_same( true, $media_policy->authorize( 501 ), 'Authorized Media attachments should remain attachable.' );
+$pandatask_test_caps[99] = array();
+assert_same( true, $media_policy->authorize( 501, (object) array( 'attachment_post_id' => 501 ) ), 'Unrelated updates must retain an existing attachment without requiring Media capabilities again.' );
+$attachment_invalid = $media_policy->authorize( 999 );
+assert_same( 'rest_invalid_attachment', $attachment_invalid->code ?? null, 'Non-attachment post IDs must retain validation failure semantics.' );
+assert_same( 422, $attachment_invalid->data['status'] ?? null, 'Invalid Media references should return HTTP 422 semantics.' );
 
 $comment_service = new class() {
     public function getComment( $comment_id ) {

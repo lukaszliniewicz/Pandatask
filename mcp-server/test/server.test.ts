@@ -434,6 +434,35 @@ test('task status tool keeps completion on the time-aware boundary', async (t) =
   assert.equal(done.isError, true);
 });
 
+test('all task creation and bulk-update paths reject done before mutation', async (t) => {
+  let fetchCalls = 0;
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async () => {
+    fetchCalls += 1;
+    return new Response('{}', { status: 200 });
+  });
+
+  const cases = [
+    {
+      name: 'task_create_subtask',
+      arguments: { board_name: 'project_alpha', parent_task_id: 10, name: 'Done subtask', status: 'done' },
+    },
+    {
+      name: 'project_plan',
+      arguments: { board_name: 'project_alpha', project: { name: 'Done plan' }, tasks: [{ name: 'Done plan task', status: 'done' }] },
+    },
+    {
+      name: 'task_bulk_update',
+      arguments: { updates: [{ task_id: 10, changes: { status: 'done' } }] },
+    },
+  ] as const;
+
+  for (const item of cases) {
+    const result = await client.callTool({ name: item.name, arguments: item.arguments });
+    assert.equal(result.isError, true, `${item.name} must keep completion behind task_complete`);
+  }
+  assert.equal(fetchCalls, 0, 'Rejected completion bypasses must not reach WordPress');
+});
+
 test('tool profiles keep core focused and administrator tools opt-in', async (t) => {
   const fetchImplementation = async () => new Response('{}', { status: 200 });
   const coreClient = await connectedClient(t, { ...config, toolProfile: 'core' }, fetchImplementation);

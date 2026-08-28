@@ -6,6 +6,7 @@ import {
     useInboxMutations,
     useSharedInboxes,
 } from '../hooks/useInbox';
+import { flattenInboxPages } from '../inboxModel.mjs';
 import UserSelect from './UserSelect';
 import TaskMoveDialog from './TaskMoveDialog';
 
@@ -17,7 +18,14 @@ const InboxView = ({ onOpenTask }) => {
     const [ownerUserId, setOwnerUserId] = useState(null);
     const [captureOwnerUserId, setCaptureOwnerUserId] = useState(null);
     const [search, setSearch] = useState('');
-    const { data: inboxData, isLoading, isError } = useInbox(ownerUserId, {
+    const {
+        data: inboxData,
+        isLoading,
+        isError,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInbox(ownerUserId, {
         search,
         status: 'all',
         limit: 200,
@@ -33,7 +41,13 @@ const InboxView = ({ onOpenTask }) => {
     const [delegateRoles, setDelegateRoles] = useState({});
 
     const isOwnInbox = ownerUserId === null;
-    const tasks = inboxData?.tasks || [];
+    const tasks = useMemo(
+        () =>
+            inboxData?.pages
+                ? flattenInboxPages(inboxData.pages)
+                : inboxData?.tasks || [],
+        [inboxData]
+    );
 
     useEffect(() => {
         const delegates = delegateData?.delegates || [];
@@ -91,6 +105,30 @@ const InboxView = ({ onOpenTask }) => {
             );
         } catch (err) {
             setError(err?.message || 'Could not save Inbox delegation.');
+        }
+    };
+
+    const loadMore = async () => {
+        setError('');
+        try {
+            const result = await fetchNextPage();
+            if (result?.isError) {
+                setError(result.error?.message || 'Could not load more Inbox items.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Could not load more Inbox items.');
+        }
+    };
+
+    const toggleInboxState = async (task) => {
+        setError('');
+        try {
+            await setState.mutateAsync({
+                taskId: task.id,
+                state: task.inbox_state === 'reviewed' ? 'untriaged' : 'reviewed',
+            });
+        } catch (err) {
+            setError(err?.message || 'Could not update Inbox item.');
         }
     };
 
@@ -191,10 +229,7 @@ const InboxView = ({ onOpenTask }) => {
                                 type="button"
                                 className="pandat69-button"
                                 disabled={setState.isPending}
-                                onClick={() => setState.mutate({
-                                    taskId: task.id,
-                                    state: task.inbox_state === 'reviewed' ? 'untriaged' : 'reviewed',
-                                })}
+                                onClick={() => toggleInboxState(task)}
                             >
                                 {task.inbox_state === 'reviewed' ? 'Mark untriaged' : 'Mark reviewed'}
                             </button>
@@ -205,6 +240,17 @@ const InboxView = ({ onOpenTask }) => {
                     </article>
                 ))}
             </div>
+
+            {hasNextPage && (
+                <button
+                    type="button"
+                    className="pandat69-button pandat69-inbox-load-more"
+                    onClick={loadMore}
+                    disabled={isFetchingNextPage}
+                >
+                    {isFetchingNextPage ? 'Loading…' : 'Load older Inbox items'}
+                </button>
+            )}
 
             {isOwnInbox && (
                 <details className="pandat69-inbox-delegation">

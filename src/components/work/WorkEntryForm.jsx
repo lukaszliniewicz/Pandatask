@@ -13,8 +13,9 @@ import {
   summarizeAllocationDrafts,
   validateAllocationDrafts,
 } from "../../workLogModel.mjs";
+import { toLocalIsoDate } from "../../workLogUiModel.mjs";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalIsoDate(new Date());
 let allocationSequence = 0;
 const newAllocation = (minutes = 30, values = {}) => ({
   key: `work-allocation-${++allocationSequence}`,

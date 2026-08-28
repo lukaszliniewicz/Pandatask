@@ -53,6 +53,19 @@ function validateDateOrder(
   }
 }
 
+function validateOpenTaskStatus(
+  value: { status?: string | undefined },
+  context: z.RefinementCtx,
+): void {
+  if (value.status === 'done') {
+    context.addIssue({
+      code: 'custom',
+      path: ['status'],
+      message: 'Create or update the task in an open state, then use task_complete so actual time is resolved explicitly.',
+    });
+  }
+}
+
 export const taskMutableFields = {
   name: z.string().min(1).max(255).optional().describe('Short task title.'),
   description: z.string().optional().describe('Detailed task description. Stored/read content is canonical sanitized HTML.'),
@@ -60,7 +73,10 @@ export const taskMutableFields = {
     .enum(['html', 'markdown', 'plain'])
     .optional()
     .describe('Input format for description in this operation. Defaults to html for backward compatibility; markdown and plain are converted to canonical HTML before the REST mutation.'),
-  status: z.enum(['pending', 'in-progress', 'done']).optional().describe('Task workflow status.'),
+  status: z
+    .enum(['pending', 'in-progress', 'done'])
+    .optional()
+    .describe('Open workflow status. Use task_complete instead of setting done so actual time is resolved explicitly.'),
   priority: z.number().int().min(1).max(10).optional().describe('Priority from 1 (lowest) to 10 (highest).'),
   estimated_effort_seconds: z.number().int().nonnegative().optional().describe('Optional expected effort in seconds.'),
   task_type: z.enum(['task', 'bug']).optional().describe('Standard task or bug-tracking item.'),
@@ -97,12 +113,14 @@ export const taskCreateData = z
     ...taskMutableFields,
     name: z.string().min(1).max(255).describe('Short task title.'),
   })
-  .superRefine(validateDateOrder);
+  .superRefine(validateDateOrder)
+  .superRefine(validateOpenTaskStatus);
 
 export const taskUpdateData = z
   .object(taskMutableFields)
   .refine((value) => Object.values(value).some((item) => item !== undefined), 'Provide at least one task field to update.')
-  .superRefine(validateDateOrder);
+  .superRefine(validateDateOrder)
+  .superRefine(validateOpenTaskStatus);
 
 const { project_id: _projectId, predecessors: _predecessors, ...plannedTaskMutableFields } = taskMutableFields;
 export const plannedTaskData = z
@@ -116,7 +134,8 @@ export const plannedTaskData = z
       .describe('Zero-based indexes of earlier tasks in this same plan.'),
   })
   .strict()
-  .superRefine(validateDateOrder);
+  .superRefine(validateDateOrder)
+  .superRefine(validateOpenTaskStatus);
 
 export const projectMutableFields = {
   name: z.string().min(1).max(255).optional().describe('Short project name.'),
@@ -145,7 +164,8 @@ const batchTaskUpdateData = z
     (value) => Object.entries(value).some(([key, item]) => key !== 'id' && item !== undefined),
     'Provide at least one task field to update.',
   )
-  .superRefine(validateDateOrder);
+  .superRefine(validateDateOrder)
+  .superRefine(validateOpenTaskStatus);
 const batchProjectUpdateData = z
   .object({ ...projectMutableFields, id: positiveId.describe('Project ID to update.') })
   .refine(

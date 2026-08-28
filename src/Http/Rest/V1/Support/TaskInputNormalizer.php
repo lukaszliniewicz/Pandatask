@@ -3,6 +3,7 @@
 namespace Pandatask\Http\Rest\V1\Support;
 
 use DateTimeImmutable;
+use Pandatask\Application\Security\MediaAttachmentAccessPolicy;
 use Pandatask\Application\Task\TaskDescriptionService;
 use WP_Error;
 
@@ -10,6 +11,12 @@ use WP_Error;
  * Converts REST/batch payloads into the application task command shape.
  */
 final class TaskInputNormalizer {
+
+    private $media_attachment_access_policy;
+
+    public function __construct( $media_attachment_access_policy = null ) {
+        $this->media_attachment_access_policy = $media_attachment_access_policy ?: new MediaAttachmentAccessPolicy();
+    }
 
     /**
      * @param string              $board_name Destination board.
@@ -236,19 +243,7 @@ final class TaskInputNormalizer {
                 : new WP_Error( 'rest_invalid_attachment', __( 'A link attachment requires a valid URL.', 'pandatask' ), array( 'status' => 422 ) );
         }
 
-        if ( $attachment_post_id <= 0 || 'attachment' !== get_post_type( $attachment_post_id ) ) {
-            return new WP_Error( 'rest_invalid_attachment', __( 'A valid Media Library attachment is required.', 'pandatask' ), array( 'status' => 422 ) );
-        }
-
-        if ( $current_task && (int) $current_task->attachment_post_id === $attachment_post_id ) {
-            return true;
-        }
-
-        if ( ! current_user_can( 'upload_files' ) || ! current_user_can( 'edit_post', $attachment_post_id ) ) {
-            return new WP_Error( 'rest_forbidden_attachment', __( 'You cannot attach this Media Library item.', 'pandatask' ), array( 'status' => 403 ) );
-        }
-
-        return true;
+        return $this->media_attachment_access_policy->authorize( $attachment_post_id, $current_task );
     }
 
     /**

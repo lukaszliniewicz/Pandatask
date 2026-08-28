@@ -9,8 +9,15 @@ const clampText = ( value, maxLength ) =>
 		.trim()
 		.slice( 0, maxLength );
 
+const normalizeSource = ( value ) =>
+	String( value ?? '' )
+		.replace( /\r\n?/g, '\n' )
+		.trim();
+
 export const normalizeMermaidContent = ( value = {} ) => ( {
-	source: clampText( value.source, MERMAID_MAX_SOURCE_LENGTH ),
+	// Preserve oversized source so validation can reject it visibly instead of
+	// silently changing what the user typed or uploaded.
+	source: normalizeSource( value.source ),
 	title: clampText( value.title, MERMAID_MAX_TITLE_LENGTH ),
 	caption: clampText( value.caption, MERMAID_MAX_CAPTION_LENGTH ),
 	description: clampText( value.description, MERMAID_MAX_DESCRIPTION_LENGTH ),

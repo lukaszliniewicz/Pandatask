@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
 import {
+    MERMAID_MAX_SOURCE_LENGTH,
     defaultMermaidSource,
     normalizeMermaidContent,
     validateMermaidSource,
@@ -58,6 +59,7 @@ const MermaidEditorDialog = ({ initialValue, onClose, onSave }) => {
     };
 
     const validationError = validateMermaidSource(content.source);
+    const displayedPreviewError = validationError || previewError;
     const canSave = !validationError && !previewError && !isRendering;
 
     return (
@@ -118,9 +120,9 @@ const MermaidEditorDialog = ({ initialValue, onClose, onSave }) => {
                             hidden
                             onChange={async (event) => {
                                 const file = event.target.files?.[0];
-                                if (file?.size > 200_000) {
+                                if (file?.size > MERMAID_MAX_SOURCE_LENGTH * 4) {
                                     setPreviewSvg('');
-                                    setPreviewError('Diagram files must be 200 KB or smaller.');
+                                    setPreviewError(`Diagram files must contain ${MERMAID_MAX_SOURCE_LENGTH.toLocaleString()} characters or fewer.`);
                                 } else if (file) {
                                     update('source', await file.text());
                                 }
@@ -136,13 +138,13 @@ const MermaidEditorDialog = ({ initialValue, onClose, onSave }) => {
                 <div className="pandat69-mermaid-editor-preview-column">
                     <strong>Preview</strong>
                     <div className="pandat69-mermaid-editor-preview">
-                        {previewSvg ? (
-                            <div className="pandat69-mermaid-preview-svg" dangerouslySetInnerHTML={{ __html: previewSvg }} />
-                        ) : previewError ? (
+                        {displayedPreviewError ? (
                             <div className="pandat69-mermaid-preview-error" role="alert">
                                 <strong>Diagram preview unavailable</strong>
-                                <span>{previewError}</span>
+                                <span>{displayedPreviewError}</span>
                             </div>
+                        ) : previewSvg ? (
+                            <div className="pandat69-mermaid-preview-svg" dangerouslySetInnerHTML={{ __html: previewSvg }} />
                         ) : (
                             <span className="pandat69-field-hint">{isRendering ? 'Rendering…' : 'Enter a diagram to see its preview.'}</span>
                         )}

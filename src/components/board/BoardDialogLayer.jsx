@@ -69,6 +69,8 @@ const BoardDialogLayer = ({ controller }) => {
                                           updateEntry.mutateAsync({
                                               id: workDialog.entry.id,
                                               data,
+                                              previousAllocations:
+                                                  workDialog.entry.allocations || [],
                                           })
                                     : null
                             }

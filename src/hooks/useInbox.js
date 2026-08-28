@@ -1,16 +1,43 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from '@tanstack/react-query';
 import { useConfig } from '../context/ConfigContext';
+import { getInboxNextPageParam } from '../inboxModel.mjs';
 import { queryKeys } from '../query/queryKeys';
 
 export const useInbox = ( ownerUserId = null, filters = {} ) => {
 	const { apiClient } = useConfig();
-	return useQuery( {
-		queryKey: queryKeys.inbox.list( ownerUserId, filters ),
-		queryFn: ( { signal } ) =>
+	const requestedLimit = filters.limit ?? 200;
+	const queryFilters = { ...filters };
+	delete queryFilters.limit;
+	delete queryFilters.offset;
+	const limit = Math.max(
+		1,
+		Math.min( 500, Number( requestedLimit ) || 200 )
+	);
+
+	return useInfiniteQuery( {
+		queryKey: queryKeys.inbox.list( ownerUserId, {
+			...queryFilters,
+			limit,
+		} ),
+		queryFn: ( { pageParam = 0, signal } ) =>
 			apiClient.get(
 				ownerUserId ? `users/${ ownerUserId }/inbox` : 'users/me/inbox',
-				{ params: filters, signal }
+				{
+					params: {
+						...queryFilters,
+						limit,
+						offset: pageParam,
+					},
+					signal,
+				}
 			),
+		initialPageParam: 0,
+		getNextPageParam: getInboxNextPageParam,
 	} );
 };
 

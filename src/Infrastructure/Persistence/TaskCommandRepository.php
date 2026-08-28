@@ -67,6 +67,24 @@ final class TaskCommandRepository {
         return $wpdb->update( $tasks_table, $update_data, array( 'id' => $task_id ), $format, array( '%d' ) );
     }
 
+    /**
+     * Lock a task row for the current transaction and return its status.
+     *
+     * @return string|null Status, or null when the task no longer exists.
+     */
+    public function lockTaskStatusForUpdate( $task_id ) {
+        global $wpdb;
+
+        $tasks_table = DatabaseContext::getDbPrefix() . 'tasks';
+
+        return $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT status FROM {$tasks_table} WHERE id = %d FOR UPDATE",
+                $task_id
+            )
+        );
+    }
+
     public function updateProjectForTasks( $task_ids, $project_id ) {
         global $wpdb;
 

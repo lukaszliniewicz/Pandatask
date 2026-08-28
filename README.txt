@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.28
+Stable tag: 1.0.29
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -97,6 +97,13 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.29 =
+
+* Harden delegated Inbox capture so the owner retains task ownership while the submitting delegate remains the auditable actor, and enforce object-level Media Library authorization across every mutation path.
+* Make completion accounting idempotent under repeated and concurrent requests, initialize completed-task time states for every assignee, and prevent MCP status mutations from bypassing explicit completion.
+* Add reliable Inbox and shared Work Log pagination, refresh both old and new task-work caches after allocation edits, and use local dates for new work entries.
+* Polish Kanban nesting, lazy completion loading, Mermaid size validation, and recurring-template workload summaries.
 
 = 1.0.28 =
 

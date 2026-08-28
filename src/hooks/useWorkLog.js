@@ -128,10 +128,19 @@ export const useInfiniteSharedWorkLog = (
 				signal,
 			} ),
 		initialPageParam: 0,
-		getNextPageParam: ( lastPage, pages ) =>
-			( lastPage.entries || [] ).length === pageSize
+		getNextPageParam: ( lastPage, pages ) => {
+			const pagination = lastPage?.pagination;
+			if ( pagination && typeof pagination.has_more === 'boolean' ) {
+				return pagination.has_more &&
+					pagination.next_offset !== null &&
+					pagination.next_offset !== undefined
+					? Number( pagination.next_offset )
+					: undefined;
+			}
+			return ( lastPage.entries || [] ).length === pageSize
 				? pages.length * pageSize
-				: undefined,
+				: undefined;
+		},
 		enabled: Boolean( groupId && userId ),
 	} );
 };
@@ -164,12 +173,54 @@ export const useTaskWork = ( taskId ) => {
 export const useWorkMutations = () => {
 	const { apiClient, boardName } = useConfig();
 	const queryClient = useQueryClient();
+	const taskIdsFromAllocations = ( allocations = [] ) =>
+		Array.from(
+			new Set(
+				allocations
+					.map( ( allocation ) =>
+						Number(
+							allocation?.task_id ??
+								allocation?.task_id_snapshot ??
+								allocation?.taskId
+						)
+					)
+					.filter( Boolean )
+			)
+		);
+	const entriesFromCache = ( data ) => {
+		if ( Array.isArray( data ) ) {
+			return data;
+		}
+		if ( Array.isArray( data?.pages ) ) {
+			return data.pages.flatMap( ( page ) =>
+				Array.isArray( page ) ? page : page?.entries || []
+			);
+		}
+		return [];
+	};
+	const taskIdsForCachedEntry = ( entryId ) => {
+		const taskIds = [];
+		const entriesQueries = queryClient.getQueriesData( {
+			queryKey: [ ...queryKeys.work.all(), 'entries' ],
+		} );
+		for ( const [ , data ] of entriesQueries ) {
+			const entry = entriesFromCache( data ).find(
+				( item ) => Number( item?.id ) === Number( entryId )
+			);
+			if ( entry ) {
+				taskIds.push( ...taskIdsFromAllocations( entry.allocations ) );
+			}
+		}
+		return Array.from( new Set( taskIds ) );
+	};
 	const invalidate = ( taskIds = [] ) => {
 		queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } );
 		queryClient.invalidateQueries( {
 			queryKey: queryKeys.reports.board( boardName ),
 		} );
-		taskIds.filter( Boolean ).forEach( ( id ) =>
+		Array.from(
+			new Set( taskIds.map( Number ).filter( Boolean ) )
+		).forEach( ( id ) =>
 			queryClient.invalidateQueries( {
 				queryKey: queryKeys.taskWork( id ),
 			} )
@@ -198,18 +249,29 @@ export const useWorkMutations = () => {
 			);
 			return response.entry;
 		},
-		onSuccess: ( _, variables ) =>
-			invalidate(
-				( variables.data.allocations || [] ).map(
-					( item ) => item.task_id
-				)
+		onMutate: ( { id, previousAllocations = [] } ) => ( {
+			taskIds: Array.from(
+				new Set( [
+					...taskIdsForCachedEntry( id ),
+					...taskIdsFromAllocations( previousAllocations ),
+				] )
 			),
+		} ),
+		onSuccess: ( entry, variables, context ) =>
+			invalidate( [
+				...( context?.taskIds || [] ),
+				...taskIdsFromAllocations( entry?.allocations ),
+				...taskIdsFromAllocations( variables.data?.allocations ),
+			] ),
 	} );
 
 	const deleteEntry = useMutation( {
 		mutationFn: async ( { id } ) =>
 			apiClient.delete( `work-entries/${ id }` ),
-		onSuccess: () => invalidate(),
+		onMutate: ( { id } ) => ( {
+			taskIds: taskIdsForCachedEntry( id ),
+		} ),
+		onSuccess: ( _, __, context ) => invalidate( context?.taskIds || [] ),
 	} );
 
 	const confirmSuggestion = useMutation( {

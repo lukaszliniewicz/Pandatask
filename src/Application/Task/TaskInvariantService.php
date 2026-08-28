@@ -6,6 +6,7 @@ use DateInterval;
 use DateTimeImmutable;
 use Exception;
 use Pandatask\Application\Security\BoardAccessPolicy;
+use Pandatask\Application\Security\MediaAttachmentAccessPolicy;
 use Pandatask\Domain\Task\TaskGraph;
 use Pandatask\Infrastructure\Persistence\CategoryRepository;
 use Pandatask\Infrastructure\Persistence\ProjectRepository;
@@ -25,11 +26,14 @@ final class TaskInvariantService {
 
     private $board_access_policy;
 
-    public function __construct( $task_repository = null, $category_repository = null, $project_repository = null, $board_access_policy = null ) {
+    private $media_attachment_access_policy;
+
+    public function __construct( $task_repository = null, $category_repository = null, $project_repository = null, $board_access_policy = null, $media_attachment_access_policy = null ) {
         $this->task_repository     = $task_repository ?: new TaskRepository();
         $this->category_repository = $category_repository ?: new CategoryRepository();
         $this->project_repository  = $project_repository ?: new ProjectRepository();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
+        $this->media_attachment_access_policy = $media_attachment_access_policy ?: new MediaAttachmentAccessPolicy();
     }
 
     /**
@@ -425,8 +429,12 @@ final class TaskInvariantService {
             ? esc_url_raw( $data['attachment_url'] )
             : esc_url_raw( $current_task->attachment_url ?? '' );
 
-        if ( 'file' === $attachment_type && ( $attachment_id <= 0 || 'attachment' !== get_post_type( $attachment_id ) ) ) {
-            return new WP_Error( 'rest_invalid_attachment', __( 'A valid Media Library attachment is required.', 'pandatask' ), array( 'status' => 422 ) );
+        if ( 'file' === $attachment_type ) {
+            $attachment_authorization = $this->media_attachment_access_policy->authorize( $attachment_id, $current_task );
+
+            if ( is_wp_error( $attachment_authorization ) ) {
+                return $attachment_authorization;
+            }
         }
 
         if ( 'link' === $attachment_type && '' === $attachment_url ) {

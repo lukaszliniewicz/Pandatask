@@ -20,3 +20,16 @@ test('relationship IDs are unique and typed batch updates require an actual chan
   assert.equal(batchAction.safeParse({ action: 'update_task', data: { id: 1 } }).success, false);
   assert.equal(batchAction.safeParse({ action: 'update_task', data: { id: 1, priority: 8 } }).success, true);
 });
+
+test('task creation and update schemas keep done behind task_complete', () => {
+  assert.equal(plannedTaskData.safeParse({ name: 'Done plan task', status: 'done' }).success, false);
+  assert.equal(batchAction.safeParse({
+    action: 'create_task',
+    board_name: 'project_alpha',
+    data: { name: 'Done batch task', status: 'done' },
+  }).success, false);
+  assert.equal(batchAction.safeParse({
+    action: 'update_task',
+    data: { id: 1, status: 'done' },
+  }).success, false);
+});

@@ -31,7 +31,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,

@@ -33,7 +33,7 @@ function enabled(value: unknown): boolean {
 }
 
 function actionableTasks(tasks: UnknownRecord[]): UnknownRecord[] {
-  return tasks;
+  return tasks.filter((task) => !enabled(task.is_recurring));
 }
 
 function dateValue(value: unknown): string | null {
@@ -67,6 +67,7 @@ export function todayIso(now: Date = new Date()): string {
 
 export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRecord {
   const actionable = actionableTasks(tasks);
+  const recurringTemplates = tasks.filter((task) => enabled(task.is_recurring)).length;
   const open = actionable.filter((task) => task.status !== 'done');
   const overdue = open.filter((task) => {
     const deadline = dateValue(task.deadline);
@@ -96,8 +97,8 @@ export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRe
     high_priority_open: highPriority.length,
     unassigned_open: unassigned.length,
     blocked_open: blocked.length,
-    recurring_tasks: tasks.filter((task) => enabled(task.is_recurring)).length,
-    recurring_templates: tasks.filter((task) => enabled(task.is_recurring)).length, // Backward-compatible alias; recurrence-enabled rows are current work, not template-only records.
+    recurring_tasks: recurringTemplates,
+    recurring_templates: recurringTemplates,
     attention: {
       overdue: overdue.slice(0, 25).map(compactTask),
       due_today: dueToday.slice(0, 25).map(compactTask),

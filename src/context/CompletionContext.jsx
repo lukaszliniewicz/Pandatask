@@ -33,11 +33,19 @@ export const CompletionProvider = ({ children }) => {
     <CompletionContext.Provider value={value}>
       {children}
       {workLogEnabled && request?.kind === "complete" && (
-        <CompletionDialog
-          task={request?.task || null}
-          changeComment={request?.changeComment || ""}
-          onClose={() => setRequest(null)}
-        />
+        <React.Suspense
+          fallback={
+            <div className="pandat69-loading" role="status" aria-live="polite">
+              Loading completion options…
+            </div>
+          }
+        >
+          <CompletionDialog
+            task={request?.task || null}
+            changeComment={request?.changeComment || ""}
+            onClose={() => setRequest(null)}
+          />
+        </React.Suspense>
       )}
       {request?.kind === "reopen" && (
         <React.Suspense fallback={null}>

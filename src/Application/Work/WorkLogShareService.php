@@ -152,6 +152,13 @@ final class WorkLogShareService {
             return new WP_Error( 'rest_not_found', __( 'Work-log owner not found.', 'pandatask' ), array( 'status' => 404 ) );
         }
         $group = $this->getGroup( $group_id );
+        $limit = max( 1, min( 500, absint( $limit ) ) );
+        $offset = max( 0, absint( $offset ) );
+        $entries = $this->entry_repository->findForUser( $owner_id, $start_date, $end_date, $limit + 1, $offset );
+        $has_more = count( $entries ) > $limit;
+        if ( $has_more ) {
+            $entries = array_slice( $entries, 0, $limit );
+        }
 
         return array(
             'group'          => $this->groupData( $group ),
@@ -162,7 +169,14 @@ final class WorkLogShareService {
                 'profile_url'  => $this->profileUrl( $owner_id ),
             ),
             'activity_types' => $this->work_type_service->all( $owner_id ),
-            'entries'        => $this->shareableEntries( $this->entry_repository->findForUser( $owner_id, $start_date, $end_date, $limit, $offset ) ),
+            'entries'        => $this->shareableEntries( $entries ),
+            'pagination'     => array(
+                'limit'       => $limit,
+                'offset'      => $offset,
+                'returned'    => count( $entries ),
+                'has_more'    => $has_more,
+                'next_offset' => $has_more ? $offset + $limit : null,
+            ),
             'report'         => $this->report_service->sharedPersonal( $owner_id, $start_date, $end_date ),
             'start_date'     => $start_date,
             'end_date'       => $end_date,

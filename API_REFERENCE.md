@@ -81,7 +81,7 @@ If you are an AI agent or building an automation script, follow these best pract
 -   **Response Example:**
     ```json
     {
-        "plugin_version": "1.0.14",
+        "plugin_version": "1.0.29",
         "today": "2026-07-24",
         "now": "2026-07-24T12:30:00+02:00",
         "timezone": "Europe/Warsaw",

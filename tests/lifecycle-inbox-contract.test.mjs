@@ -5,6 +5,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { getBoardTabs } from '../src/boardTabs.mjs';
 import { serializeCompletionWorkItems } from '../src/components/work/completionWorkModel.mjs';
+import {
+  flattenInboxPages,
+  getInboxNextPageParam,
+} from '../src/inboxModel.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relativePath => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -26,9 +30,11 @@ test('Inbox provenance and lifecycle lineage are protected behind dedicated APIs
     assert.doesNotMatch(normalizer, new RegExp(`array_key_exists\\( ['\"]${field}['\"]`));
   }
   const inboxRoutes = read('src/Http/Rest/V1/InboxRouteRegistrar.php');
+  const inboxService = read('src/Application/Task/InboxService.php');
   const lifecycleRoutes = read('src/Http/Rest/V1/TaskLifecycleRouteRegistrar.php');
   assert.match(inboxRoutes, /\/users\/me\/inbox/);
   assert.match(inboxRoutes, /inbox-state/);
+  assert.match(inboxService, /createTask\(\s*\$data,\s*array\(\s*'actor_id'\s*=>\s*\(int\) \$actor_id,\s*'creator_id'\s*=>\s*\(int\) \$owner_user_id/s);
   assert.match(lifecycleRoutes, /move-preview/);
   assert.match(lifecycleRoutes, /\/reopen/);
   assert.match(lifecycleRoutes, /follow-ups/);
@@ -51,6 +57,7 @@ test('reopen, follow-up task, and post-completion work remain distinct lifecycle
   const lifecycle = read('src/Http/Rest/V1/TaskLifecycleRouteHandler.php');
   const work = read('src/Application/Work/WorkEntryService.php');
   assert.match(mutation, /pandatask_reopen_required/);
+  assert.match(mutation, /pandatask_completion_required/);
   assert.match(mutation, /'reopen' === \$lifecycle_operation/);
   assert.match(mutation, /nextSequence/);
   assert.match(lifecycle, /follow_up_created/);
@@ -108,4 +115,44 @@ test('browser extension remains a thin generic capture client', () => {
   assert.match(popup, /\/users\/me\/boards/);
   assert.match(popup, /\/boards\/\$\{encodeURIComponent\(destination\.value\)\}\/tasks/);
   assert.doesNotMatch(popup, /follow_up_of_task_id|inbox_state|allocation_context/);
+});
+
+test('Inbox pages flatten and follow server pagination metadata', () => {
+  assert.deepEqual(
+    flattenInboxPages([
+      { tasks: [{ id: 1 }, { id: 2 }] },
+      { tasks: [] },
+      { tasks: [{ id: 3 }] },
+    ]),
+    [{ id: 1 }, { id: 2 }, { id: 3 }],
+  );
+  assert.equal(
+    getInboxNextPageParam({
+      pagination: { has_more: true, next_offset: 200 },
+    }),
+    200,
+  );
+  assert.equal(
+    getInboxNextPageParam({
+      pagination: { has_more: false, next_offset: null },
+    }),
+    undefined,
+  );
+  assert.equal(
+    getInboxNextPageParam({
+      pagination: { has_more: true, next_offset: null },
+    }),
+    undefined,
+  );
+});
+
+test('Inbox UI wires paginated reads and visible triage failures', () => {
+  const hook = read('src/hooks/useInbox.js');
+  const view = read('src/components/InboxView.jsx');
+  assert.match(hook, /useInfiniteQuery/);
+  assert.match(hook, /getNextPageParam: getInboxNextPageParam/);
+  assert.match(hook, /offset: pageParam/);
+  assert.match(view, /fetchNextPage/);
+  assert.match(view, /setState\.mutateAsync/);
+  assert.match(view, /Could not update Inbox item\./);
 });

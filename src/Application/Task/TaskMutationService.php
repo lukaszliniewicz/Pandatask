@@ -53,7 +53,14 @@ final class TaskMutationService {
         $this->feature_settings = $feature_settings ?: new FeatureSettings();
     }
 
-    public function createTask( $data ) {
+    /**
+     * Create a task with separate authorization ownership and audit actor context.
+     *
+     * Ordinary callers omit the context, preserving actor-as-creator behavior.
+     * Delegated Inbox capture may name the Inbox owner as creator while retaining
+     * the submitting delegate as the actor recorded by audit integrations.
+     */
+    public function createTask( $data, array $context = array() ) {
         $data = $this->invariant_service->applyAndValidate( $data );
 
         if ( is_wp_error( $data ) ) {
@@ -61,7 +68,8 @@ final class TaskMutationService {
         }
 
         $is_recurring = ! empty( $data['is_recurring'] ) ? 1 : 0;
-        $creator_id  = get_current_user_id();
+        $actor_id    = array_key_exists( 'actor_id', $context ) ? absint( $context['actor_id'] ) : get_current_user_id();
+        $creator_id  = array_key_exists( 'creator_id', $context ) ? absint( $context['creator_id'] ) : $actor_id;
         $task_data    = array(
             'board_name'               => $data['board_name'],
             'name'                     => $data['name'],
@@ -159,15 +167,11 @@ final class TaskMutationService {
                 )
             );
             $occurrence_state = 'done' === $task_data['status'] ? 'completed' : 'open';
-            $occurrence_id = $this->occurrence_repository->createForTask( $occurrence_task, 1, $occurrence_state, $creator_id );
+            $occurrence_id = $this->occurrence_repository->createForTask( $occurrence_task, 1, $occurrence_state, $actor_id );
 
             if ( ! $occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $occurrence_id ) ) {
                 throw new Exception( 'Failed to create the task work occurrence.' );
             }
-            if ( $this->feature_settings->workLogEnabled() && 'done' === $task_data['status'] && $creator_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $creator_id, $creator_id ) ) {
-                throw new Exception( 'Failed to preserve unresolved time for a completed task.' );
-            }
-
             $attachment_sync = ProtectedAttachmentService::syncTask( $task_id );
 
             if ( is_wp_error( $attachment_sync ) ) {
@@ -203,7 +207,17 @@ final class TaskMutationService {
 
             $assignment_changes = $this->updateTaskAssignments( $task_id, $assigned_persons, $supervisor_persons );
 
-            if ( ! $this->history_service->addEntry( $task_id, $creator_id, 'task_created', '', $task_data['name'] ) ) {
+            // Assignments are persisted after the occurrence is created, so preserve
+            // the creator's legacy state and seed every assigned user's state only
+            // after the complete assignment set is known.
+            if (
+                'done' === $task_data['status']
+                && ! $this->preserveCompletedTaskTimeStates( $task_id, $creator_id, $assigned_persons, $actor_id )
+            ) {
+                throw new Exception( 'Failed to preserve unresolved time for a completed task.' );
+            }
+
+            if ( ! $this->history_service->addEntry( $task_id, $actor_id, 'task_created', '', $task_data['name'] ) ) {
                 throw new Exception( 'Failed to create task history.' );
             }
 
@@ -219,14 +233,14 @@ final class TaskMutationService {
 
         ProtectedAttachmentService::finalizeSync( $attachment_sync );
 
-        $this->sendAssignmentNotifications( $task_id, $assignment_changes, $creator_id );
+        $this->sendAssignmentNotifications( $task_id, $assignment_changes, $actor_id );
         delete_transient( 'pandat69_all_board_names' );
 
-        $all_affected_users = array_unique( array_merge( $assigned_persons, $supervisor_persons, array( $creator_id ) ) );
+        $all_affected_users = array_values( array_unique( array_filter( array_merge( $assigned_persons, $supervisor_persons, array( $creator_id, $actor_id ) ) ) ) );
         $this->cache_invalidator->invalidateTask( $task_id, $task_data['board_name'], $all_affected_users );
 
         $created_task = $this->task_repository->findById( $task_id );
-        $this->dispatchLifecycleEvent( 'pandatask_task_created', $task_id, $created_task, $creator_id );
+        $this->dispatchLifecycleEvent( 'pandatask_task_created', $task_id, $created_task, $actor_id );
 
         return $task_id;
     }
@@ -240,10 +254,27 @@ final class TaskMutationService {
             return false;
         }
 
+        if ( 'complete' === $lifecycle_operation && 'done' === $current_task->status ) {
+            return $this->alreadyCompletedError();
+        }
+
         $data = $this->invariant_service->applyAndValidate( $data, $current_task );
 
         if ( is_wp_error( $data ) ) {
             return $data;
+        }
+
+        if (
+            isset( $data['status'] )
+            && 'done' === $data['status']
+            && 'done' !== $current_task->status
+            && 'complete' !== $lifecycle_operation
+        ) {
+            return new WP_Error(
+                'pandatask_completion_required',
+                __( 'Complete tasks through the explicit Complete action so work accounting is recorded.', 'pandatask' ),
+                array( 'status' => 409 )
+            );
         }
 
         if (
@@ -515,12 +546,26 @@ final class TaskMutationService {
         $attachment_sync = null;
 
         try {
-        if ( isset( $data['predecessors'] ) ) {
-            $new_predecessors = array_map( 'absint', (array) $data['predecessors'] );
-            $new_predecessors = array_unique( array_filter( $new_predecessors ) );
-            $current_rels     = $this->repository->getTaskPredecessorIds( $task_id );
-            $to_add           = array_diff( $new_predecessors, $current_rels );
-            $to_remove        = array_diff( $current_rels, $new_predecessors );
+            if ( 'complete' === $lifecycle_operation ) {
+                // Serialize completion accounting on the task row. A concurrent
+                // request waits here, then observes the committed done status.
+                $transaction_status = $this->repository->lockTaskStatusForUpdate( $task_id );
+                if ( null === $transaction_status ) {
+                    DatabaseContext::rollback();
+                    return false;
+                }
+                if ( 'done' === $transaction_status ) {
+                    DatabaseContext::rollback();
+                    return $this->alreadyCompletedError();
+                }
+            }
+
+            if ( isset( $data['predecessors'] ) ) {
+                $new_predecessors = array_map( 'absint', (array) $data['predecessors'] );
+                $new_predecessors = array_unique( array_filter( $new_predecessors ) );
+                $current_rels     = $this->repository->getTaskPredecessorIds( $task_id );
+                $to_add           = array_diff( $new_predecessors, $current_rels );
+                $to_remove        = array_diff( $current_rels, $new_predecessors );
 
             foreach ( $to_remove as $predecessor_id ) {
                 if ( ! $this->repository->deleteTaskRelationship( $task_id, $predecessor_id ) ) {
@@ -1082,6 +1127,30 @@ final class TaskMutationService {
                 BuddyPressNotifier::add_assignment_notification( $task_id, $user_id, $actor_id, $role );
             }
         }
+    }
+
+    /**
+     * Preserve legacy creator accounting while initializing all assignee states
+     * for tasks that are created already completed.
+     */
+    private function preserveCompletedTaskTimeStates( $task_id, $creator_id, array $assigned_user_ids, $actor_id ) {
+        if ( ! $this->feature_settings->workLogEnabled() ) {
+            return true;
+        }
+
+        if ( $creator_id > 0 && ! $this->task_time_service->markUnresolved( $task_id, $creator_id, $actor_id ) ) {
+            return false;
+        }
+
+        return $this->task_time_service->ensureUnresolvedForUsers( $task_id, $assigned_user_ids, $actor_id );
+    }
+
+    private function alreadyCompletedError() {
+        return new WP_Error(
+            'pandatask_task_already_completed',
+            __( 'This task is already completed. Reopen it before completing it again, or use task time resolution for post-completion accounting.', 'pandatask' ),
+            array( 'status' => 409 )
+        );
     }
 
     private function updateTaskRoleAssignments( $task_id, $user_ids, $role = 'assignee' ) {
