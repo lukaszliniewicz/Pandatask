@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.33
+Stable tag: 1.0.34
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -97,6 +97,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.34 =
+
+* Group Flow descendants into compact workstream cards while preserving task-level dependency connections at every hierarchy depth.
+* Add background drag-panning, relation highlighting, and zoom-plus-pan reset controls to the project canvas.
+* Make full-screen Flow host-shell independent and polish the project view switcher and List heading.
 
 = 1.0.33 =
 

@@ -196,10 +196,7 @@ const ProjectWorkspaceList = ( {
 			{ mutationError && <div className="pandat69-error" role="alert">{ mutationError }</div> }
 			<section className="pandat69-project-native-section" aria-labelledby="pandatask-native-tasks-title">
 				<header>
-					<div>
-						<p className="pandat69-eyebrow">Canonical work</p>
-						<h4 id="pandatask-native-tasks-title">Project tasks</h4>
-					</div>
+					<h4 id="pandatask-native-tasks-title">Project tasks</h4>
 					<span>{ nativeTaskTree.total } open</span>
 				</header>
 				{ nativeTaskTree.total ? (
