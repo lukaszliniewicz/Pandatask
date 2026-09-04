@@ -1,10 +1,25 @@
 const defaultConfig = require('@wordpress/scripts/config/webpack.config');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const path = require('path');
 
 // We extend the default config to override the entry point.
 // `@wordpress/scripts` would normally look for `src/index.js`.
 module.exports = {
     ...defaultConfig,
+    plugins: defaultConfig.plugins.map((plugin) => {
+        if (!(plugin instanceof MiniCssExtractPlugin)) {
+            return plugin;
+        }
+
+        return new MiniCssExtractPlugin({
+            ...plugin.options,
+            // Lazy CSS chunks otherwise have stable numeric URLs (for example,
+            // 471.css), so browsers and CDNs can pair a new JS release with an
+            // obsolete stylesheet. Keep the entry stylesheet stable because
+            // WordPress versions it, and content-hash every lazy stylesheet.
+            chunkFilename: '[name].[contenthash:8].css',
+        });
+    }),
     module: {
         ...defaultConfig.module,
         rules: [

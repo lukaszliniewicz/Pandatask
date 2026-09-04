@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
@@ -32,6 +32,29 @@ for ( const budget of budgets ) {
 	);
 	failed ||= ! withinBudget;
 }
+
+const lazyStyleFiles = ( await readdir( 'build' ) ).filter(
+	( file ) =>
+		file.endsWith( '.css' ) &&
+		file !== 'main.css' &&
+		! file.endsWith( '-rtl.css' )
+);
+const unhashedLazyStyleFiles = lazyStyleFiles.filter(
+	( file ) => ! /^\d+\.[a-f0-9]{8}\.css$/.test( file )
+);
+const lazyStylesAreCacheSafe =
+	lazyStyleFiles.length > 0 && unhashedLazyStyleFiles.length === 0;
+
+process.stdout.write(
+	`${ lazyStylesAreCacheSafe ? 'PASS' : 'FAIL' } lazy CSS cache safety: ${
+		lazyStyleFiles.length
+	} content-hashed chunk(s)${
+		unhashedLazyStyleFiles.length
+			? `; unhashed: ${ unhashedLazyStyleFiles.join( ', ' ) }`
+			: ''
+	}\n`
+);
+failed ||= ! lazyStylesAreCacheSafe;
 
 if ( failed ) {
 	process.exitCode = 1;
