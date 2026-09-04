@@ -69,9 +69,39 @@ test( 'existing task values take precedence and normalize relationship IDs', () 
 	assert.deepEqual( defaults.assigned_persons, [ 7, 8 ] );
 	assert.deepEqual( defaults.supervisor_persons, [ 9 ] );
 	assert.deepEqual( defaults.recurrence_days, [ '1', '3', '5' ] );
-	assert.equal( defaults.recurrence_frequency, 'bi-weekly' );
+	assert.equal( defaults.recurrence_frequency, 'weekly' );
+	assert.equal( defaults.recurrence_interval, 2 );
 	assert.equal( defaults.schedule_mode, 'dynamic' );
 	assert.equal( defaults.target_board, 'group_actual' );
+} );
+
+test( 'monthly weekday recurrence round-trips through form defaults and payload', () => {
+	const defaults = createTaskFormDefaults( {
+		boardName: 'group_delivery',
+		task: {
+			is_recurring: 1,
+			recurrence_frequency: 'monthly_weekday',
+			recurrence_interval: 3,
+			recurrence_days: '7',
+			recurrence_month_week: 'last',
+		},
+	} );
+
+	assert.equal( defaults.recurrence_frequency, 'monthly_weekday' );
+	assert.equal( defaults.recurrence_interval, 3 );
+	assert.equal( defaults.recurrence_weekday, '7' );
+	assert.equal( defaults.recurrence_month_week, 'last' );
+
+	const payload = buildTaskPayload( defaults, {
+		boardName: 'group_delivery',
+		isUserBoard: false,
+		isEdit: true,
+		task: { board_name: 'group_delivery' },
+	} );
+	assert.equal( payload.recurrence_days, '7' );
+	assert.equal( payload.recurrence_month_week, 'last' );
+	assert.equal( payload.recurrence_interval, 3 );
+	assert.equal( 'recurrence_weekday' in payload, false );
 } );
 
 test( 'dynamic dependent-task payload removes conflicting fixed dates', () => {

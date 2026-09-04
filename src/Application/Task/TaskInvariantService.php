@@ -252,6 +252,7 @@ final class TaskInvariantService {
             $frequency = (string) ( $data['recurrence_frequency'] ?? ( $current_task->recurrence_frequency ?? '' ) );
             $interval = (int) ( $data['recurrence_interval'] ?? ( $current_task->recurrence_interval ?? 0 ) );
             $days = (string) ( $data['recurrence_days'] ?? ( $current_task->recurrence_days ?? '' ) );
+            $month_week = (string) ( $data['recurrence_month_week'] ?? ( $current_task->recurrence_month_week ?? '' ) );
             $ends_on = $data['recurrence_ends_on'] ?? ( $current_task->recurrence_ends_on ?? null );
 
             if ( ! $start_date || ! $deadline ) {
@@ -262,10 +263,10 @@ final class TaskInvariantService {
                 );
             }
 
-            if ( ! in_array( $frequency, array( 'weekly', 'monthly', 'custom_weekly' ), true ) || $interval < 1 ) {
+            if ( ! in_array( $frequency, array( 'weekly', 'monthly', 'custom_weekly', 'monthly_weekday' ), true ) || $interval < 1 ) {
                 return new WP_Error(
                     'rest_invalid_recurrence',
-                    __( 'The recurrence rule is invalid.', 'pandatask' ),
+                    __( 'Recurrence requires a supported frequency and recurrence_interval of at least 1.', 'pandatask' ),
                     array( 'status' => 422 )
                 );
             }
@@ -278,10 +279,30 @@ final class TaskInvariantService {
                 );
             }
 
-            if ( 'custom_weekly' === $frequency ) {
+            if ( 'monthly_weekday' === $frequency ) {
+                $normalized_days = $this->normalizeRecurrenceDays( $days );
+                if ( 1 !== count( array_filter( explode( ',', $normalized_days ) ) ) ) {
+                    return new WP_Error(
+                        'rest_invalid_recurrence',
+                        __( 'Monthly weekday recurrence requires exactly one ISO weekday in recurrence_days.', 'pandatask' ),
+                        array( 'status' => 422 )
+                    );
+                }
+                if ( ! in_array( $month_week, array( 'first', 'second', 'third', 'fourth', 'last' ), true ) ) {
+                    return new WP_Error(
+                        'rest_invalid_recurrence',
+                        __( 'Monthly weekday recurrence requires recurrence_month_week to be first, second, third, fourth, or last.', 'pandatask' ),
+                        array( 'status' => 422 )
+                    );
+                }
+                $data['recurrence_days'] = $normalized_days;
+                $data['recurrence_month_week'] = $month_week;
+            } elseif ( 'custom_weekly' === $frequency ) {
                 $data['recurrence_days'] = $this->normalizeRecurrenceDays( $days );
-            } elseif ( array_key_exists( 'recurrence_days', $data ) || 'custom_weekly' === ( $current_task->recurrence_frequency ?? '' ) ) {
+                $data['recurrence_month_week'] = null;
+            } elseif ( array_key_exists( 'recurrence_days', $data ) || in_array( (string) ( $current_task->recurrence_frequency ?? '' ), array( 'custom_weekly', 'monthly_weekday' ), true ) ) {
                 $data['recurrence_days'] = null;
+                $data['recurrence_month_week'] = null;
             }
 
             if ( $ends_on && $ends_on < $start_date ) {
@@ -385,6 +406,12 @@ final class TaskInvariantService {
 
         if ( array_key_exists( 'recurrence_days', $data ) ) {
             $data['recurrence_days'] = $this->normalizeRecurrenceDays( $data['recurrence_days'] );
+        }
+
+        if ( array_key_exists( 'recurrence_month_week', $data ) ) {
+            $data['recurrence_month_week'] = null === $data['recurrence_month_week'] || '' === $data['recurrence_month_week']
+                ? null
+                : sanitize_key( $data['recurrence_month_week'] );
         }
 
         foreach ( array( 'start_date', 'deadline', 'recurrence_ends_on' ) as $date_field ) {

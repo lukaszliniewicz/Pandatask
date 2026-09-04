@@ -2,7 +2,7 @@
 
 A WordPress plugin that renders task management boards via shortcode, with optional BuddyPress group integration. The front end is a React SPA backed by a custom REST API.
 
-**Version:** 1.0.31
+**Version:** 1.0.32
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
@@ -83,8 +83,10 @@ Each task has these fields:
 | `parent_task_id` | integer | Makes this task a child (subtask) of another task |
 | `predecessors` | array of integers | Task IDs that must finish before this one can start |
 | `is_recurring` | boolean | Whether the task is a recurring template |
-| `recurrence_frequency` | string | `weekly`, `bi-weekly`, `monthly`, `custom_weekly` |
-| `recurrence_days` | string | Comma-separated ISO day numbers for `custom_weekly` |
+| `recurrence_frequency` | string | `weekly`, `bi-weekly` (legacy alias), `monthly`, `custom_weekly`, `monthly_weekday` |
+| `recurrence_interval` | integer | Positive number of weeks or months between recurrence cycles |
+| `recurrence_days` | string | ISO weekdays `1` (Monday) through `7` (Sunday); one or more for `custom_weekly`, exactly one for `monthly_weekday` |
+| `recurrence_month_week` | string | `first`, `second`, `third`, `fourth`, or `last` for `monthly_weekday` |
 | `recurrence_ends_on` | date | Optional end date for recurrence |
 | `notify_deadline` | boolean | Enable deadline reminder |
 | `notify_days_before` | integer | Days before deadline to send reminder (1–30) |

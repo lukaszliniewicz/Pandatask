@@ -95,6 +95,7 @@ final class TaskMutationService {
             'recurrence_interval'      => $is_recurring ? ( $data['recurrence_interval'] ?? null ) : null,
             'recurrence_days'          => $is_recurring ? ( $data['recurrence_days'] ?? null ) : null,
             'recurrence_ends_on'       => $is_recurring ? ( $data['recurrence_ends_on'] ?? null ) : null,
+            'recurrence_month_week'    => $is_recurring ? ( $data['recurrence_month_week'] ?? null ) : null,
             'attachment_type'          => $data['attachment_type'] ?? null,
             'attachment_url'           => $data['attachment_url'] ?? null,
             'attachment_post_id'       => ! empty( $data['attachment_post_id'] ) ? $data['attachment_post_id'] : null,
@@ -132,6 +133,11 @@ final class TaskMutationService {
             $task_data['recurrence_interval']  = null;
             $task_data['recurrence_days']      = null;
             $task_data['recurrence_ends_on']   = null;
+            $task_data['recurrence_month_week'] = null;
+        }
+
+        if ( 'monthly_weekday' !== $task_data['recurrence_frequency'] ) {
+            $task_data['recurrence_month_week'] = null;
         }
 
         $task_data['recurrence_anchor_day'] = (
@@ -379,6 +385,7 @@ final class TaskMutationService {
             'recurrence_interval',
             'recurrence_days',
             'recurrence_ends_on',
+            'recurrence_month_week',
             'recurrence_anchor_day',
             'attachment_type',
             'attachment_url',
@@ -429,7 +436,7 @@ final class TaskMutationService {
                         $update_data['deadline'] = $value;
                         $format[]                = '%s';
                     }
-                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for', 'inbox_state', 'capture_source', 'capture_url' ), true ) ) {
+                } elseif ( in_array( $key, array( 'board_name', 'name', 'description', 'start_date', 'recurrence_frequency', 'recurrence_days', 'recurrence_ends_on', 'recurrence_month_week', 'attachment_type', 'attachment_url', 'attachment_filename', 'task_type', 'bug_url', 'deadline_reminder_sent_for', 'inbox_state', 'capture_source', 'capture_url' ), true ) ) {
                     $update_data[ $key ] = $value;
                     $format[]            = '%s';
                 } elseif ( in_array( $key, array( 'category_id', 'project_id', 'deadline_days_after_start', 'parent_task_id', 'follow_up_of_task_id', 'recurrence_interval', 'recurrence_anchor_day', 'attachment_post_id', 'estimated_effort_seconds' ), true ) ) {
@@ -443,7 +450,7 @@ final class TaskMutationService {
         }
 
         if ( array_key_exists( 'is_recurring', $data ) && empty( $data['is_recurring'] ) ) {
-            foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on', 'recurrence_anchor_day' ) as $field ) {
+            foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on', 'recurrence_month_week', 'recurrence_anchor_day' ) as $field ) {
                 if ( ! array_key_exists( $field, $update_data ) ) {
                     $format[] = '%s';
                 }
@@ -497,6 +504,15 @@ final class TaskMutationService {
             }
         } elseif ( ! empty( $current_task->recurrence_anchor_day ) || array_key_exists( 'recurrence_anchor_day', $update_data ) ) {
             $update_data['recurrence_anchor_day'] = null;
+        }
+
+        if ( ! $final_is_recurring || 'monthly_weekday' !== $final_frequency ) {
+            if ( ! empty( $current_task->recurrence_month_week ) || array_key_exists( 'recurrence_month_week', $update_data ) ) {
+                if ( ! array_key_exists( 'recurrence_month_week', $update_data ) ) {
+                    $format[] = '%s';
+                }
+                $update_data['recurrence_month_week'] = null;
+            }
         }
 
         $logged_fields = array(
@@ -866,7 +882,8 @@ final class TaskMutationService {
                 $task_to_delete->recurrence_frequency,
                 $task_to_delete->recurrence_interval,
                 $task_to_delete->recurrence_days,
-                (int) ( $task_to_delete->recurrence_anchor_day ?? 0 )
+                (int) ( $task_to_delete->recurrence_anchor_day ?? 0 ),
+                $task_to_delete->recurrence_month_week ?? null
             );
 
             if ( $next_date_str && ( ! $task_to_delete->recurrence_ends_on || $next_date_str <= $task_to_delete->recurrence_ends_on ) ) {
@@ -890,6 +907,7 @@ final class TaskMutationService {
                     'deadline_reminder_sent_for' => null,
                     'missed_deadline_notified' => 0,
                     'recurrence_anchor_day' => (int) ( $task_to_delete->recurrence_anchor_day ?? 0 ),
+                    'recurrence_month_week' => $task_to_delete->recurrence_month_week ?? null,
                 );
 
                 $result = $this->updateTask(
@@ -1040,7 +1058,8 @@ final class TaskMutationService {
                 $task->recurrence_frequency,
                 $task->recurrence_interval,
                 $task->recurrence_days,
-                (int) ( $task->recurrence_anchor_day ?? 0 )
+                (int) ( $task->recurrence_anchor_day ?? 0 ),
+                $task->recurrence_month_week ?? null
             );
             $current_start_date = $next_occurrence
                 ? $this->recurrence_calculator->onOrAfter(
@@ -1049,7 +1068,8 @@ final class TaskMutationService {
                 $task->recurrence_frequency,
                 $task->recurrence_interval,
                 $task->recurrence_days,
-                (int) ( $task->recurrence_anchor_day ?? 0 )
+                (int) ( $task->recurrence_anchor_day ?? 0 ),
+                $task->recurrence_month_week ?? null
                 )
                 : null;
 
@@ -1083,6 +1103,7 @@ final class TaskMutationService {
                 'status'       => 'pending',
                 'completed_at' => null,
                 'recurrence_anchor_day' => (int) ( $task->recurrence_anchor_day ?? 0 ),
+                'recurrence_month_week' => $task->recurrence_month_week ?? null,
             );
 
             $result = $this->updateTask( $task->id, $update_data, '', 0, null, 'rollover' );

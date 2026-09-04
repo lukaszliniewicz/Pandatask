@@ -4,6 +4,11 @@ import TaskSelect from '../TaskSelect';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const recurrenceUnit = (frequency, interval) => {
+    const unit = frequency === 'monthly' || frequency === 'monthly_weekday' ? 'month' : 'week';
+    return Number(interval) === 1 ? unit : `${unit}s`;
+};
+
 const TaskScheduleFields = ({
     active,
     control,
@@ -13,6 +18,7 @@ const TaskScheduleFields = ({
     notifyDeadline,
     projectId,
     recurrenceFrequency,
+    recurrenceInterval,
     register,
     scheduleMode,
     targetBoard,
@@ -121,13 +127,30 @@ const TaskScheduleFields = ({
             {isRecurring && (
                 <div className="pandat69-recurrence-options pandat69-form-panel">
                     <div className="pandat69-form-field">
-                        <label htmlFor={`${fieldPrefix}-recurrence-frequency`}>Repeats every</label>
+                        <label htmlFor={`${fieldPrefix}-recurrence-frequency`}>Repeat pattern</label>
                         <select id={`${fieldPrefix}-recurrence-frequency`} className="pandat69-select" {...register('recurrence_frequency')}>
                             <option value="weekly">Weekly</option>
-                            <option value="bi-weekly">Bi-Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="custom_weekly">Custom Days of Week</option>
+                            <option value="custom_weekly">Selected weekdays</option>
+                            <option value="monthly">Monthly on the start date</option>
+                            <option value="monthly_weekday">Monthly by weekday</option>
                         </select>
+                    </div>
+
+                    <div className="pandat69-form-field">
+                        <label htmlFor={`${fieldPrefix}-recurrence-interval`}>Repeat every</label>
+                        <div className="pandat69-choice-row">
+                            <input
+                                id={`${fieldPrefix}-recurrence-interval`}
+                                type="number"
+                                min="1"
+                                className="pandat69-input pandat69-small-number"
+                                aria-describedby={`${fieldPrefix}-recurrence-interval-unit`}
+                                {...register('recurrence_interval', { valueAsNumber: true, min: 1 })}
+                            />
+                            <span id={`${fieldPrefix}-recurrence-interval-unit`}>
+                                {recurrenceUnit(recurrenceFrequency, recurrenceInterval)}
+                            </span>
+                        </div>
                     </div>
 
                     {recurrenceFrequency === 'custom_weekly' && (
@@ -141,6 +164,29 @@ const TaskScheduleFields = ({
                                 ))}
                             </div>
                         </fieldset>
+                    )}
+
+                    {recurrenceFrequency === 'monthly_weekday' && (
+                        <div className="pandat69-form-row">
+                            <div className="pandat69-form-field pandat69-form-field-half">
+                                <label htmlFor={`${fieldPrefix}-recurrence-month-week`}>Week of month</label>
+                                <select id={`${fieldPrefix}-recurrence-month-week`} className="pandat69-select" {...register('recurrence_month_week')}>
+                                    <option value="first">First</option>
+                                    <option value="second">Second</option>
+                                    <option value="third">Third</option>
+                                    <option value="fourth">Fourth</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                            <div className="pandat69-form-field pandat69-form-field-half">
+                                <label htmlFor={`${fieldPrefix}-recurrence-weekday`}>Weekday</label>
+                                <select id={`${fieldPrefix}-recurrence-weekday`} className="pandat69-select" {...register('recurrence_weekday')}>
+                                    {WEEKDAYS.map((day, index) => (
+                                        <option key={day} value={index + 1}>{day}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                     )}
 
                     <div className="pandat69-form-field">

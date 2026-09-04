@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.31
+Stable tag: 1.0.32
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -23,7 +23,7 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 *   **Board and personal workspace tabs** – All Tasks, Projects, Overview, Archive, and Report on boards, with Inbox and Work Log added to personal workspaces.
 *   **Task hierarchy** – Tasks can have same-board parent-child relationships (subtasks). Subtasks inherit the parent's project, including descendant cascades when the project changes; parent board moves are blocked until children are moved or detached.
 *   **Task dependencies and lifecycle** – Tasks can list predecessors. Completion has an explicit work-accounting boundary, while reopen, post-completion work, and causal follow-up tasks remain distinct auditable operations.
-*   **Recurring tasks** – Weekly, bi-weekly, custom weekdays, or monthly. A daily cron rolls over completed instances to the next occurrence.
+*   **Recurring tasks** – Configurable weekly intervals, selected weekdays, fixed-date monthly schedules, or first/second/third/fourth/last weekday-of-month rules. A daily cron rolls over completed instances to the next occurrence.
 *   **Deadline management** – Fixed dates or relative duration (days after start). Per-task deadline reminders with configurable lead time.
 *   **User roles** – Assignees (responsible) and supervisors (oversight). Both receive notifications.
 *   **Categories** – Named groupings scoped to each board, manageable from the board header or inline in the task form.
@@ -97,6 +97,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.32 =
+
+* Include safe, concise task-description context in assignment and supervision email/BuddyPress notifications.
+* Preserve weekly and monthly recurrence intervals, support ordinal weekday-of-month schedules, and reject malformed recurrence combinations with actionable errors.
+* Persist estimated effort during task creation and round-trip recurrence fields through REST, MCP, and the task form.
 
 = 1.0.31 =
 

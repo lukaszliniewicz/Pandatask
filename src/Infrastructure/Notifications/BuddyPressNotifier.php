@@ -76,14 +76,25 @@ class BuddyPressNotifier {
                 // Get the assigner's details (secondary_item_id is the user who assigned the task)
                 $assigner = get_userdata($secondary_item_id);
                 $assigner_name = $assigner ? $assigner->display_name : __('Someone', 'pandatask');
+                $description_excerpt = TaskDescriptionService::notificationExcerpt( $task->description ?? '', 20 );
 
                 // Create the notification text
-                /* translators: 1: Assigner's display name, 2: Task name. */
-                $title = sprintf(
-                    __('%1$s assigned you to task: %2$s', 'pandatask'),
-                    $assigner_name,
-                    $task->name
-                );
+                if ( '' !== $description_excerpt ) {
+                    /* translators: 1: Assigner's display name, 2: Task name, 3: Description excerpt. */
+                    $title = sprintf(
+                        __('%1$s assigned you to task "%2$s": %3$s', 'pandatask'),
+                        $assigner_name,
+                        $task->name,
+                        $description_excerpt
+                    );
+                } else {
+                    /* translators: 1: Assigner's display name, 2: Task name. */
+                    $title = sprintf(
+                        __('%1$s assigned you to task: %2$s', 'pandatask'),
+                        $assigner_name,
+                        $task->name
+                    );
+                }
 
                 // Generate the link to the task board
                 $link = self::get_task_board_url($task->board_name, $item_id);
@@ -216,14 +227,25 @@ class BuddyPressNotifier {
                 // Get the assigner's details
                 $assigner = get_userdata($secondary_item_id);
                 $assigner_name = $assigner ? $assigner->display_name : __('Someone', 'pandatask');
+                $description_excerpt = TaskDescriptionService::notificationExcerpt( $task->description ?? '', 20 );
 
                 // Create the notification text
-                /* translators: 1: Assigner's display name, 2: Task name. */
-                $title = sprintf(
-                    __('%1$s assigned you as supervisor to task: %2$s', 'pandatask'),
-                    $assigner_name,
-                    $task->name
-                );
+                if ( '' !== $description_excerpt ) {
+                    /* translators: 1: Assigner's display name, 2: Task name, 3: Description excerpt. */
+                    $title = sprintf(
+                        __('%1$s assigned you as supervisor to task "%2$s": %3$s', 'pandatask'),
+                        $assigner_name,
+                        $task->name,
+                        $description_excerpt
+                    );
+                } else {
+                    /* translators: 1: Assigner's display name, 2: Task name. */
+                    $title = sprintf(
+                        __('%1$s assigned you as supervisor to task: %2$s', 'pandatask'),
+                        $assigner_name,
+                        $task->name
+                    );
+                }
 
                 // Generate the link to the task board
                 $link = self::get_task_board_url($task->board_name, $item_id);

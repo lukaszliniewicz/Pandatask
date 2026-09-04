@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.19';
+    private const DB_VERSION = '1.0.20';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -78,6 +78,7 @@ final class DatabaseLifecycle {
             recurrence_interval INT UNSIGNED NULL,
             recurrence_days VARCHAR(30) NULL,
             recurrence_ends_on DATE NULL,
+            recurrence_month_week VARCHAR(10) NULL,
             recurrence_anchor_day TINYINT UNSIGNED NULL,
             attachment_type VARCHAR(10) NULL,
             attachment_url VARCHAR(2048) NULL,
@@ -465,7 +466,7 @@ final class DatabaseLifecycle {
         $tasks_table = $prefix . 'tasks';
         $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 
-        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id', 'follow_up_of_task_id', 'inbox_state', 'capture_source', 'capture_url' ) as $column ) {
+        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_month_week', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id', 'follow_up_of_task_id', 'inbox_state', 'capture_source', 'capture_url' ) as $column ) {
             if ( ! in_array( $column, $task_columns, true ) ) {
                 return false;
             }
@@ -648,22 +649,39 @@ final class DatabaseLifecycle {
                    AND predecessor.status <> 'done'
                    AND predecessor.archived = 0",
                 "UPDATE {$tasks}
+                 SET recurrence_frequency = 'weekly',
+                     recurrence_interval = 2,
+                     recurrence_days = NULL,
+                     recurrence_month_week = NULL,
+                     recurrence_anchor_day = NULL,
+                     updated_at = UTC_TIMESTAMP()
+                 WHERE is_recurring = 1
+                   AND recurrence_frequency = 'bi-weekly'",
+                "UPDATE {$tasks}
                  SET is_recurring = 0,
                      recurrence_frequency = NULL,
                      recurrence_interval = NULL,
                      recurrence_days = NULL,
                      recurrence_ends_on = NULL,
+                     recurrence_month_week = NULL,
                      recurrence_anchor_day = NULL,
                      updated_at = UTC_TIMESTAMP()
                  WHERE is_recurring = 1
                    AND (
                        start_date IS NULL
                        OR deadline IS NULL
-                       OR recurrence_frequency NOT IN ('weekly', 'monthly', 'custom_weekly')
+                       OR recurrence_frequency NOT IN ('weekly', 'monthly', 'monthly_weekday', 'custom_weekly')
                        OR COALESCE(recurrence_interval, 0) < 1
                        OR (
                            recurrence_frequency = 'custom_weekly'
                            AND COALESCE(recurrence_days, '') NOT REGEXP '^[1-7](,[1-7])*$'
+                       )
+                       OR (
+                           recurrence_frequency = 'monthly_weekday'
+                           AND (
+                               COALESCE(recurrence_days, '') NOT REGEXP '^[1-7]$'
+                               OR COALESCE(recurrence_month_week, '') NOT REGEXP '^(first|second|third|fourth|last)$'
+                           )
                        )
                        OR (recurrence_ends_on IS NOT NULL AND recurrence_ends_on < start_date)
                    )",
@@ -672,6 +690,7 @@ final class DatabaseLifecycle {
                      recurrence_interval = NULL,
                      recurrence_days = NULL,
                      recurrence_ends_on = NULL,
+                     recurrence_month_week = NULL,
                      recurrence_anchor_day = NULL,
                      updated_at = UTC_TIMESTAMP()
                  WHERE is_recurring = 0
@@ -680,6 +699,7 @@ final class DatabaseLifecycle {
                        OR recurrence_interval IS NOT NULL
                        OR recurrence_days IS NOT NULL
                        OR recurrence_ends_on IS NOT NULL
+                       OR recurrence_month_week IS NOT NULL
                        OR recurrence_anchor_day IS NOT NULL
                    )",
                 "UPDATE {$tasks}
@@ -690,6 +710,9 @@ final class DatabaseLifecycle {
                 "UPDATE {$tasks}
                  SET recurrence_anchor_day = NULL
                  WHERE recurrence_frequency <> 'monthly' AND recurrence_anchor_day IS NOT NULL",
+                "UPDATE {$tasks}
+                 SET recurrence_month_week = NULL
+                 WHERE recurrence_frequency <> 'monthly_weekday' AND recurrence_month_week IS NOT NULL",
             );
 
             foreach ( $queries as $query ) {

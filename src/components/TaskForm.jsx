@@ -56,6 +56,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
     const notifyDeadline = watch('notify_deadline');
     const isRecurring = watch('is_recurring');
     const recurrenceFrequency = watch('recurrence_frequency');
+    const recurrenceInterval = watch('recurrence_interval');
     const parentTaskId = watch('parent_task_id');
     const projectId = watch('project_id');
     const { data: projects } = useProjects(targetBoard);
@@ -181,6 +182,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                     notifyDeadline={notifyDeadline}
                     projectId={projectId}
                     recurrenceFrequency={recurrenceFrequency}
+                    recurrenceInterval={recurrenceInterval}
                     register={register}
                     scheduleMode={scheduleMode}
                     targetBoard={targetBoard}

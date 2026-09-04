@@ -29,6 +29,15 @@ function wp_strip_all_tags( $value, $remove_breaks = false ) {
     return $remove_breaks ? preg_replace( '/[\r\n\t ]+/', ' ', $text ) : $text;
 }
 
+function wp_trim_words( $text, $word_limit = 55, $more = null ) {
+    $words = preg_split( '/\s+/', trim( (string) $text ) );
+    if ( count( $words ) <= $word_limit ) {
+        return trim( (string) $text );
+    }
+
+    return implode( ' ', array_slice( $words, 0, $word_limit ) ) . ( null === $more ? '&hellip;' : $more );
+}
+
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskDescriptionService.php';
 
 use Pandatask\Application\Task\TaskDescriptionService;
@@ -61,6 +70,9 @@ $assert_same( 'Before [Diagram: Review flow] after.', $excerpt, 'Plain-text exce
 $assert_true( false === strpos( $excerpt, 'flowchart' ), 'Mermaid source leaked into the plain-text excerpt.' );
 $assert_same( true, TaskDescriptionService::hasBlockMarkup( '<pre><code>example</code></pre>' ), 'Code blocks should be recognized as canonical block markup.' );
 $assert_same( false, TaskDescriptionService::hasBlockMarkup( 'inline <strong>text</strong>' ), 'Inline-only legacy HTML should remain eligible for wpautop().' );
+$assert_same( '', TaskDescriptionService::notificationExcerpt( '' ), 'Empty descriptions should produce no notification excerpt.' );
+$assert_same( 'Short linked description.', TaskDescriptionService::notificationExcerpt( '<p>Short <a href="https://example.test">linked</a> description.</p>' ), 'Short rich descriptions should become safe plain text.' );
+$assert_same( 'one two three…', TaskDescriptionService::notificationExcerpt( 'one two three four five', 3 ), 'Long notification excerpts should be bounded with an ellipsis.' );
 
 if ( ! empty( $failures ) ) {
     fwrite( STDERR, implode( PHP_EOL, $failures ) . PHP_EOL );

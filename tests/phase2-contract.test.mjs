@@ -239,12 +239,23 @@ test('Subtask projects are authoritative, cascaded, and repaired on upgrade', ()
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.19'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.20'/);
 	assert.match(lifecycle, /board_events/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
 	assert.match(lifecycle, /child\.board_name <> parent\.board_name/);
 	assert.match(lifecycle, /SET child\.parent_task_id = NULL/);
+});
+
+test('Legacy bi-weekly schedules are canonicalized before invalid recurrence cleanup', () => {
+	const lifecycle = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Setup/DatabaseLifecycle.php'), 'utf8');
+	const canonicalization = lifecycle.indexOf("SET recurrence_frequency = 'weekly',");
+	const invalidCleanup = lifecycle.indexOf("recurrence_frequency NOT IN ('weekly', 'monthly', 'monthly_weekday', 'custom_weekly')");
+
+	assert.notEqual(canonicalization, -1);
+	assert.notEqual(invalidCleanup, -1);
+	assert.ok(canonicalization < invalidCleanup);
+	assert.match(lifecycle, /recurrence_interval = 2[\s\S]*recurrence_frequency = 'bi-weekly'/);
 });
 
 test('Backend workflows persist audit buffers and stage protected media transactionally', () => {

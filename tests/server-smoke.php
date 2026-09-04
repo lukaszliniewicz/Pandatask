@@ -247,6 +247,7 @@ if ( ! empty( $missing_assets ) ) {
 $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 $result['schema_columns'] = array(
     'deadline_reminder_sent_for' => in_array( 'deadline_reminder_sent_for', $task_columns, true ),
+    'recurrence_month_week'     => in_array( 'recurrence_month_week', $task_columns, true ),
     'recurrence_anchor_day'      => in_array( 'recurrence_anchor_day', $task_columns, true ),
     'creator_id'                 => in_array( 'creator_id', $task_columns, true ),
     'estimated_effort_seconds'   => in_array( 'estimated_effort_seconds', $task_columns, true ),
@@ -257,8 +258,8 @@ if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.19', '<' ) ) {
-    $failures[] = 'Expected a loaded plugin with database schema 1.0.19 or newer.';
+if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.20', '<' ) ) {
+    $failures[] = 'Expected a loaded plugin with database schema 1.0.20 or newer.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

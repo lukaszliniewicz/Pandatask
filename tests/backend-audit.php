@@ -150,11 +150,18 @@ $checks = array(
             AND (
                 start_date IS NULL
                 OR deadline IS NULL
-                OR recurrence_frequency NOT IN ('weekly', 'monthly', 'custom_weekly')
+                OR recurrence_frequency NOT IN ('weekly', 'monthly', 'monthly_weekday', 'custom_weekly')
                 OR COALESCE(recurrence_interval, 0) < 1
                 OR (
                     recurrence_frequency = 'custom_weekly'
                     AND COALESCE(recurrence_days, '') NOT REGEXP '^[1-7](,[1-7])*$'
+                )
+                OR (
+                    recurrence_frequency = 'monthly_weekday'
+                    AND (
+                        COALESCE(recurrence_days, '') NOT REGEXP '^[1-7]$'
+                        OR COALESCE(recurrence_month_week, '') NOT REGEXP '^(first|second|third|fourth|last)$'
+                    )
                 )
                 OR (recurrence_ends_on IS NOT NULL AND recurrence_ends_on < start_date)
             )
@@ -166,6 +173,7 @@ $checks = array(
                 OR recurrence_interval IS NOT NULL
                 OR recurrence_days IS NOT NULL
                 OR recurrence_ends_on IS NOT NULL
+                OR recurrence_month_week IS NOT NULL
             )
         )",
     'recurring_missing_dates' => "
@@ -178,11 +186,18 @@ $checks = array(
         FROM {$tasks}
         WHERE is_recurring = 1
           AND (
-              recurrence_frequency NOT IN ('weekly', 'monthly', 'custom_weekly')
+              recurrence_frequency NOT IN ('weekly', 'monthly', 'monthly_weekday', 'custom_weekly')
               OR COALESCE(recurrence_interval, 0) < 1
               OR (
                   recurrence_frequency = 'custom_weekly'
                   AND COALESCE(recurrence_days, '') NOT REGEXP '^[1-7](,[1-7])*$'
+              )
+              OR (
+                  recurrence_frequency = 'monthly_weekday'
+                  AND (
+                      COALESCE(recurrence_days, '') NOT REGEXP '^[1-7]$'
+                      OR COALESCE(recurrence_month_week, '') NOT REGEXP '^(first|second|third|fourth|last)$'
+                  )
               )
               OR (recurrence_ends_on IS NOT NULL AND recurrence_ends_on < start_date)
           )",
@@ -195,6 +210,7 @@ $checks = array(
               OR recurrence_interval IS NOT NULL
               OR recurrence_days IS NOT NULL
               OR recurrence_ends_on IS NOT NULL
+              OR recurrence_month_week IS NOT NULL
           )",
     'duplicate_creator_history' => "
         SELECT COUNT(*)
@@ -216,6 +232,21 @@ $checks = array(
         OR (
             (is_recurring = 0 OR recurrence_frequency <> 'monthly')
             AND recurrence_anchor_day IS NOT NULL
+        )",
+    'invalid_monthly_weekday_rule' => "
+        SELECT COUNT(*)
+        FROM {$tasks}
+        WHERE (
+            is_recurring = 1
+            AND recurrence_frequency = 'monthly_weekday'
+            AND (
+                COALESCE(recurrence_days, '') NOT REGEXP '^[1-7]$'
+                OR COALESCE(recurrence_month_week, '') NOT REGEXP '^(first|second|third|fourth|last)$'
+            )
+        )
+        OR (
+            (is_recurring = 0 OR recurrence_frequency <> 'monthly_weekday')
+            AND recurrence_month_week IS NOT NULL
         )",
     'stale_deadline_reminder_marker' => "
         SELECT COUNT(*)

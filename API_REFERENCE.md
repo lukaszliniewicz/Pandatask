@@ -81,7 +81,7 @@ If you are an AI agent or building an automation script, follow these best pract
 -   **Response Example:**
     ```json
     {
-        "plugin_version": "1.0.31",
+        "plugin_version": "1.0.32",
         "today": "2026-07-24",
         "now": "2026-07-24T12:30:00+02:00",
         "timezone": "Europe/Warsaw",
@@ -219,9 +219,10 @@ Fields available when creating or updating tasks.
 | `project_id` | Integer | ID of project. For a subtask, the server always replaces this with the parent task's project. |
 | `parent_task_id` | Integer | ID of a same-board parent task. Changing a parent task's project cascades to all descendants; a task with descendants cannot change boards until they are moved or detached. |
 | `is_recurring` | Boolean | `true` if this is a recurring template |
-| `recurrence_frequency`| String | `weekly`, `bi-weekly`, `monthly`, `custom_weekly` |
-| `recurrence_interval` | Integer | e.g., `1` for every week, `2` for bi-weekly |
-| `recurrence_days` | String | Comma-separated day numbers (e.g. `"1,3,5"` for Mon,Wed,Fri) |
+| `recurrence_frequency`| String | `weekly`, `bi-weekly` (legacy alias for weekly interval 2), `monthly`, `custom_weekly`, `monthly_weekday` |
+| `recurrence_interval` | Integer | Positive number of weeks or months between recurrence cycles |
+| `recurrence_days` | String | ISO weekdays `1` (Monday) through `7` (Sunday); one or more for `custom_weekly`, exactly one for `monthly_weekday` |
+| `recurrence_month_week` | String | `first`, `second`, `third`, `fourth`, or `last`; required for `monthly_weekday` |
 | `recurrence_ends_on` | String | `YYYY-MM-DD` — recurrence stops after this date |
 | `attachment_type` | String | `file` or `link` |
 | `attachment_url` | String | URL of the attachment |
@@ -287,7 +288,7 @@ Fields available when creating or updating tasks.
     }
     ```
 
-    The projection allowlist is: `id`, `board_name`, `board_display_name`, `frontend_url`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
+    The projection allowlist is: `id`, `board_name`, `board_display_name`, `frontend_url`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_month_week`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
 
     `frontend_url` is the canonical current-board link for opening the task and is safe to surface to users. It is `false` only when Pandatask cannot resolve a published board route. `description_rendered` is computed only for an unprojected response or when explicitly requested. For example, `fields=name,description` returns exactly those two task properties without rendering or returning the rest of each record.
 

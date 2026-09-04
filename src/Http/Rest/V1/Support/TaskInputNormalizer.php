@@ -40,11 +40,17 @@ final class TaskInputNormalizer {
             return new WP_Error( 'rest_invalid_param', __( 'Invalid task type.', 'pandatask' ), array( 'status' => 422 ) );
         }
 
+        $recurrence_days = $this->sanitizeRecurrenceDays( $params['recurrence_days'] ?? '' );
+        if ( is_wp_error( $recurrence_days ) ) {
+            return $recurrence_days;
+        }
+
         $data = array(
             'board_name'                => sanitize_key( $board_name ),
             'name'                      => $name,
             'status'                    => $status,
             'priority'                  => max( 1, min( 10, absint( $params['priority'] ?? 5 ) ) ),
+            'estimated_effort_seconds'  => isset( $params['estimated_effort_seconds'] ) && '' !== $params['estimated_effort_seconds'] ? absint( $params['estimated_effort_seconds'] ) : null,
             'description'               => isset( $params['description'] ) ? TaskDescriptionService::sanitize( $params['description'] ) : '',
             'assigned_persons'          => RequestHelper::parseIdList( $params['assigned_persons'] ?? '' ),
             'supervisor_persons'        => RequestHelper::parseIdList( $params['supervisor_persons'] ?? '' ),
@@ -58,7 +64,9 @@ final class TaskInputNormalizer {
             'notify_days_before'        => max( 1, min( 30, absint( $params['notify_days_before'] ?? 3 ) ) ),
             'is_recurring'              => isset( $params['is_recurring'] ) && rest_sanitize_boolean( $params['is_recurring'] ) ? 1 : 0,
             'recurrence_frequency_val'  => sanitize_key( $params['recurrence_frequency'] ?? ( $params['recurrence_frequency_val'] ?? 'weekly' ) ),
-            'recurrence_days'           => $this->sanitizeRecurrenceDays( $params['recurrence_days'] ?? '' ),
+            'recurrence_interval'       => isset( $params['recurrence_interval'] ) && '' !== $params['recurrence_interval'] ? absint( $params['recurrence_interval'] ) : 1,
+            'recurrence_days'           => $recurrence_days,
+            'recurrence_month_week'     => isset( $params['recurrence_month_week'] ) ? sanitize_key( $params['recurrence_month_week'] ) : null,
             'recurrence_ends_on'        => ! empty( $params['recurrence_ends_on'] ) ? $this->sanitizeDate( $params['recurrence_ends_on'] ) : null,
             'attachment_type'           => isset( $params['attachment_type'] ) ? sanitize_key( $params['attachment_type'] ) : '',
             'attachment_url'            => isset( $params['attachment_url'] ) ? esc_url_raw( $params['attachment_url'] ) : '',
@@ -172,6 +180,15 @@ final class TaskInputNormalizer {
 
         if ( array_key_exists( 'recurrence_days', $params ) ) {
             $data['recurrence_days'] = $this->sanitizeRecurrenceDays( $params['recurrence_days'] );
+            if ( is_wp_error( $data['recurrence_days'] ) ) {
+                return $data['recurrence_days'];
+            }
+        }
+
+        if ( array_key_exists( 'recurrence_month_week', $params ) ) {
+            $data['recurrence_month_week'] = '' === $params['recurrence_month_week'] || null === $params['recurrence_month_week']
+                ? null
+                : sanitize_key( $params['recurrence_month_week'] );
         }
 
         if ( array_key_exists( 'attachment_type', $params ) ) {
@@ -280,18 +297,37 @@ final class TaskInputNormalizer {
     /**
      * @param mixed $value Raw recurrence weekdays.
      */
-    private function sanitizeRecurrenceDays( $value ): string {
+    private function sanitizeRecurrenceDays( $value ) {
         $values = is_array( $value ) ? $value : explode( ',', (string) $value );
-        $days = array_values(
-            array_unique(
-                array_filter(
-                    array_map( 'absint', $values ),
-                    static function ( $day ) {
-                        return $day >= 1 && $day <= 7;
-                    }
-                )
-            )
-        );
+        $days = array();
+
+        if ( empty( $values ) ) {
+            return '';
+        }
+
+        foreach ( $values as $raw_day ) {
+            $raw_day = trim( (string) $raw_day );
+            if ( '' === $raw_day ) {
+                if ( 1 === count( $values ) ) {
+                    return '';
+                }
+                return new WP_Error(
+                    'rest_invalid_recurrence',
+                    __( 'recurrence_days must be a comma-separated list of ISO weekdays 1 (Monday) through 7 (Sunday), without empty entries.', 'pandatask' ),
+                    array( 'status' => 422 )
+                );
+            }
+            if ( ! preg_match( '/^[1-7]$/', $raw_day ) ) {
+                return new WP_Error(
+                    'rest_invalid_recurrence',
+                    __( 'recurrence_days must contain only ISO weekdays 1 (Monday) through 7 (Sunday).', 'pandatask' ),
+                    array( 'status' => 422 )
+                );
+            }
+            $days[] = (int) $raw_day;
+        }
+
+        $days = array_values( array_unique( $days ) );
         sort( $days );
 
         return implode( ',', $days );
@@ -313,30 +349,55 @@ final class TaskInputNormalizer {
         }
 
         $frequency = sanitize_key( $data['recurrence_frequency'] ?? $data['recurrence_frequency_val'] );
+        $explicit_interval = array_key_exists( 'recurrence_interval', $data ) && null !== $data['recurrence_interval'];
+        $interval = $explicit_interval ? absint( $data['recurrence_interval'] ) : 1;
 
         switch ( $frequency ) {
             case 'weekly':
                 $data['recurrence_frequency'] = 'weekly';
-                $data['recurrence_interval'] = 1;
+                $data['recurrence_interval'] = $interval;
                 break;
 
             case 'bi-weekly':
+                if ( $explicit_interval && 2 !== $interval ) {
+                    return new WP_Error(
+                        'rest_invalid_recurrence',
+                        __( 'bi-weekly is a legacy alias for weekly with recurrence_interval 2; omit the interval or use 2.', 'pandatask' ),
+                        array( 'status' => 422 )
+                    );
+                }
                 $data['recurrence_frequency'] = 'weekly';
                 $data['recurrence_interval'] = 2;
                 break;
 
             case 'monthly':
                 $data['recurrence_frequency'] = 'monthly';
-                $data['recurrence_interval'] = 1;
+                $data['recurrence_interval'] = $interval;
                 break;
 
             case 'custom_weekly':
                 $data['recurrence_frequency'] = 'custom_weekly';
-                $data['recurrence_interval'] = 1;
+                $data['recurrence_interval'] = $interval;
+                break;
+
+            case 'monthly_weekday':
+                $data['recurrence_frequency'] = 'monthly_weekday';
+                $data['recurrence_interval'] = $interval;
                 break;
 
             default:
                 return new WP_Error( 'rest_invalid_recurrence', __( 'Invalid recurrence frequency.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+
+        if ( 'monthly_weekday' !== $data['recurrence_frequency'] ) {
+            if ( ! empty( $data['recurrence_month_week'] ) ) {
+                return new WP_Error(
+                    'rest_invalid_recurrence',
+                    __( 'recurrence_month_week is supported only when recurrence_frequency is monthly_weekday.', 'pandatask' ),
+                    array( 'status' => 422 )
+                );
+            }
+            $data['recurrence_month_week'] = null;
         }
 
         unset( $data['recurrence_frequency_val'] );

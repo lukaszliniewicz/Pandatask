@@ -54,4 +54,15 @@ test('fresh stdio core profile advertises the required tools and response contra
   const taskListProperties = (taskList.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
   const fieldsSchema = taskListProperties.fields as { items?: { enum?: readonly unknown[] } } | undefined;
   assert.ok(fieldsSchema?.items?.enum?.includes('frontend_url'), 'task_list fields must include frontend_url.');
+  assert.ok(fieldsSchema?.items?.enum?.includes('recurrence_month_week'), 'task_list fields must include recurrence_month_week.');
+
+  const taskCreate = listed.tools.find((tool) => tool.name === 'task_create');
+  assert.ok(taskCreate, 'Core profile must advertise task_create.');
+  const taskCreateProperties = (taskCreate.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  const recurrenceFrequency = taskCreateProperties.recurrence_frequency as { enum?: readonly unknown[] } | undefined;
+  const recurrenceMonthWeek = taskCreateProperties.recurrence_month_week as { enum?: readonly unknown[] } | undefined;
+  const recurrenceDays = taskCreateProperties.recurrence_days as { description?: string } | undefined;
+  assert.ok(recurrenceFrequency?.enum?.includes('monthly_weekday'), 'task_create must advertise monthly_weekday recurrence.');
+  assert.deepEqual(recurrenceMonthWeek?.enum, ['first', 'second', 'third', 'fourth', 'last']);
+  assert.match(recurrenceDays?.description ?? '', /Sunday is 7, never 0/);
 });

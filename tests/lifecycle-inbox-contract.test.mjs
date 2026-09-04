@@ -91,7 +91,7 @@ test('itemised completion refuses to exceed the still-unlogged actual time', () 
 
 test('database schema persists Inbox delegation, follow-up lineage, and work allocation context', () => {
   const lifecycle = read('src/Infrastructure/Setup/DatabaseLifecycle.php');
-  assert.match(lifecycle, /DB_VERSION = '1\.0\.19'/);
+  assert.match(lifecycle, /DB_VERSION = '1\.0\.20'/);
   assert.match(lifecycle, /follow_up_of_task_id/);
   assert.match(lifecycle, /inbox_delegates/);
   assert.match(lifecycle, /allocation_context VARCHAR\(32\) NOT NULL DEFAULT 'occurrence'/);

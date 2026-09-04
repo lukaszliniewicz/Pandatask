@@ -70,15 +70,16 @@ export const createTaskFormDefaults = ( {
 		parent_task_id:
 			task?.parent_task_id || defaultValues.parent_task_id || '',
 		is_recurring: Number( task?.is_recurring ) === 1,
-		recurrence_frequency:
-			task?.recurrence_frequency === 'weekly' &&
-			Number( task?.recurrence_interval ) === 2
-				? 'bi-weekly'
-				: task?.recurrence_frequency || 'weekly',
+		recurrence_frequency: task?.recurrence_frequency || 'weekly',
 		recurrence_interval: task?.recurrence_interval || 1,
 		recurrence_days: task?.recurrence_days
 			? task.recurrence_days.split( ',' )
 			: [],
+		recurrence_weekday:
+			task?.recurrence_frequency === 'monthly_weekday'
+				? task?.recurrence_days || '1'
+				: '1',
+		recurrence_month_week: task?.recurrence_month_week || 'first',
 		recurrence_ends_on: task?.recurrence_ends_on || '',
 		attachment: {
 			type: task?.attachment_type || '',
@@ -138,9 +139,15 @@ export const buildTaskPayload = (
 
 	payload.is_recurring = data.is_recurring ? 1 : 0;
 	payload.notify_deadline = data.notify_deadline ? 1 : 0;
-	if ( Array.isArray( data.recurrence_days ) ) {
+	if ( data.recurrence_frequency === 'monthly_weekday' ) {
+		payload.recurrence_days = String( data.recurrence_weekday || '1' );
+	} else if ( Array.isArray( data.recurrence_days ) ) {
 		payload.recurrence_days = data.recurrence_days.join( ',' );
 	}
+	if ( data.recurrence_frequency !== 'monthly_weekday' ) {
+		delete payload.recurrence_month_week;
+	}
+	delete payload.recurrence_weekday;
 	if ( data.parent_task_id ) {
 		payload.parent_task_id = Number.parseInt( data.parent_task_id, 10 );
 	}

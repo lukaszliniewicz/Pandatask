@@ -117,6 +117,7 @@ final class RequestHelper {
             'recurrence_frequency',
             'recurrence_interval',
             'recurrence_days',
+            'recurrence_month_week',
             'recurrence_ends_on',
             'next_recurrence_date',
             'parent_recurring_task_id',

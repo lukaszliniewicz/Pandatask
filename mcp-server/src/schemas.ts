@@ -65,6 +65,7 @@ export const taskCollectionFieldNames = [
   'recurrence_frequency',
   'recurrence_interval',
   'recurrence_days',
+  'recurrence_month_week',
   'recurrence_ends_on',
   'next_recurrence_date',
   'parent_recurring_task_id',
@@ -143,6 +144,63 @@ function validateOpenTaskStatus(
   }
 }
 
+type RecurrenceInput = {
+  is_recurring?: boolean | undefined;
+  recurrence_frequency?: 'weekly' | 'bi-weekly' | 'monthly' | 'custom_weekly' | 'monthly_weekday' | undefined;
+  recurrence_interval?: number | undefined;
+  recurrence_days?: string | undefined;
+  recurrence_month_week?: 'first' | 'second' | 'third' | 'fourth' | 'last' | undefined;
+};
+
+function validateRecurrenceRule(value: RecurrenceInput, context: z.RefinementCtx, creating = false): void {
+  if (value.is_recurring === false) return;
+
+  if (value.recurrence_frequency === 'bi-weekly' && value.recurrence_interval !== undefined && value.recurrence_interval !== 2) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recurrence_interval'],
+      message: 'bi-weekly is a legacy alias for weekly with recurrence_interval 2; omit recurrence_interval or use 2.',
+    });
+  }
+
+  if (value.recurrence_frequency === 'custom_weekly' && !value.recurrence_days) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recurrence_days'],
+      message: 'custom_weekly requires one or more ISO weekdays in recurrence_days.',
+    });
+  }
+
+  if (value.recurrence_frequency === 'monthly_weekday') {
+    if (!value.recurrence_days || value.recurrence_days.includes(',')) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recurrence_days'],
+        message: 'monthly_weekday requires exactly one ISO weekday in recurrence_days.',
+      });
+    }
+    if (!value.recurrence_month_week) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recurrence_month_week'],
+        message: 'monthly_weekday requires recurrence_month_week.',
+      });
+    }
+  } else if (value.recurrence_frequency && value.recurrence_month_week) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recurrence_month_week'],
+      message: 'recurrence_month_week is supported only with monthly_weekday.',
+    });
+  } else if (creating && value.recurrence_month_week) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recurrence_frequency'],
+      message: 'Set recurrence_frequency to monthly_weekday when using recurrence_month_week.',
+    });
+  }
+}
+
 export const taskMutableFields = {
   name: z.string().min(1).max(255).optional().describe('Short task title.'),
   description: z.string().optional().describe('Detailed task description. Stored/read content is canonical sanitized HTML.'),
@@ -167,11 +225,19 @@ export const taskMutableFields = {
   predecessors: idList.optional().describe('Predecessor task IDs on the same board.'),
   is_recurring: z.boolean().optional().describe('Whether this task repeats after its current occurrence.'),
   recurrence_frequency: z
-    .enum(['weekly', 'bi-weekly', 'monthly', 'custom_weekly'])
+    .enum(['weekly', 'bi-weekly', 'monthly', 'custom_weekly', 'monthly_weekday'])
     .optional()
-    .describe('Recurrence schedule type when is_recurring is true.'),
-  recurrence_interval: z.number().int().positive().optional().describe('Number of recurrence units between generated tasks.'),
-  recurrence_days: z.string().optional().describe('Comma-separated weekday numbers for custom_weekly recurrence.'),
+    .describe('Recurrence schedule type. bi-weekly is a legacy alias for weekly with interval 2.'),
+  recurrence_interval: z.number().int().positive().optional().describe('Positive number of weeks or months between recurrence cycles.'),
+  recurrence_days: z
+    .string()
+    .regex(/^(?:[1-7](?:,[1-7])*)?$/, 'Use comma-separated ISO weekdays 1 (Monday) through 7 (Sunday), without spaces.')
+    .optional()
+    .describe('ISO weekdays for custom_weekly, or exactly one weekday for monthly_weekday; Sunday is 7, never 0.'),
+  recurrence_month_week: z
+    .enum(['first', 'second', 'third', 'fourth', 'last'])
+    .optional()
+    .describe('Ordinal week used only with monthly_weekday recurrence.'),
   recurrence_ends_on: clearableDate.optional().describe('Last date on which the recurrence may generate work.'),
   notify_deadline: z.boolean().optional().describe('Enable deadline notification for assigned users.'),
   notify_days_before: z.number().int().min(1).max(30).optional().describe('Days before the deadline to notify.'),
@@ -191,12 +257,14 @@ export const taskCreateData = z
     name: z.string().min(1).max(255).describe('Short task title.'),
   })
   .superRefine(validateDateOrder)
+  .superRefine((value, context) => validateRecurrenceRule(value, context, true))
   .superRefine(validateOpenTaskStatus);
 
 export const taskUpdateData = z
   .object(taskMutableFields)
   .refine((value) => Object.values(value).some((item) => item !== undefined), 'Provide at least one task field to update.')
   .superRefine(validateDateOrder)
+  .superRefine((value, context) => validateRecurrenceRule(value, context))
   .superRefine(validateOpenTaskStatus);
 
 const { project_id: _projectId, predecessors: _predecessors, ...plannedTaskMutableFields } = taskMutableFields;
@@ -212,6 +280,7 @@ export const plannedTaskData = z
   })
   .strict()
   .superRefine(validateDateOrder)
+  .superRefine((value, context) => validateRecurrenceRule(value, context, true))
   .superRefine(validateOpenTaskStatus);
 
 export const projectMutableFields = {

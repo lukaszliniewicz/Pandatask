@@ -259,6 +259,8 @@ namespace {
                 'name'                  => 'Lifecycle task',
                 'description'           => '',
                 'status'                => $status,
+                'task_type'             => 'task',
+                'priority'              => 5,
                 'completed_at'          => null,
                 'creator_id'            => 7,
                 'project_id'            => null,
@@ -347,6 +349,12 @@ namespace {
         public function findCurrentForTask( $task_id ) {
             unset( $task_id );
             return $this->occurrence;
+        }
+
+        public function refreshOpenSnapshot( $occurrence_id, $task, $actor_id ) {
+            unset( $occurrence_id, $task, $actor_id );
+            $this->events[] = 'refresh_snapshot';
+            return true;
         }
 
         public function setState( $occurrence_id, $state, $actor_id ) {
@@ -550,17 +558,48 @@ namespace {
             'description'      => '',
             'status'           => 'done',
             'priority'         => 5,
+            'estimated_effort_seconds' => 5400,
             'assigned_persons' => array( 8, 9 ),
         )
     );
 
     $assert( 42 === $created, 'Already-completed task creation should return the new task ID.' );
+    $assert( 5400 === $create_repository->inserted['estimated_effort_seconds'], 'Task creation must persist estimated effort.' );
     $assert( array( array( 42, 7, 7 ) ) === $create_time->marks, 'The creator should retain the legacy unresolved state.' );
     $assert( array( array( 42, array( 8, 9 ), 7 ) ) === $create_time->ensures, 'Every assigned user should receive an unresolved state.' );
     $assert(
         array_search( 'assignment_lookup:supervisor', $GLOBALS['pandatask_lifecycle_events'], true ) < array_search( 'mark:7', $GLOBALS['pandatask_lifecycle_events'], true ),
         'Completed-task time states should be initialized after assignments are known.'
     );
+
+    $recurrence_repository = new LifecycleTestRepository();
+    $recurrence_service = $make_service(
+        new LifecycleTestTaskRepository(),
+        $recurrence_repository,
+        new LifecycleTestOccurrenceRepository(),
+        new LifecycleTestTimeService(),
+        new LifecycleTestFeatureSettings( true )
+    );
+    $recurrence_created = $recurrence_service->createTask(
+        array(
+            'board_name'                => 'audit-board',
+            'name'                      => 'Last Sunday review',
+            'description'               => '',
+            'status'                    => 'pending',
+            'priority'                  => 5,
+            'is_recurring'              => 1,
+            'recurrence_frequency'      => 'monthly_weekday',
+            'recurrence_interval'       => 1,
+            'recurrence_days'           => '7',
+            'recurrence_month_week'     => 'last',
+            'start_date'                => '2026-09-27',
+            'deadline'                  => '2026-09-27',
+        )
+    );
+    $assert( 42 === $recurrence_created, 'Monthly weekday task creation should succeed.' );
+    $assert( 'monthly_weekday' === $recurrence_repository->inserted['recurrence_frequency'], 'Task creation must persist the monthly weekday frequency.' );
+    $assert( '7' === $recurrence_repository->inserted['recurrence_days'], 'Task creation must persist ISO Sunday as 7.' );
+    $assert( 'last' === $recurrence_repository->inserted['recurrence_month_week'], 'Task creation must persist the monthly weekday ordinal.' );
 
     $delegated_repository = new LifecycleTestRepository();
     $delegated_occurrence = new LifecycleTestOccurrenceRepository();
@@ -599,6 +638,25 @@ namespace {
     $assert( 7 === (int) ( $GLOBALS['pandatask_action_args'][0][3] ?? 0 ), 'Delegated capture lifecycle events must identify the submitting actor.' );
     $assert( array( array( 42, array( 11 ), 'assignee' ) ) === $GLOBALS['pandatask_email_notifications'], 'Delegated capture should notify the assigned Inbox owner.' );
     $assert( array( array( 42, 11, 7, 'assignee' ) ) === $GLOBALS['pandatask_buddypress_notifications'], 'Delegated capture notifications must identify the submitting actor.' );
+
+    $reassignment_service = $make_service(
+        new LifecycleTestTaskRepository(),
+        new LifecycleTestRepository(),
+        new LifecycleTestOccurrenceRepository(),
+        new LifecycleTestTimeService(),
+        new LifecycleTestFeatureSettings( true )
+    );
+    $GLOBALS['pandatask_buddypress_notifications'] = array();
+    $GLOBALS['pandatask_email_notifications'] = array();
+    $reassigned = $reassignment_service->updateTask(
+        42,
+        array( 'assigned_persons' => array( 8, 10 ) ),
+        '',
+        7
+    );
+    $assert( true === $reassigned, 'A valid reassignment update should succeed.' );
+    $assert( array( array( 42, array( 10 ), 'assignee' ) ) === $GLOBALS['pandatask_email_notifications'], 'Reassignment should email only the newly added assignee.' );
+    $assert( array( array( 42, 10, 7, 'assignee' ) ) === $GLOBALS['pandatask_buddypress_notifications'], 'Reassignment should create a BuddyPress notification only for the newly added assignee.' );
 
     $disabled_time = new LifecycleTestTimeService();
     $disabled_service = $make_service(

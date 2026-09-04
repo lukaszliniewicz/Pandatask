@@ -86,6 +86,23 @@ final class TaskDescriptionService {
     }
 
     /**
+     * Build a bounded, plain-text description excerpt for notifications.
+     *
+     * @param mixed $description Rich task description.
+     * @param int   $word_limit  Maximum number of words to retain.
+     * @return string
+     */
+    public static function notificationExcerpt( $description, $word_limit = 30 ) {
+        $plain_text = self::plainText( $description );
+
+        if ( '' === $plain_text ) {
+            return '';
+        }
+
+        return wp_trim_words( $plain_text, max( 1, (int) $word_limit ), '…' );
+    }
+
+    /**
      * @param string $html Sanitized HTML.
      * @return bool
      */

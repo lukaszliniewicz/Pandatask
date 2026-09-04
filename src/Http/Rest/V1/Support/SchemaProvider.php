@@ -28,9 +28,10 @@ final class SchemaProvider {
             'notify_days_before'  => array( 'description' => __( 'Days before the deadline to notify.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1, 'maximum' => 30 ),
             'deadline_days_after_start' => array( 'description' => __( 'Dynamic deadline duration in days.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1 ),
             'is_recurring'        => array( 'description' => __( 'Whether this task repeats after its current occurrence.', 'pandatask' ), 'type' => 'boolean' ),
-            'recurrence_frequency'=> array( 'description' => __( 'Frequency of recurrence.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'weekly', 'bi-weekly', 'monthly', 'custom_weekly' ) ),
-            'recurrence_interval' => array( 'description' => __( 'Interval for recurrence.', 'pandatask' ), 'type' => 'integer' ),
-            'recurrence_days'     => array( 'description' => __( 'Comma-separated days for custom weekly recurrence.', 'pandatask' ), 'type' => 'string' ),
+            'recurrence_frequency'=> array( 'description' => __( 'Recurrence type. bi-weekly is a legacy alias for weekly with interval 2.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'weekly', 'bi-weekly', 'monthly', 'custom_weekly', 'monthly_weekday' ) ),
+            'recurrence_interval' => array( 'description' => __( 'Positive number of weeks or months between recurrence cycles.', 'pandatask' ), 'type' => 'integer', 'minimum' => 1 ),
+            'recurrence_days'     => array( 'description' => __( 'Comma-separated ISO weekdays: 1 is Monday and 7 is Sunday. Required for custom_weekly; monthly_weekday accepts exactly one.', 'pandatask' ), 'type' => 'string' ),
+            'recurrence_month_week' => array( 'description' => __( 'Ordinal week for monthly_weekday recurrence.', 'pandatask' ), 'type' => 'string', 'enum' => array( 'first', 'second', 'third', 'fourth', 'last' ) ),
             'recurrence_ends_on'  => array( 'description' => __( 'Date the recurrence should end.', 'pandatask' ), 'type' => 'string' ),
             'attachment_type'     => array( 'description' => __( 'Type of attachment.', 'pandatask' ), 'type' => 'string', 'enum' => array( '', 'file', 'link' ) ),
             'attachment_url'      => array( 'description' => __( 'URL of the attachment.', 'pandatask' ), 'type' => 'string' ),
@@ -79,7 +80,7 @@ final class SchemaProvider {
         $prompt  = "API ENDPOINTS AND SCHEMA:\n";
         $prompt .= "You can perform one or more of the following actions: create_task, update_task, delete_task, create_project, update_project, delete_project, create_category, delete_category, create_comment, update_comment, delete_comment.\n\n";
         $prompt .= "--- TASKS ---\n";
-        $prompt .= "1. 'create_task': Creates a new task. Required: 'name'. Optional: 'description', 'status', 'priority', 'deadline', 'start_date', 'assigned_persons' (array of user IDs), 'supervisor_persons' (array of user IDs), 'predecessors' (array of task IDs), 'category_id', 'parent_task_id', 'is_recurring' (boolean), 'recurrence_frequency' ('weekly', 'monthly', 'custom_weekly'), 'recurrence_interval' (integer), 'recurrence_days' (string), 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename'.\n";
+        $prompt .= "1. 'create_task': Creates a new task. Required: 'name'. Optional: 'description', 'status', 'priority', 'estimated_effort_seconds', 'deadline', 'start_date', 'assigned_persons' (array of user IDs), 'supervisor_persons' (array of user IDs), 'predecessors' (array of task IDs), 'category_id', 'parent_task_id', 'is_recurring' (boolean), 'recurrence_frequency' ('weekly', 'monthly', 'custom_weekly', 'monthly_weekday'), 'recurrence_interval' (positive integer), 'recurrence_days' (ISO weekdays 1=Monday through 7=Sunday), 'recurrence_month_week' ('first', 'second', 'third', 'fourth', or 'last'), 'recurrence_ends_on', 'attachment_type', 'attachment_url', 'attachment_filename'.\n";
         $prompt .= "2. 'update_task': Updates an existing task. Required: 'id'. Optional: any field from create_task.\n";
         $prompt .= "3. 'delete_task': Deletes a task. Required: 'id'.\n\n";
         $prompt .= "--- PROJECTS ---\n";

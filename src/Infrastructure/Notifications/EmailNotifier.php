@@ -3,6 +3,7 @@ namespace Pandatask\Infrastructure\Notifications;
 
 use DateTimeImmutable;
 use Exception;
+use Pandatask\Application\Task\TaskDescriptionService;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -37,6 +38,7 @@ class EmailNotifier {
         // Try to determine task URL
         $task_url = self::get_task_board_url($task->board_name, $task_id);
         $button_text = __('See Task', 'pandatask');
+        $description_excerpt = TaskDescriptionService::notificationExcerpt( $task->description ?? '', 40 );
         
         foreach ($new_user_ids as $user_id) {
             $user = get_userdata($user_id);
@@ -54,6 +56,10 @@ class EmailNotifier {
             $assignment_intro = sprintf( __('You have been assigned %s the following task:', 'pandatask'), $role_display );
             // translators: %s: Task name.
             $task_line = sprintf( __('Task: %s', 'pandatask'), $task->name );
+            // translators: %s: Plain-text task description excerpt.
+            $description_line = '' !== $description_excerpt
+                ? sprintf( __('Description: %s', 'pandatask'), $description_excerpt ) . "\n"
+                : '';
             // translators: %s: Task status (e.g., "Pending", "In Progress").
             $status_line = sprintf( __('Status: %s', 'pandatask'), ucfirst(str_replace('-', ' ', $task->status)) );
             // translators: %s: Task priority number (1-10).
@@ -72,6 +78,7 @@ class EmailNotifier {
             $text_message = $greeting . "\n\n" .
                             $assignment_intro . "\n\n" .
                             $task_line . "\n" .
+                            $description_line .
                             $status_line . "\n" .
                             $priority_line . "\n" .
                             $deadline_line . "\n\n" .
@@ -85,6 +92,7 @@ class EmailNotifier {
                             '<p>' . esc_html($assignment_intro) . '</p>' .
                             '<table style="border-collapse: collapse; width: 100%%; margin-bottom: 20px; border: 1px solid #ddd;">' .
                                 '<tr><td style="padding: 8px; border: 1px solid #ddd; width: 30%"><strong>' . esc_html(__('Task', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->name) . '</td></tr>' .
+                                ( '' !== $description_excerpt ? '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Description', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($description_excerpt) . '</td></tr>' : '' ) .
                                 '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Status', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html(ucfirst(str_replace('-', ' ', $task->status))) . '</td></tr>' .
                                 '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Priority', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->priority) . '</td></tr>' .
                                 '<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>' . esc_html(__('Deadline', 'pandatask')) . '</strong></td><td style="padding: 8px; border: 1px solid #ddd;">' . esc_html($task->deadline ?: __('No deadline', 'pandatask')) . '</td></tr>' .
