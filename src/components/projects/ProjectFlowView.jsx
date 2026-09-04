@@ -264,9 +264,7 @@ const ProjectFlowView = ({ dependencies, onTaskAction, tasks }) => {
   const flow = (
     <section
       className={`pandat69-project-flow ${
-        isExpanded
-          ? "is-viewport-expanded pandat69-container pandat69-root"
-          : ""
+        isExpanded ? "is-viewport-expanded" : ""
       } ${hasRelationFocus ? "has-relation-focus" : ""}`}
       aria-labelledby="pandatask-project-flow-title"
     >
@@ -474,7 +472,15 @@ const ProjectFlowView = ({ dependencies, onTaskAction, tasks }) => {
   );
 
   return isExpanded && typeof document !== "undefined"
-    ? createPortal(flow, document.body)
+    ? createPortal(
+        <div
+          className="pandat69-project-flow-portal pandat69-root"
+          data-iarf-plugin="pandatask"
+        >
+          {flow}
+        </div>,
+        document.body,
+      )
     : flow;
 };
 

@@ -52,10 +52,10 @@ test( 'project detail uses exclusive views and reserves related context for the 
 	assert.match( list, /Related context/ );
 	assert.match( list, /stay out of the action flow and timeline/ );
 	assert.doesNotMatch( list, /Canonical work/ );
-	assert.match( flow, /createPortal\(\s*flow,\s*document\.body\s*\)/ );
+	assert.match( flow, /pandat69-project-flow-portal pandat69-root/ );
+	assert.match( flow, /data-iarf-plugin="pandatask"/ );
 	assert.match( flow, /Open flow in full screen/ );
 	assert.match( flow, /is-viewport-expanded/ );
-	assert.match( flow, /is-viewport-expanded pandat69-container pandat69-root/ );
 	assert.match( flow, /onPointerDown=\{\s*startPan\s*\}/ );
 	assert.match( flow, /Focus relations for/ );
 	assert.match( flow, /pandat69-project-flow-children/ );

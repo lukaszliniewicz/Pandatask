@@ -1335,15 +1335,62 @@ body.pandat69-project-canvas-open {
 	overscroll-behavior: none;
 }
 
-.pandat69-project-flow.is-viewport-expanded {
-	position: fixed;
+.pandat69-project-flow-portal {
+	position: fixed !important;
 	inset: 0 !important;
 	z-index: var(--pandatask-gantt-viewport-z, 2147483646);
 	display: flex;
 	width: 100vw;
-	max-width: none;
 	height: 100vh;
 	height: 100dvh;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: #f4f7f9;
+	isolation: isolate;
+	overflow: hidden;
+
+	&,
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
+	}
+
+	:where(button, input, select, textarea) {
+		font: inherit;
+		letter-spacing: 0;
+	}
+
+	button {
+		appearance: none;
+		margin: 0;
+		border: 0;
+		background: transparent;
+		box-shadow: none;
+		color: inherit;
+		cursor: pointer;
+		text-shadow: none;
+		text-transform: none;
+	}
+
+	:where(ul[class^='pandat69-'], ul[class*=' pandat69-']) {
+		margin: 0 !important;
+		padding: 0 !important;
+		list-style: none !important;
+	}
+
+	:where(ul[class^='pandat69-'], ul[class*=' pandat69-']) > li::marker {
+		content: '';
+	}
+}
+
+.pandat69-project-flow.is-viewport-expanded {
+	position: relative !important;
+	display: flex;
+	width: 100%;
+	max-width: none;
+	height: 100%;
 	margin: 0 !important;
 	padding: 14px;
 	border: 0;
