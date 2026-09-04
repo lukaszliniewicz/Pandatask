@@ -69,6 +69,7 @@ final class RequestHelper {
             'id',
             'board_name',
             'board_display_name',
+            'frontend_url',
             'name',
             'description',
             'description_rendered',
@@ -159,7 +160,21 @@ final class RequestHelper {
             }
 
             foreach ( explode( ',', (string) $value ) as $field ) {
-                $field = sanitize_key( trim( $field ) );
+                $field = trim( $field );
+
+                // Validate before sanitizing so punctuation cannot be stripped
+                // into an otherwise valid allowlisted field name.
+                if ( '' === $field || ! preg_match( '/^[a-z0-9_]+$/', $field ) ) {
+                    return self::invalidTaskFieldsError(
+                        sprintf(
+                            /* translators: %s: requested task field. */
+                            __( 'Unknown or disallowed task field: %s.', 'pandatask' ),
+                            (string) $field
+                        )
+                    );
+                }
+
+                $field = sanitize_key( $field );
 
                 if ( '' === $field || ! in_array( $field, $allowed, true ) ) {
                     return self::invalidTaskFieldsError(

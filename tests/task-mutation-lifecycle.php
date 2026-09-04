@@ -8,6 +8,10 @@
 
 namespace Pandatask\Infrastructure\Persistence {
     final class DatabaseContext {
+        public static function getDbPrefix() {
+            return 'wp_pandat69_';
+        }
+
         public static function beginTransaction() {
             $GLOBALS['pandatask_lifecycle_events'][] = 'begin';
             return true;
@@ -163,6 +167,18 @@ namespace {
         }
     }
 
+    if ( ! class_exists( 'WP_REST_Response' ) ) {
+        class WP_REST_Response {
+            public $data;
+            public $status;
+
+            public function __construct( $data, $status = 200 ) {
+                $this->data = $data;
+                $this->status = $status;
+            }
+        }
+    }
+
     if ( ! function_exists( 'is_wp_error' ) ) {
         function is_wp_error( $value ) {
             return $value instanceof WP_Error;
@@ -302,6 +318,7 @@ namespace {
         public $events = array();
         public $occurrence;
         public $create_actor_ids = array();
+        public $current_occurrence_id = 99;
 
         public function __construct( $state = 'open' ) {
             $this->occurrence = (object) array(
@@ -321,7 +338,8 @@ namespace {
         }
 
         public function setCurrentOccurrence( $task_id, $occurrence_id ) {
-            unset( $task_id, $occurrence_id );
+            unset( $task_id );
+            $this->current_occurrence_id = (int) $occurrence_id;
             $this->events[] = 'set_current';
             return true;
         }
@@ -343,6 +361,7 @@ namespace {
         public $marks = array();
         public $ensures = array();
         public $resolutions = array();
+        public $reopens = array();
 
         public function markUnresolved( $task_id, $user_id, $resolved_by ) {
             $this->marks[] = array( $task_id, $user_id, $resolved_by );
@@ -359,6 +378,93 @@ namespace {
         public function resolveCurrentOccurrence( $task_id, $user_id, $actual_seconds, $not_tracked, $resolved_by, $options ) {
             $this->resolutions[] = array( $task_id, $user_id, $actual_seconds, $not_tracked, $resolved_by, $options );
             return array( 'state' => 'resolved' );
+        }
+
+        public function reviseOnReopen( $occurrence_id, $actor_id ) {
+            $this->reopens[] = array( (int) $occurrence_id, (int) $actor_id );
+            return true;
+        }
+    }
+
+    final class LifecycleTestWpdb {
+        public $status = 'done';
+
+        public function prepare( $query ) {
+            return $query;
+        }
+
+        public function get_row( $query ) {
+            if ( false === strpos( $query, 'FROM wp_pandat69_tasks' ) ) {
+                return null;
+            }
+
+            return (object) array(
+                'id'                   => 42,
+                'board_name'           => 'audit-board',
+                'creator_id'           => 7,
+                'inbox_state'          => null,
+                'follow_up_of_task_id' => null,
+                'status'               => $this->status,
+            );
+        }
+
+        public function get_results( $query ) {
+            if ( false !== strpos( $query, 'FROM wp_pandat69_assignments' ) ) {
+                return array();
+            }
+
+            return array();
+        }
+    }
+
+    final class LifecycleTestRequest implements \ArrayAccess {
+        private $params;
+
+        public function __construct( array $params ) {
+            $this->params = $params;
+        }
+
+        public function get_json_params() {
+            return array();
+        }
+
+        public function offsetExists( $offset ) {
+            return array_key_exists( $offset, $this->params );
+        }
+
+        public function offsetGet( $offset ) {
+            return $this->params[ $offset ] ?? null;
+        }
+
+        public function offsetSet( $offset, $value ) {
+            $this->params[ $offset ] = $value;
+        }
+
+        public function offsetUnset( $offset ) {
+            unset( $this->params[ $offset ] );
+        }
+    }
+
+    final class LifecycleTestRouteTaskService {
+        public $access;
+        public $reopen_calls = array();
+
+        public function __construct( $access ) {
+            $this->access = $access;
+        }
+
+        public function getTaskForAuthorization( $task_id ) {
+            unset( $task_id );
+            return $this->access;
+        }
+
+        public function reopenTask( $task_id, $status, $reason, $actor_id ) {
+            $this->reopen_calls[] = array( (int) $task_id, $status, $reason, (int) $actor_id );
+            return true;
+        }
+
+        public function getTask( $task_id ) {
+            return (object) array( 'id' => (int) $task_id, 'description' => '' );
         }
     }
 
@@ -580,6 +686,50 @@ namespace {
     $assert( true === $genuine, 'A pending task should still complete successfully.' );
     $assert( 1 === count( $genuine_time->resolutions ), 'Genuine completion should preserve accounting resolution.' );
     $assert( 'completed' === $genuine_occurrence->occurrence->state, 'Genuine completion should close the current occurrence.' );
+
+    $reopen_time = new LifecycleTestTimeService();
+    $reopen_occurrence = new LifecycleTestOccurrenceRepository( 'completed' );
+    $reopen_service = $make_service(
+        new LifecycleTestTaskRepository( 'done' ),
+        new LifecycleTestRepository(),
+        $reopen_occurrence,
+        $reopen_time,
+        new LifecycleTestFeatureSettings( true )
+    );
+    $reopened = $reopen_service->updateTask( 42, array( 'status' => 'in-progress' ), 'Corrected completion', 7, null, 'reopen' );
+    $assert( true === $reopened, 'An explicit reopen should succeed for a completed task.' );
+    $assert( 'open' === $reopen_occurrence->occurrence->state, 'An explicit reopen should reopen the existing current occurrence.' );
+    $assert( 99 === $reopen_occurrence->current_occurrence_id, 'An explicit reopen should keep the existing occurrence selected as current.' );
+    $assert( ! in_array( 'create:open', $reopen_occurrence->events, true ), 'An explicit reopen must not create a new work occurrence.' );
+    $assert( array( array( 99, 7 ) ) === $reopen_time->reopens, 'An explicit reopen should revise time for the reopened occurrence.' );
+
+    require_once dirname( __DIR__ ) . '/src/Infrastructure/Persistence/TaskRepository.php';
+    require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
+    require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/TaskLifecycleRouteHandler.php';
+
+    $GLOBALS['wpdb'] = new LifecycleTestWpdb();
+    $access_repository = new \Pandatask\Infrastructure\Persistence\TaskRepository();
+    $access_record = $access_repository->findAccessRecordById( 42 );
+    $assert( 'done' === $access_record->status, 'The authorization access projection should expose the canonical task status.' );
+
+    $route_task_service = new LifecycleTestRouteTaskService( $access_record );
+    $route_handler = new \Pandatask\Http\Rest\V1\TaskLifecycleRouteHandler(
+        $route_task_service,
+        new stdClass(),
+        new stdClass(),
+        new stdClass(),
+        new stdClass(),
+        new stdClass()
+    );
+    $route_result = $route_handler->reopen_task( new LifecycleTestRequest( array( 'id' => 42, 'reason' => 'Fix completion' ) ) );
+    $assert( $route_result instanceof \WP_REST_Response, 'A done access record should reach the explicit reopen route.' );
+    $assert( 1 === count( $route_task_service->reopen_calls ), 'A done access record should invoke the reopen mutation.' );
+
+    $GLOBALS['wpdb']->status = 'open';
+    $route_task_service->access = $access_repository->findAccessRecordById( 42 );
+    $route_result = $route_handler->reopen_task( new LifecycleTestRequest( array( 'id' => 42, 'reason' => 'Should be rejected' ) ) );
+    $assert( is_wp_error( $route_result ) && 'pandatask_task_not_completed' === $route_result->get_error_code(), 'An open access record should be rejected by the reopen route.' );
+    $assert( 1 === count( $route_task_service->reopen_calls ), 'An open access record must not invoke the reopen mutation.' );
 
     if ( ! empty( $failures ) ) {
         fwrite( STDERR, implode( PHP_EOL, $failures ) . PHP_EOL );

@@ -33,6 +33,38 @@ if ( ! function_exists( 'wpautop' ) ) {
 if ( ! function_exists( 'get_current_user_id' ) ) {
     function get_current_user_id() { return 7; }
 }
+if ( ! function_exists( 'get_transient' ) ) {
+    function get_transient( $key ) { return false; }
+}
+if ( ! function_exists( 'set_transient' ) ) {
+    function set_transient( $key, $value, $expiration ) { return true; }
+}
+if ( ! function_exists( 'trailingslashit' ) ) {
+    function trailingslashit( $value ) { return rtrim( (string) $value, '/' ) . '/'; }
+}
+if ( ! function_exists( 'add_query_arg' ) ) {
+    function add_query_arg( $key, $value, $url ) {
+        return (string) $url . ( false === strpos( (string) $url, '?' ) ? '?' : '&' ) . rawurlencode( (string) $key ) . '=' . rawurlencode( (string) $value );
+    }
+}
+if ( ! function_exists( 'get_permalink' ) ) {
+    function get_permalink( $post_id ) { return 'https://example.test/shortcode-board/' . (int) $post_id . '/'; }
+}
+if ( ! class_exists( 'VisibleTasksRestTestWpdb' ) ) {
+    final class VisibleTasksRestTestWpdb {
+        public $posts = 'wp_posts';
+        public function prepare( $query, ...$args ) { return $query; }
+        public function esc_like( $value ) { return $value; }
+        public function get_var( $query ) { return 0; }
+    }
+}
+$GLOBALS['wpdb'] = new VisibleTasksRestTestWpdb();
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+    define( 'DAY_IN_SECONDS', 86400 );
+}
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+    define( 'HOUR_IN_SECONDS', 3600 );
+}
 if ( ! function_exists( 'user_can' ) ) {
     function user_can( $user_id, $capability ) {
         return ! empty( $GLOBALS['pandatask_test_caps'][ (int) $user_id ][ $capability ] );
@@ -62,6 +94,7 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Media/ProtectedAttachmentService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskDescriptionService.php';
+require_once dirname( __DIR__ ) . '/src/Infrastructure/Notifications/TaskBoardUrlResolver.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Security/WorkEntryAccessPolicy.php';
 require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
@@ -294,6 +327,19 @@ $unknown_projection_request = new class( array( 'fields' => 'not_a_task_field' )
 };
 $unknown_projection_response = $invalid_projection_handler->get_visible_tasks( $unknown_projection_request );
 $assert( is_wp_error( $unknown_projection_response ) && 400 === $unknown_projection_response->get_error_data()['status'] && 0 === $invalid_projection_service->calls, 'Unknown projections must fail with 400 before repository work.' );
+$malformed_projection_request = new class( array( 'fields' => 'na!me' ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$malformed_projection_response = $invalid_projection_handler->get_visible_tasks( $malformed_projection_request );
+$assert( is_wp_error( $malformed_projection_response ) && 'rest_invalid_param' === $malformed_projection_response->get_error_code() && 400 === $malformed_projection_response->get_error_data()['status'] && 0 === $invalid_projection_service->calls, 'Malformed projection tokens must fail with rest_invalid_param/400 before sanitization or repository work.' );
+$uppercase_projection_fields = \Pandatask\Http\Rest\V1\Support\RequestHelper::parseTaskFields( 'NAME' );
+$assert( is_wp_error( $uppercase_projection_fields ) && 'rest_invalid_param' === $uppercase_projection_fields->get_error_code() && 400 === $uppercase_projection_fields->get_error_data()['status'], 'Projection field names must use canonical lowercase snake_case.' );
 
 $repository_source = file_get_contents( dirname( __DIR__ ) . '/src/Infrastructure/Persistence/TaskRepository.php' );
 $assert( false !== strpos( $repository_source, "assignee_filter.role = 'assignee' OR assignee_filter.role IS NULL" ), 'Repository assignee filters must include assignee and legacy NULL roles.' );

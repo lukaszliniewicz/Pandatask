@@ -42,6 +42,31 @@ test('minimal mutation results preserve identity and state while removing rich r
   });
 });
 
+test('minimal task mutation receipts preserve an authoritative frontend URL', () => {
+  const result = toolResult(
+    {
+      message: 'Task added',
+      task: {
+        id: 7,
+        board_name: 'group_10',
+        frontend_url: 'https://example.test/groups/group-10/tasks?open_task=7',
+        description: 'Omit rich fields from the minimal receipt.',
+      },
+    },
+    { responseMode: 'minimal', operation: 'task_create' },
+  );
+
+  assert.deepEqual(result.structuredContent?.data, {
+    operation: 'task_create',
+    message: 'Task added',
+    task: {
+      id: 7,
+      board_name: 'group_10',
+      frontend_url: 'https://example.test/groups/group-10/tasks?open_task=7',
+    },
+  });
+});
+
 test('full mutation and dry-run responses remain unprojected', () => {
   const fullValue = { message: 'Task added', task: { id: 7, description: 'Keep me.' } };
   assert.deepEqual(toolResult(fullValue, { responseMode: 'full', operation: 'task_create' }).structuredContent, {

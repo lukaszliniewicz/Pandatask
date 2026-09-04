@@ -323,7 +323,7 @@ final class TaskRepository {
         $assignments_table = $prefix . 'assignments';
         $task = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT t.id, t.board_name, t.creator_id, t.inbox_state, t.follow_up_of_task_id
+                "SELECT t.id, t.board_name, t.creator_id, t.inbox_state, t.follow_up_of_task_id, t.status
                  FROM {$tasks_table} t
                  WHERE t.id = %d",
                 $task_id

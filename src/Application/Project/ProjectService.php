@@ -5,6 +5,7 @@ namespace Pandatask\Application\Project;
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Task\TaskCacheInvalidator;
+use Pandatask\Infrastructure\Notifications\TaskBoardUrlResolver;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Persistence\ProjectRepository;
 
@@ -58,7 +59,7 @@ final class ProjectService {
         $cached        = get_transient( $transient_key );
 
         if ( false !== $cached ) {
-            return $cached;
+            return $this->decorateProjectUrl( $cached );
         }
 
         $project = $this->repository->findById( $project_id );
@@ -67,7 +68,7 @@ final class ProjectService {
             set_transient( $transient_key, $project, 12 * HOUR_IN_SECONDS );
         }
 
-        return $project;
+        return $project ? $this->decorateProjectUrl( $project ) : $project;
     }
 
     public function addProject( $data ) {
@@ -130,7 +131,35 @@ final class ProjectService {
                 ? 'group'
                 : ( preg_match( '/^user_\d+$/', $project->board_name ) ? 'private' : 'standard' );
             $project->can_manage = true === $this->board_access_policy->canManageBoard( $project->board_name, $viewer_id );
+            $project->frontend_url = TaskBoardUrlResolver::resolveProject( $project->board_name ?? '', (int) ( $project->id ?? 0 ) );
+            if ( property_exists( $project, 'tasks' ) ) {
+                $project->tasks = $this->decorateProjectTasks( $project->tasks, $project->board_name ?? '' );
+            }
             $decorated[] = $project;
+        }
+
+        return $decorated;
+    }
+
+    private function decorateProjectUrl( $canonical_project ) {
+        $project = clone $canonical_project;
+        $project->frontend_url = TaskBoardUrlResolver::resolveProject( $project->board_name ?? '', (int) ( $project->id ?? 0 ) );
+
+        return $project;
+    }
+
+    private function decorateProjectTasks( $tasks, $board_name ) {
+        $decorated = array();
+
+        foreach ( (array) $tasks as $task ) {
+            if ( is_object( $task ) ) {
+                $task = clone $task;
+                $task->frontend_url = TaskBoardUrlResolver::resolve( $board_name, (int) ( $task->id ?? 0 ) );
+            } elseif ( is_array( $task ) ) {
+                $task['frontend_url'] = TaskBoardUrlResolver::resolve( $board_name, (int) ( $task['id'] ?? 0 ) );
+            }
+
+            $decorated[] = $task;
         }
 
         return $decorated;

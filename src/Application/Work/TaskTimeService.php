@@ -216,36 +216,39 @@ final class TaskTimeService {
         return $this->audit_repository->record( 'task_time_resolution', $resolution_id, 'unresolved', $resolved_by, $latest, $resolution_data );
     }
 
-    /** Reopening preserves the last known cumulative resolution as a new revision. */
-    public function reviseOnReopen( $task_id, $user_id, $actor_id ) {
-        $occurrence = $this->occurrence_repository->findCurrentForTask( (int) $task_id );
-        if ( ! $occurrence || $user_id <= 0 ) {
+    /** Reopening preserves each user's last resolution context as an unresolved revision. */
+    public function reviseOnReopen( $occurrence_id, $actor_id ) {
+        $occurrence_id = (int) $occurrence_id;
+        if ( $occurrence_id <= 0 ) {
             return true;
         }
 
-        $latest = $this->time_repository->latest( (int) $occurrence->id, (int) $user_id );
-        if ( ! $latest ) {
-            return true;
+        foreach ( $this->time_repository->userIdsForOccurrence( $occurrence_id ) as $user_id ) {
+            $latest = $this->time_repository->latest( $occurrence_id, (int) $user_id );
+            if ( ! $latest ) {
+                continue;
+            }
+
+            $specific = $this->work_repository->specificSecondsForOccurrenceUser( $occurrence_id, (int) $user_id, true );
+            $residual_entry_id = ! empty( $latest->residual_entry_id ) && $this->work_repository->findById( (int) $latest->residual_entry_id )
+                ? (int) $latest->residual_entry_id
+                : null;
+            $resolution_data = array(
+                'occurrence_id'           => $occurrence_id,
+                'user_id'                 => (int) $user_id,
+                'state'                   => 'unresolved',
+                'declared_actual_seconds' => null === $latest->declared_actual_seconds ? null : (int) $latest->declared_actual_seconds,
+                'specific_seconds'        => $specific,
+                'residual_entry_id'       => $residual_entry_id,
+                'resolved_by'             => max( 0, (int) $actor_id ),
+            );
+            $resolution_id = $this->time_repository->insertRevision( $resolution_data );
+            if ( ! $resolution_id || ! $this->audit_repository->record( 'task_time_resolution', $resolution_id, 'reopened', $actor_id, $latest, $resolution_data ) ) {
+                return false;
+            }
         }
 
-        $specific = $this->work_repository->specificSecondsForOccurrenceUser( (int) $occurrence->id, (int) $user_id, true );
-        $residual_entry_id = ! empty( $latest->residual_entry_id ) && $this->work_repository->findById( (int) $latest->residual_entry_id )
-            ? (int) $latest->residual_entry_id
-            : null;
-        $resolution_data = array(
-            'occurrence_id'           => (int) $occurrence->id,
-            'user_id'                 => (int) $user_id,
-            'state'                   => (string) $latest->state,
-            'declared_actual_seconds' => null === $latest->declared_actual_seconds ? null : (int) $latest->declared_actual_seconds,
-            'specific_seconds'        => $specific,
-            'residual_entry_id'       => $residual_entry_id,
-            'resolved_by'             => max( 0, (int) $actor_id ),
-        );
-        $resolution_id = $this->time_repository->insertRevision( $resolution_data );
-        if ( ! $resolution_id ) {
-            return false;
-        }
-        return $this->audit_repository->record( 'task_time_resolution', $resolution_id, 'reopened', $actor_id, $latest, $resolution_data );
+        return true;
     }
 
     /** Ensure every assignee has a durable state for a completed occurrence. */
@@ -346,9 +349,28 @@ final class TaskTimeService {
         }
 
         if ( 'unresolved' === $latest->state ) {
-            return $this->markUnresolved( (int) $occurrence->task_id, (int) $user_id, (int) $actor_id )
-                ? true
-                : new WP_Error( 'pandatask_time_resolution_failed', __( 'Unresolved task time could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
+            $specific = $this->work_repository->specificSecondsForOccurrenceUser( (int) $occurrence_id, (int) $user_id, true );
+            $residual_entry_id = ! empty( $latest->residual_entry_id ) && $this->work_repository->findById( (int) $latest->residual_entry_id )
+                ? (int) $latest->residual_entry_id
+                : null;
+            $resolution_data = array(
+                'occurrence_id'           => (int) $occurrence_id,
+                'user_id'                 => (int) $user_id,
+                'state'                   => 'unresolved',
+                'declared_actual_seconds' => null === $latest->declared_actual_seconds ? null : (int) $latest->declared_actual_seconds,
+                'specific_seconds'        => $specific,
+                'residual_entry_id'       => $residual_entry_id,
+                'resolved_by'             => max( 0, (int) $actor_id ),
+            );
+            $resolution_id = $this->time_repository->insertRevision( $resolution_data );
+            if ( ! $resolution_id ) {
+                return new WP_Error( 'pandatask_time_resolution_failed', __( 'Unresolved task time could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
+            }
+            if ( ! $this->audit_repository->record( 'task_time_resolution', $resolution_id, 'unresolved', $actor_id, $latest, $resolution_data ) ) {
+                return new WP_Error( 'pandatask_work_audit_failed', __( 'Unresolved task time could not be audited.', 'pandatask' ), array( 'status' => 500 ) );
+            }
+
+            return true;
         }
 
         return true;

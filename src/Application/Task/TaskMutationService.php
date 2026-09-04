@@ -680,18 +680,14 @@ final class TaskMutationService {
 
         $is_reopening = isset( $update_data['status'] ) && 'done' !== $update_data['status'] && 'done' === $current_task->status;
         if ( $is_reopening && $current_occurrence && 'reopen' === $lifecycle_operation ) {
-            $next_task = clone $current_task;
-            foreach ( $update_data as $field => $value ) {
-                $next_task->$field = $value;
+            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, 'open', $actor_id ) ) {
+                throw new Exception( 'The completed work occurrence could not be reopened.' );
             }
-            $next_occurrence_id = $this->occurrence_repository->createForTask(
-                $next_task,
-                $this->occurrence_repository->nextSequence( $task_id ),
-                'open',
-                $actor_id
-            );
-            if ( ! $next_occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $next_occurrence_id ) ) {
-                throw new Exception( 'The reopened work occurrence could not be created.' );
+            if ( ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $current_occurrence->id ) ) {
+                throw new Exception( 'The reopened work occurrence could not remain current.' );
+            }
+            if ( $work_log_enabled && ! $this->task_time_service->reviseOnReopen( (int) $current_occurrence->id, $actor_id ) ) {
+                throw new Exception( 'The reopened task time could not be revised.' );
             }
         }
 

@@ -1,30 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isBoardTabAvailable } from '../boardTabs.mjs';
-
-const VALID_VIEWS = new Set( [
-	'compact',
-	'list',
-	'kanban',
-	'calendar',
-	'gantt',
-] );
+import {
+	projectSelectionQueryValue,
+	readBoardNavigationSearch,
+} from '../boardNavigationModel.mjs';
 
 const readLocation = ( isUserBoard = false, workLogEnabled = true ) => {
-	const params = new URLSearchParams( window.location.search );
-	const tab = params.get( 'pandatask_tab' );
-	const view = params.get( 'pandatask_view' );
-	const taskValue = Number.parseInt( params.get( 'open_task' ) || '', 10 );
-
-	return {
-		currentTab: isBoardTabAvailable( tab || '', isUserBoard, {
-			workLogEnabled,
-		} )
-			? tab
-			: 'tasks',
-		currentView: VALID_VIEWS.has( view ) ? view : 'compact',
-		selectedTaskId:
-			Number.isInteger( taskValue ) && taskValue > 0 ? taskValue : null,
-	};
+	return readBoardNavigationSearch(
+		window.location.search,
+		isUserBoard,
+		workLogEnabled
+	);
 };
 
 const writeLocation = ( values, mode, state = {} ) => {
@@ -91,7 +77,11 @@ export const useBoardNavigation = (
 	);
 
 	const setCurrentView = useCallback( ( currentView ) => {
-		if ( ! VALID_VIEWS.has( currentView ) ) {
+		if (
+			! [ 'compact', 'list', 'kanban', 'calendar', 'gantt' ].includes(
+				currentView
+			)
+		) {
 			return;
 		}
 		setNavigation( ( current ) => ( { ...current, currentView } ) );
@@ -99,6 +89,15 @@ export const useBoardNavigation = (
 			{ pandatask_view: currentView === 'compact' ? null : currentView },
 			'push'
 		);
+	}, [] );
+
+	const setSelectedProject = useCallback( ( projectId ) => {
+		const selectedProjectId = projectSelectionQueryValue( projectId );
+		setNavigation( ( current ) => ( {
+			...current,
+			selectedProjectId: selectedProjectId ?? 'all',
+		} ) );
+		writeLocation( { pandatask_project: selectedProjectId }, 'push' );
 	}, [] );
 
 	const openTask = useCallback( ( taskId, { replace = false } = {} ) => {
@@ -138,6 +137,7 @@ export const useBoardNavigation = (
 		isDetailModalOpen: navigation.selectedTaskId !== null,
 		setCurrentTab,
 		setCurrentView,
+		setSelectedProject,
 		openTask,
 		closeTask,
 	};

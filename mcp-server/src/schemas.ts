@@ -39,6 +39,7 @@ export const taskCollectionFieldNames = [
   'id',
   'board_name',
   'board_display_name',
+  'frontend_url',
   'name',
   'description',
   'description_rendered',

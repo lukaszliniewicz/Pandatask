@@ -18,6 +18,25 @@ final class TaskTimeRepository {
         );
     }
 
+    /** Return every positive user with a resolution revision for one occurrence. */
+    public function userIdsForOccurrence( $occurrence_id ) {
+        global $wpdb;
+
+        $table = DatabaseContext::getDbPrefix() . 'task_time_resolutions';
+        $user_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT user_id
+                 FROM {$table}
+                 WHERE occurrence_id = %d
+                   AND user_id > 0
+                 ORDER BY user_id ASC",
+                (int) $occurrence_id
+            )
+        );
+
+        return array_values( array_unique( array_filter( array_map( 'absint', (array) $user_ids ) ) ) );
+    }
+
     public function insertRevision( array $data ) {
         global $wpdb;
         $table = DatabaseContext::getDbPrefix() . 'task_time_resolutions';

@@ -23,6 +23,7 @@ const MINIMAL_RESULT_KEYS = new Set([
   'owner_user_id',
   'user_id',
   'board_name',
+  'frontend_url',
   'source_board',
   'destination_board',
   'key',

@@ -7,6 +7,7 @@ use Pandatask\Application\Comment\CommentService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
+use Pandatask\Infrastructure\Notifications\TaskBoardUrlResolver;
 use Pandatask\Infrastructure\Persistence\TaskRepository;
 
 final class TaskService {
@@ -224,6 +225,7 @@ final class TaskService {
     private function decorateTaskForViewer( $canonical_task ) {
         $task = clone $canonical_task;
         $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
+        $task->frontend_url = TaskBoardUrlResolver::resolve( $task->board_name ?? '', (int) ( $task->id ?? 0 ) );
         $task->comments = $this->comment_service->getComments( $task->id, $task );
         $task->history = array();
         $task->description = $task->description ?? '';
@@ -242,6 +244,7 @@ final class TaskService {
             }
 
             $task->board_display_name = $display_names[ $task->board_name ];
+            $task->frontend_url = TaskBoardUrlResolver::resolve( $task->board_name ?? '', (int) ( $task->id ?? 0 ) );
             $this->protectFollowUpSourceForViewer( $task, get_current_user_id() );
         }
 

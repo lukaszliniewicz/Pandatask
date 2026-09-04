@@ -14,7 +14,6 @@ const INITIAL_FILTERS = {
 	search: '',
 	sort: 'created_at_desc',
 	status: 'pending_in-progress',
-	project: 'all',
 	onlyMyTasks: false,
 	archived: false,
 };
@@ -51,7 +50,11 @@ export const useBoardController = () => {
 	}, [ isContainerNarrow ] );
 
 	const activeFilters = useMemo( () => {
-		const queryFilters = { ...filters, search: debouncedSearch };
+		const queryFilters = {
+			...filters,
+			project: navigation.selectedProjectId,
+			search: debouncedSearch,
+		};
 		if (
 			navigation.currentTab === 'tasks' &&
 			[ 'kanban', 'gantt' ].includes( navigation.currentView )
@@ -64,16 +67,21 @@ export const useBoardController = () => {
 		filters,
 		navigation.currentTab,
 		navigation.currentView,
+		navigation.selectedProjectId,
 	] );
 	const taskQuery = useTasks( activeFilters );
 
 	const setFilter = ( key, value ) => {
+		if ( key === 'project' ) {
+			navigation.setSelectedProject( value );
+			return;
+		}
+		if ( isUserBoard && key === 'onlyMyTasks' && value ) {
+			navigation.setSelectedProject( 'all' );
+		}
 		setFilters( ( current ) => ( {
 			...current,
 			[ key ]: value,
-			...( isUserBoard && key === 'onlyMyTasks' && value
-				? { project: 'all' }
-				: {} ),
 		} ) );
 	};
 
@@ -188,7 +196,7 @@ export const useBoardController = () => {
 		confirmRecurringDelete,
 		containerRef,
 		dialog,
-		filters,
+		filters: { ...filters, project: navigation.selectedProjectId },
 		groupByProject,
 		handleTaskAction,
 		isContainerNarrow,

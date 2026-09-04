@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { batchAction, idList, isoDate, plannedTaskData } from '../src/schemas.js';
+import { batchAction, idList, isoDate, plannedTaskData, taskCollectionFieldNames, taskListInput } from '../src/schemas.js';
 
 test('calendar dates reject impossible month and day values', () => {
   assert.equal(isoDate.safeParse('2026-07-24').success, true);
@@ -32,4 +32,9 @@ test('task creation and update schemas keep done behind task_complete', () => {
     action: 'update_task',
     data: { id: 1, status: 'done' },
   }).success, false);
+});
+
+test('task collection schemas advertise the authoritative frontend URL field', () => {
+  assert.equal(taskCollectionFieldNames.includes('frontend_url'), true);
+  assert.equal(taskListInput.safeParse({ board_name: 'group_10', fields: ['frontend_url'] }).success, true);
 });

@@ -32,7 +32,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.2';
+const VERSION = '1.3.3';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -640,7 +640,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_list',
     'List tasks',
-    'Lists tasks on one board with search, status, project, archive, assignee, type, template, and sorting filters.',
+    'Lists tasks on one board with search, status, project, archive, assignee, type, template, and sorting filters. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection.',
     taskListInput,
     readOnly,
     async (input, extra) =>
@@ -651,7 +651,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_list_visible',
     'List all visible tasks',
-    'Lists every task visible to the authenticated user across boards. One MCP call follows REST pagination and combines the pages, using the same search, status, project, assignment, type, template, and sorting filters as task_list. By default it includes all statuses, both active and archived tasks, and recurring templates; set archived=false for active only or archived=true for archived only. The configured collection cap is surfaced as pagination.truncated=true with total=null.',
+    'Lists every task visible to the authenticated user across boards. One MCP call follows REST pagination and combines the pages, using the same search, status, project, assignment, type, template, and sorting filters as task_list. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection. By default it includes all statuses, both active and archived tasks, and recurring templates; set archived=false for active only or archived=true for archived only. The configured collection cap is surfaced as pagination.truncated=true with total=null.',
     taskListVisibleInput,
     readOnly,
     async (input, extra) => getAllVisibleTasks(client, input, extra.signal),
@@ -661,7 +661,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_get',
     'Get task',
-    'Gets full details for one task, including assignments, project, category, parent, predecessors, and rendered description.',
+    'Gets full details for one task, including assignments, project, category, parent, predecessors, rendered description, and an authoritative frontend_url that is safe to surface as an open-task link.',
     z.object({ task_id: positiveId }),
     readOnly,
     async ({ task_id }, extra) => client.request({ path: `/tasks/${task_id}`, signal: extra.signal }),
@@ -1206,7 +1206,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'project_list',
     'List projects',
-    'Lists projects on a board with deadlines and project-level assignments.',
+    'Lists projects on a board with deadlines, project-level assignments, and authoritative frontend_url links that are safe to surface to users.',
     z.object({ board_name: boardName }),
     readOnly,
     async ({ board_name }, extra) => client.request({ path: boardPath(board_name, '/projects'), signal: extra.signal }),
@@ -1216,7 +1216,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'project_get',
     'Get project',
-    'Gets one project by numeric ID.',
+    'Gets one project by numeric ID, including an authoritative frontend_url that is safe to surface as an open-project link.',
     z.object({ project_id: positiveId }),
     readOnly,
     async ({ project_id }, extra) => client.request({ path: `/projects/${project_id}`, signal: extra.signal }),

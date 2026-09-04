@@ -439,6 +439,76 @@ test('executed MCP writes default to minimal responses with an explicit full ove
   assert.equal(requestBodies[1]?.response_mode, undefined, 'Full response selection must remain MCP-local.');
 });
 
+test('minimal idempotent replay receipts retain replay flags and omit rich task fields', async (t) => {
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async () => new Response(JSON.stringify({
+    message: 'Task already created',
+    idempotent: true,
+    replayed: true,
+    task: {
+      id: 77,
+      board_name: 'group_10',
+      name: 'Replay me',
+      status: 'pending',
+      description: 'A rich replay payload that is not needed in a minimal receipt.',
+      description_rendered: '<p>A rich replay payload that is not needed in a minimal receipt.</p>',
+      comments: [{ id: 1, comment_text: 'Omit this history.' }],
+    },
+  }), { status: 200 }));
+
+  const replay = await client.callTool({
+    name: 'task_create',
+    arguments: {
+      board_name: 'group_10',
+      name: 'Replay me',
+      idempotency_key: 'replay-task-77',
+      response_mode: 'minimal',
+    },
+  });
+  assert.equal(replay.isError, undefined);
+  assert.deepEqual((replay.structuredContent as Record<string, unknown>).data, {
+    operation: 'task_create',
+    message: 'Task already created',
+    idempotent: true,
+    replayed: true,
+    task: {
+      id: 77,
+      board_name: 'group_10',
+      name: 'Replay me',
+      status: 'pending',
+    },
+    board_name: 'group_10',
+  });
+});
+
+test('idempotency conflicts remain actionable 409 MCP error envelopes', async (t) => {
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async () => new Response(JSON.stringify({
+    code: 'pandatask_idempotency_conflict',
+    message: 'This idempotency key was already used with a different request.',
+    data: { status: 409 },
+  }), { status: 409 }));
+
+  const conflict = await client.callTool({
+    name: 'task_create',
+    arguments: {
+      board_name: 'group_10',
+      name: 'Conflict me',
+      idempotency_key: 'conflict-task-77',
+      response_mode: 'minimal',
+    },
+  });
+  assert.equal(conflict.isError, true);
+  assert.deepEqual((conflict.structuredContent as Record<string, unknown>).error, {
+    code: 'pandatask_idempotency_conflict',
+    message: 'This idempotency key was already used with a different request.',
+    http_status: 409,
+    details: {
+      code: 'pandatask_idempotency_conflict',
+      message: 'This idempotency key was already used with a different request.',
+      data: { status: 409 },
+    },
+  });
+});
+
 test('task_list_visible aggregates pages with broad defaults and accurate metadata', async (t) => {
   const calls: URL[] = [];
   const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input) => {

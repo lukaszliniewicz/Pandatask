@@ -258,6 +258,7 @@ Fields available when creating or updating tasks.
             {
                 "id": 1,
                 "board_name": "project_alpha",
+                "frontend_url": "https://example.test/task-board/?open_task=1",
                 "name": "Design the new logo",
                 "description": "<p>Use the brand guidelines.</p>",
                 "description_rendered": "<p>Use the brand guidelines.</p>",
@@ -286,9 +287,9 @@ Fields available when creating or updating tasks.
     }
     ```
 
-    The projection allowlist is: `id`, `board_name`, `board_display_name`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
+    The projection allowlist is: `id`, `board_name`, `board_display_name`, `frontend_url`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
 
-    `description_rendered` is computed only for an unprojected response or when explicitly requested. For example, `fields=name,description` returns exactly those two task properties without rendering or returning the rest of each record.
+    `frontend_url` is the canonical current-board link for opening the task and is safe to surface to users. It is `false` only when Pandatask cannot resolve a published board route. `description_rendered` is computed only for an unprojected response or when explicitly requested. For example, `fields=name,description` returns exactly those two task properties without rendering or returning the rest of each record.
 
 ### 1A. Get All Tasks Visible to the Current User
 
@@ -325,6 +326,7 @@ Fields available when creating or updating tasks.
         "task": {
             "id": 124,
             "board_name": "project_alpha",
+            "frontend_url": "https://example.test/task-board/?open_task=124",
             "name": "Write API documentation",
             "status": "in-progress",
             "priority": 6,
@@ -355,6 +357,7 @@ Fields available when creating or updating tasks.
         "task": {
             "id": 1,
             "board_name": "project_alpha",
+            "frontend_url": "https://example.test/task-board/?open_task=1",
             "name": "Design the new logo",
             "status": "in-progress",
             "priority": 7,
@@ -475,6 +478,7 @@ Fields available when creating or updating tasks.
             {
                 "id": 1,
                 "board_name": "user_5",
+                "frontend_url": "https://example.test/members/user-5/tasks?pandatask_project=1",
                 "board_display_name": "My Tasks",
                 "board_scope": "private",
                 "can_manage": true,
@@ -484,6 +488,7 @@ Fields available when creating or updating tasks.
             {
                 "id": 2,
                 "board_name": "group_10",
+                "frontend_url": "https://example.test/groups/developers/tasks?pandatask_project=2",
                 "board_display_name": "Developers",
                 "board_scope": "group",
                 "can_manage": false,
@@ -493,6 +498,8 @@ Fields available when creating or updating tasks.
         ]
     }
     ```
+
+    `frontend_url` is the authoritative current-board link for opening a project and is safe to surface to users. Embedded task summaries likewise include their own task `frontend_url`.
 
 ### 2. Create a Project
 
@@ -513,6 +520,7 @@ Fields available when creating or updating tasks.
         "project": {
             "id": 3,
             "board_name": "project_alpha",
+            "frontend_url": "https://example.test/task-board/?pandatask_project=3",
             "name": "Backend Rewrite",
             "description": "",
             "deadline": null,
@@ -533,6 +541,7 @@ Fields available when creating or updating tasks.
         "project": {
             "id": 1,
             "board_name": "project_alpha",
+            "frontend_url": "https://example.test/task-board/?pandatask_project=1",
             "name": "Release 2.0",
             "description": "",
             "deadline": null,
