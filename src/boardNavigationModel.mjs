@@ -8,6 +8,8 @@ const VALID_VIEWS = new Set( [
 	'gantt',
 ] );
 
+const VALID_PROJECT_VIEWS = new Set( [ 'list', 'flow', 'timeline' ] );
+
 export const normalizeProjectSelection = ( value ) => {
 	if ( value === 'none' ) {
 		return 'none';
@@ -32,6 +34,7 @@ export const readBoardNavigationSearch = (
 	const params = new URLSearchParams( search );
 	const tab = params.get( 'pandatask_tab' );
 	const view = params.get( 'pandatask_view' );
+	const projectView = params.get( 'pandatask_project_view' );
 	const taskValue = Number.parseInt( params.get( 'open_task' ) || '', 10 );
 
 	return {
@@ -41,6 +44,9 @@ export const readBoardNavigationSearch = (
 			? tab
 			: 'tasks',
 		currentView: VALID_VIEWS.has( view ) ? view : 'compact',
+		currentProjectView: VALID_PROJECT_VIEWS.has( projectView )
+			? projectView
+			: 'list',
 		selectedProjectId: normalizeProjectSelection(
 			params.get( 'pandatask_project' )
 		),

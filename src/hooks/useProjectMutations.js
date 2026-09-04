@@ -40,6 +40,9 @@ export const useProjectMutations = () => {
 			queryClient.removeQueries( {
 				queryKey: [ ...queryKeys.projects.all(), 'detail', id ],
 			} );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.workspace( id ),
+			} );
 		},
 	} );
 

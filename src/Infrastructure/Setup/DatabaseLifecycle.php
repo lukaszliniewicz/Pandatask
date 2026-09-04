@@ -9,7 +9,7 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.20';
+    private const DB_VERSION = '1.0.21';
 
     public static function activate() {
         if ( self::createTables() && self::repairData() && self::verifySchema() ) {
@@ -40,6 +40,7 @@ final class DatabaseLifecycle {
         $table_work_suggestion_decisions = $prefix . 'work_suggestion_decisions';
         $table_work_log_group_shares = $prefix . 'work_log_group_shares';
         $table_inbox_delegates       = $prefix . 'inbox_delegates';
+        $table_project_task_references = $prefix . 'project_task_references';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -212,6 +213,21 @@ final class DatabaseLifecycle {
             KEY predecessor_id (predecessor_id)
         ) $charset_collate;";
         dbDelta( $sql_relationships );
+
+        $sql_project_task_references = "CREATE TABLE $table_project_task_references (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            project_id BIGINT(20) UNSIGNED NOT NULL,
+            task_id BIGINT(20) UNSIGNED NOT NULL,
+            relation_type VARCHAR(20) NOT NULL,
+            created_by BIGINT(20) UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY project_task (project_id, task_id),
+            KEY task_id (task_id),
+            KEY relation_type (relation_type)
+        ) $charset_collate;";
+        dbDelta( $sql_project_task_references );
 
         $sql_change_buffers = "CREATE TABLE $table_change_buffers (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -455,6 +471,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_suggestion_decisions',
             $prefix . 'work_log_group_shares',
             $prefix . 'inbox_delegates',
+            $prefix . 'project_task_references',
         );
 
         foreach ( $required_tables as $table ) {
@@ -476,6 +493,13 @@ final class DatabaseLifecycle {
         $work_allocation_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$work_allocations_table}" ), 'Field' );
         if ( ! in_array( 'allocation_context', $work_allocation_columns, true ) ) {
             return false;
+        }
+
+        $reference_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$prefix}project_task_references" ), 'Field' );
+        foreach ( array( 'project_id', 'task_id', 'relation_type', 'created_by', 'created_at', 'updated_at' ) as $column ) {
+            if ( ! in_array( $column, $reference_columns, true ) ) {
+                return false;
+            }
         }
 
         $required_indexes = array(
@@ -502,6 +526,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_suggestion_decisions' => array( 'user_provider_external', 'user_decision', 'work_entry_id' ),
             $prefix . 'work_log_group_shares' => array( 'user_group', 'group_user', 'user_id', 'group_id' ),
             $prefix . 'inbox_delegates' => array( 'owner_user', 'user_owner', 'owner_role' ),
+            $prefix . 'project_task_references' => array( 'project_task', 'task_id', 'relation_type' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {
@@ -538,6 +563,7 @@ final class DatabaseLifecycle {
         $occurrences = $prefix . 'task_work_occurrences';
         $time_resolutions = $prefix . 'task_time_resolutions';
         $work_allocations = $prefix . 'work_allocations';
+        $project_task_references = $prefix . 'project_task_references';
         $users = $wpdb->users;
 
         try {
@@ -556,6 +582,15 @@ final class DatabaseLifecycle {
                  WHERE role NOT IN ('assignee', 'supervisor')",
                 "DELETE FROM {$project_assignments}
                  WHERE role NOT IN ('assignee', 'supervisor')",
+                "DELETE reference_record
+                 FROM {$project_task_references} reference_record
+                 LEFT JOIN {$projects} project ON project.id = reference_record.project_id
+                 LEFT JOIN {$tasks} task ON task.id = reference_record.task_id
+                 WHERE project.id IS NULL
+                    OR task.id IS NULL
+                    OR task.project_id = reference_record.project_id",
+                "DELETE FROM {$project_task_references}
+                 WHERE relation_type NOT IN ('included', 'related')",
                 "DELETE comment_record
                  FROM {$comments} comment_record
                  LEFT JOIN {$tasks} task ON task.id = comment_record.task_id
@@ -570,8 +605,7 @@ final class DatabaseLifecycle {
                  LEFT JOIN {$tasks} predecessor ON predecessor.id = relationship.predecessor_id
                  WHERE task.id IS NULL
                     OR predecessor.id IS NULL
-                    OR relationship.task_id = relationship.predecessor_id
-                    OR task.board_name <> predecessor.board_name",
+                    OR relationship.task_id = relationship.predecessor_id",
                 "UPDATE {$relationships}
                  SET type = 'FS'
                  WHERE type <> 'FS'",
@@ -881,12 +915,12 @@ final class DatabaseLifecycle {
                 return true;
             }
 
-            $cycle_lookup = array_fill_keys( $cycle_nodes, true );
             $victim_id = 0;
 
-            foreach ( $rows as $row ) {
-                if ( isset( $cycle_lookup[ (int) $row->task_id ], $cycle_lookup[ (int) $row->predecessor_id ] ) ) {
-                    $victim_id = max( $victim_id, (int) $row->id );
+            foreach ( array_reverse( $rows ) as $row ) {
+                if ( TaskGraph::edgeParticipatesInCycle( $edges, (int) $row->task_id, (int) $row->predecessor_id ) ) {
+                    $victim_id = (int) $row->id;
+                    break;
                 }
             }
 

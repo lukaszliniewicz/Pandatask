@@ -71,6 +71,16 @@ final class ProjectService {
         return $project ? $this->decorateProjectUrl( $project ) : $project;
     }
 
+    /**
+     * Read a project without the project transient. Workspace responses are
+     * viewer-specific and must not be built from a stale cached projection.
+     */
+    public function getProjectUncached( $project_id ) {
+        $project = $this->repository->findById( (int) $project_id );
+
+        return $project ? $this->decorateProjectUrl( $project ) : $project;
+    }
+
     public function addProject( $data ) {
         $project_id = $this->repository->create( $data );
 

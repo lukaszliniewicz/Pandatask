@@ -239,7 +239,7 @@ test('Subtask projects are authoritative, cascaded, and repaired on upgrade', ()
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.20'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.21'/);
 	assert.match(lifecycle, /board_events/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);
@@ -434,6 +434,7 @@ test('Production deployment keeps rollback active through exact release verifica
 	assert.match(deploy, /actual_version=.*wp plugin get pandatask/);
 	assert.match(deploy, /wp db query 'SHOW TABLES;' --skip-column-names/);
 	assert.match(deploy, /pandat69_task_work_occurrences/);
+	assert.match(deploy, /pandat69_project_task_references/);
 	assert.match(deploy, /pandat69_work_entries/);
 	assert.match(deploy, /pandat69_work_allocations/);
 	assert.match(deploy, /pandat69_task_time_resolutions/);
@@ -462,7 +463,7 @@ test('Security-sensitive task edits and public intake have explicit guards', () 
 	assert.match(policy, /canMoveTask/);
 	assert.match(handler, /validateSensitiveTaskUpdate/);
 	assert.match(invariants, /board_is_changing/);
-	assert.match(invariants, /findDependencyGraphForBoard/);
+	assert.match(invariants, /findDependencyGraph\(\)/);
 	assert.match(normalizer, /pandatask_minimum_task_date/);
 	assert.match(publicPolicy, /consumeAnonymousSubmissionBudget/);
 	assert.match(publicPolicy, /REMOTE_ADDR/);

@@ -119,12 +119,12 @@ final class TaskMoveService {
             );
         }
 
-        $current_predecessors = array_values( array_map( 'intval', (array) ( $task->predecessor_ids ?? array() ) ) );
+		$predecessors_explicit = array_key_exists( 'predecessors', $input );
         $fields = array(
             'project_id' => array_key_exists( 'project_id', $input ) ? absint( $input['project_id'] ) : absint( $task->project_id ?? 0 ),
             'category_id' => array_key_exists( 'category_id', $input ) ? absint( $input['category_id'] ) : absint( $task->category_id ?? 0 ),
             'parent_task_id' => array_key_exists( 'parent_task_id', $input ) ? absint( $input['parent_task_id'] ) : absint( $task->parent_task_id ?? 0 ),
-            'predecessors' => array_key_exists( 'predecessors', $input ) ? $this->ids( $input['predecessors'] ) : $current_predecessors,
+			'predecessors' => $predecessors_explicit ? $this->ids( $input['predecessors'] ) : array(),
             'assigned_persons' => array_key_exists( 'assigned_persons', $input ) ? $this->ids( $input['assigned_persons'] ) : $this->ids( $task->assigned_user_ids ?? array() ),
             'supervisor_persons' => array_key_exists( 'supervisor_persons', $input ) ? $this->ids( $input['supervisor_persons'] ) : $this->ids( $task->supervisor_user_ids ?? array() ),
         );
@@ -137,17 +137,6 @@ final class TaskMoveService {
         }
         if ( $fields['parent_task_id'] > 0 && ! $this->task_repository->existsOnBoard( $fields['parent_task_id'], $destination_board ) ) {
             $incompatibilities['parent_task_id'] = array( 'value' => $fields['parent_task_id'], 'reason' => 'not_on_destination' );
-        }
-
-        $valid_predecessors = array();
-        foreach ( $fields['predecessors'] as $predecessor_id ) {
-            if ( $this->task_repository->existsOnBoard( $predecessor_id, $destination_board ) ) {
-                $valid_predecessors[] = $predecessor_id;
-            }
-        }
-        $invalid_predecessors = array_values( array_diff( $fields['predecessors'], $valid_predecessors ) );
-        if ( $invalid_predecessors ) {
-            $incompatibilities['predecessors'] = array( 'values' => $invalid_predecessors, 'reason' => 'not_on_destination' );
         }
 
         foreach ( array( 'assigned_persons', 'supervisor_persons' ) as $role_field ) {
@@ -169,14 +158,18 @@ final class TaskMoveService {
             $update['project_id'] = isset( $incompatibilities['project_id'] ) ? null : ( $fields['project_id'] ?: null );
             $update['category_id'] = isset( $incompatibilities['category_id'] ) ? null : ( $fields['category_id'] ?: null );
             $update['parent_task_id'] = isset( $incompatibilities['parent_task_id'] ) ? null : ( $fields['parent_task_id'] ?: null );
-            $update['predecessors'] = $valid_predecessors;
+			if ( $predecessors_explicit ) {
+				$update['predecessors'] = $fields['predecessors'];
+			}
             $update['assigned_persons'] = $fields['valid_assigned_persons'];
             $update['supervisor_persons'] = $fields['valid_supervisor_persons'];
         } else {
             $update['project_id'] = $fields['project_id'] ?: null;
             $update['category_id'] = $fields['category_id'] ?: null;
             $update['parent_task_id'] = $fields['parent_task_id'] ?: null;
-            $update['predecessors'] = $fields['predecessors'];
+			if ( $predecessors_explicit ) {
+				$update['predecessors'] = $fields['predecessors'];
+			}
             $update['assigned_persons'] = $fields['assigned_persons'];
             $update['supervisor_persons'] = $fields['supervisor_persons'];
         }
@@ -198,7 +191,6 @@ final class TaskMoveService {
                 $blocking['project_id'],
                 $blocking['category_id'],
                 $blocking['parent_task_id'],
-                $blocking['predecessors'],
                 $blocking['assigned_persons'],
                 $blocking['supervisor_persons']
             );

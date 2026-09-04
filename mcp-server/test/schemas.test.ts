@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { batchAction, idList, isoDate, plannedTaskData, taskCollectionFieldNames, taskListInput } from '../src/schemas.js';
+import {
+  batchAction,
+  idList,
+  isoDate,
+  plannedTaskData,
+  projectDependencyReferenceKey,
+  projectReferenceAddData,
+  projectReferenceImportData,
+  projectReferenceKey,
+  projectReferenceRelationData,
+  taskCollectionFieldNames,
+  taskListInput,
+} from '../src/schemas.js';
 
 test('calendar dates reject impossible month and day values', () => {
   assert.equal(isoDate.safeParse('2026-07-24').success, true);
@@ -37,4 +49,31 @@ test('task creation and update schemas keep done behind task_complete', () => {
 test('task collection schemas advertise the authoritative frontend URL field', () => {
   assert.equal(taskCollectionFieldNames.includes('frontend_url'), true);
   assert.equal(taskListInput.safeParse({ board_name: 'group_10', fields: ['frontend_url'] }).success, true);
+});
+
+test('project reference schemas enforce association and dependency discriminants', () => {
+  assert.equal(projectReferenceRelationData.safeParse({ relation_type: 'included', task_id: 12 }).success, true);
+  assert.equal(projectReferenceRelationData.safeParse({ relation_type: 'related', task_id: 12 }).success, true);
+  assert.equal(projectReferenceRelationData.safeParse({ relation_type: 'dependency', predecessor_task_id: 12, successor_task_id: 13 }).success, true);
+  assert.equal(projectReferenceRelationData.safeParse({ relation_type: 'dependency', task_id: 12 }).success, false);
+  assert.equal(projectReferenceRelationData.safeParse({ relation_type: 'included', predecessor_task_id: 12, successor_task_id: 13 }).success, false);
+  assert.equal(projectReferenceAddData.safeParse({ relation_type: 'included', project_id: 4, task_id: 12 }).success, true);
+  assert.equal(projectReferenceAddData.safeParse({ relation_type: 'dependency', project_id: 4, predecessor_task_id: 12, successor_task_id: 13 }).success, true);
+  assert.equal(projectReferenceAddData.safeParse({ relation_type: 'unknown', project_id: 4, task_id: 12 }).success, false);
+});
+
+test('project reference keys and import versions are bounded', () => {
+  assert.equal(projectReferenceKey.safeParse('reference-1').success, true);
+  assert.equal(projectReferenceKey.safeParse('dependency-1').success, false);
+  assert.equal(projectDependencyReferenceKey.safeParse('reference-12').success, true);
+  assert.equal(projectDependencyReferenceKey.safeParse('dependency-12').success, true);
+  assert.equal(projectDependencyReferenceKey.safeParse('reference-0').success, false);
+  assert.equal(projectDependencyReferenceKey.safeParse('dependency-abc').success, false);
+
+  const parsed = projectReferenceImportData.parse({
+    project_id: 4,
+    references: [{ relation_type: 'related', task_id: 12 }],
+  });
+  assert.equal(parsed.version, 1);
+  assert.equal(projectReferenceImportData.safeParse({ project_id: 4, version: 2, references: [] }).success, false);
 });

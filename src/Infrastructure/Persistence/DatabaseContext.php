@@ -10,6 +10,35 @@ final class DatabaseContext {
         return $wpdb->prefix . 'pandat69_';
     }
 
+    public static function acquireDependencyGraphLock( $timeout_seconds = 5 ) {
+        global $wpdb;
+
+        $lock_name = self::dependencyGraphLockName();
+        $timeout   = max( 0, (int) $timeout_seconds );
+        $result    = $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT GET_LOCK(%s, %d)',
+                $lock_name,
+                $timeout
+            )
+        );
+
+        return 1 === (int) $result;
+    }
+
+    public static function releaseDependencyGraphLock() {
+        global $wpdb;
+
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT RELEASE_LOCK(%s)',
+                self::dependencyGraphLockName()
+            )
+        );
+
+        return 1 === (int) $result;
+    }
+
     public static function getBoardCacheVersion( $board_name, $type = 'tasks' ) {
         $key     = "pandat69_v_{$type}_{$board_name}";
         $version = get_transient( $key );
@@ -78,5 +107,11 @@ final class DatabaseContext {
         $version = self::getUserCacheVersion( $user_id );
 
         set_transient( $key, $version + 1, YEAR_IN_SECONDS );
+    }
+
+    private static function dependencyGraphLockName() {
+        $database_name = defined( 'DB_NAME' ) ? (string) DB_NAME : '';
+
+        return 'pandatask_dependency_graph_' . substr( md5( $database_name . ':' . self::getDbPrefix() ), 0, 32 );
     }
 }

@@ -5,6 +5,7 @@ namespace Pandatask\Application\Task;
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Comment\CommentService;
 use Pandatask\Application\Security\BoardAccessPolicy;
+use Pandatask\Application\Security\TaskAccessPolicy;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Notifications\TaskBoardUrlResolver;
@@ -22,12 +23,19 @@ final class TaskService {
 
     private $board_access_policy;
 
-    public function __construct( $repository = null, $board_service = null, $comment_service = null, $mutation_service = null, $board_access_policy = null ) {
+    private $task_access_policy;
+
+    /** @var array<int,object|null>|null */
+    private $authorization_records;
+
+    public function __construct( $repository = null, $board_service = null, $comment_service = null, $mutation_service = null, $board_access_policy = null, $task_access_policy = null ) {
         $this->repository       = $repository ?: new TaskRepository();
         $this->board_service    = $board_service ?: new BoardService();
         $this->comment_service  = $comment_service ?: new CommentService();
         $this->mutation_service = $mutation_service ?: new TaskMutationService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
+        $this->task_access_policy = $task_access_policy;
+        $this->authorization_records = null;
     }
 
     public function isTaskBlocked( $task_id ) {
@@ -127,7 +135,12 @@ final class TaskService {
     }
 
     public function getTaskForAuthorization( $task_id ) {
-        return $this->repository->findAccessRecordById( (int) $task_id );
+        $task_id = (int) $task_id;
+        if ( is_array( $this->authorization_records ) && array_key_exists( $task_id, $this->authorization_records ) ) {
+            return $this->authorization_records[ $task_id ];
+        }
+
+        return $this->repository->findAccessRecordById( $task_id );
     }
 
     public function getTaskHierarchyRecord( $task_id ) {
@@ -224,6 +237,7 @@ final class TaskService {
 
     private function decorateTaskForViewer( $canonical_task ) {
         $task = clone $canonical_task;
+        $this->decoratePredecessorsForViewer( array( $task ), get_current_user_id() );
         $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
         $task->frontend_url = TaskBoardUrlResolver::resolve( $task->board_name ?? '', (int) ( $task->id ?? 0 ) );
         $task->comments = $this->comment_service->getComments( $task->id, $task );
@@ -236,6 +250,7 @@ final class TaskService {
 
     private function decorateWorkspaceTasksForViewer( $canonical_tasks ) {
         $tasks = $this->cloneTasks( $canonical_tasks );
+        $this->decoratePredecessorsForViewer( $tasks, get_current_user_id() );
         $display_names = array();
 
         foreach ( $tasks as $task ) {
@@ -269,23 +284,95 @@ final class TaskService {
     }
 
     private function canViewerReadTaskRecord( $task, $viewer_id ) {
-        if ( $viewer_id <= 0 ) {
+        if ( ! is_object( $task ) || (int) ( $task->id ?? 0 ) <= 0 ) {
             return false;
         }
-        if ( user_can( $viewer_id, 'manage_options' ) ) {
-            return true;
-        }
-        if ( (int) ( $task->creator_id ?? 0 ) === $viewer_id ) {
-            return true;
-        }
-        if ( in_array( $viewer_id, array_map( 'intval', (array) ( $task->assigned_user_ids ?? array() ) ), true ) ) {
-            return true;
-        }
-        if ( in_array( $viewer_id, array_map( 'intval', (array) ( $task->supervisor_user_ids ?? array() ) ), true ) ) {
-            return true;
+
+        return true === $this->getTaskAccessPolicy()->canReadTask( (int) $task->id, (int) $viewer_id );
+    }
+
+    /**
+     * Redact predecessor details using the canonical task-read policy.
+     *
+     * The authorization records are loaded in one batch for a collection and
+     * temporarily served through getTaskForAuthorization(), so TaskAccessPolicy
+     * retains its complete direct-participation and board/Inbox semantics
+     * without an N+1 query pattern. Only cloned response objects are changed.
+     *
+     * @param array<int,object> $tasks
+     * @param int               $viewer_id
+     */
+    private function decoratePredecessorsForViewer( array $tasks, $viewer_id ) {
+        $predecessor_ids = array();
+
+        foreach ( $tasks as $task ) {
+            foreach ( (array) ( $task->predecessors ?? array() ) as $predecessor ) {
+                $predecessor_id = is_object( $predecessor ) ? (int) ( $predecessor->id ?? 0 ) : 0;
+                if ( $predecessor_id > 0 ) {
+                    $predecessor_ids[] = $predecessor_id;
+                }
+            }
         }
 
-        return true === $this->board_access_policy->canReadBoard( $task->board_name, $viewer_id );
+        $predecessor_ids = array_values( array_unique( $predecessor_ids ) );
+        $records = array();
+
+        foreach ( $predecessor_ids as $predecessor_id ) {
+            $records[ $predecessor_id ] = null;
+        }
+
+        if ( ! empty( $predecessor_ids ) ) {
+            if ( method_exists( $this->repository, 'findAccessRecordsByIds' ) ) {
+                foreach ( (array) $this->repository->findAccessRecordsByIds( $predecessor_ids ) as $record_id => $record ) {
+                    $resolved_id = is_object( $record ) && isset( $record->id ) ? (int) $record->id : (int) $record_id;
+                    if ( $resolved_id > 0 ) {
+                        $records[ $resolved_id ] = $record;
+                    }
+                }
+            } else {
+                foreach ( $predecessor_ids as $predecessor_id ) {
+                    $records[ $predecessor_id ] = $this->repository->findAccessRecordById( $predecessor_id );
+                }
+            }
+        }
+
+        $this->authorization_records = $records;
+
+        try {
+            foreach ( $tasks as $task ) {
+                $visible_predecessors = array();
+                $visible_ids = array();
+                $restricted_count = 0;
+
+                foreach ( (array) ( $task->predecessors ?? array() ) as $predecessor ) {
+                    $predecessor_id = is_object( $predecessor ) ? (int) ( $predecessor->id ?? 0 ) : 0;
+                    $can_read = $predecessor_id > 0
+                        && true === $this->getTaskAccessPolicy()->canReadTask( $predecessor_id, (int) $viewer_id );
+
+                    if ( $can_read ) {
+                        $visible_predecessor = clone $predecessor;
+                        $visible_predecessors[] = $visible_predecessor;
+                        $visible_ids[] = $predecessor_id;
+                    } else {
+                        $restricted_count++;
+                    }
+                }
+
+                $task->predecessors = $visible_predecessors;
+                $task->predecessor_ids = $visible_ids;
+                $task->restricted_predecessor_count = $restricted_count;
+            }
+        } finally {
+            $this->authorization_records = null;
+        }
+    }
+
+    private function getTaskAccessPolicy() {
+        if ( ! $this->task_access_policy ) {
+            $this->task_access_policy = new TaskAccessPolicy( $this, $this->board_access_policy );
+        }
+
+        return $this->task_access_policy;
     }
 
     private function cloneTasks( $tasks ) {

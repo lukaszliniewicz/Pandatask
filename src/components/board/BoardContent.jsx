@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
 import ArchiveView from '../ArchiveView';
 import OverviewView from '../OverviewView';
-import ProjectsView from '../ProjectsView';
 import TaskWorkspace from '../TaskWorkspace';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
+const ProjectsView = lazyWithRetry(() => import('../ProjectsView'));
 const ReportView = lazyWithRetry(() => import('../ReportView'));
 const WorkLogView = lazyWithRetry(() => import('../WorkLogView'));
 const InboxView = lazyWithRetry(() => import('../InboxView'));
@@ -34,11 +34,23 @@ const BoardContent = ({ controller }) => (
                 />
             )}
             {controller.currentTab === 'projects' && (
-                <ProjectsView
-                    onEditProject={controller.openProjectDialog}
-                    onTaskAction={controller.handleTaskAction}
-                    privateOnly={controller.isUserBoard && controller.filters.onlyMyTasks}
-                />
+				<Suspense
+					fallback={
+						<div className="pandat69-loading" role="status">
+							Loading projects…
+						</div>
+					}
+				>
+					<ProjectsView
+						onEditProject={controller.openProjectDialog}
+						onTaskAction={controller.handleTaskAction}
+						privateOnly={controller.isUserBoard && controller.filters.onlyMyTasks}
+						selectedProjectId={controller.selectedProjectId}
+						onSelectProject={controller.setSelectedProject}
+						currentProjectView={controller.currentProjectView}
+						onProjectViewChange={controller.setCurrentProjectView}
+					/>
+				</Suspense>
             )}
             {controller.currentTab === 'archive' && <ArchiveView onTaskAction={controller.handleTaskAction} />}
             {controller.currentTab === 'overview' && <OverviewView onTaskAction={controller.handleTaskAction} />}

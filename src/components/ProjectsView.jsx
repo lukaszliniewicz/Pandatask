@@ -1,154 +1,148 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React from 'react';
+import '../../assets/scss/components/_projects.scss';
 import { useProjects } from '../hooks/useProjects';
 import { useProjectMutations } from '../hooks/useProjectMutations';
 import { useTasks } from '../hooks/useTasks';
-import { buildProjectTaskTree } from '../projectTaskModel.mjs';
-import TaskList from './TaskList';
 import Icon from './Icon';
-import ProjectTaskTree from './projects/ProjectTaskTree';
+import TaskList from './TaskList';
+import ProjectIndex from './projects/ProjectIndex';
+import ProjectWorkspace from './projects/ProjectWorkspace';
 
-const ProjectsView = ({ onEditProject, onTaskAction, privateOnly = false }) => {
-    const { data: projects, isLoading: isLoadingProjects } = useProjects(undefined, { privateOnly });
-    const { deleteProject } = useProjectMutations();
-    const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
-    const projectTaskTrees = useMemo(
-        () => new Map(
-            (projects || []).map((project) => [
-                project.id,
-                buildProjectTaskTree(project.tasks || [])
-            ])
-        ),
-        [projects]
-    );
-    
-    // Fetch tasks that don't belong to any project
-    const { data: noProjectTasks, isLoading: isLoadingTasks } = useTasks({
-        project: 'none',
-        archived: false,
-        status: 'pending_in-progress',
-        onlyMyTasks: privateOnly,
-    });
+/* eslint-disable no-alert -- Project deletion requires explicit confirmation. */
 
-    const handleDelete = async (id) => {
-        if (deleteProject.isPending) return;
-        if (confirm('Are you sure you want to delete this project? Tasks will be unassigned.')) {
-            try {
-                await deleteProject.mutateAsync(id);
-            } catch (error) {
-                alert('Failed to delete project: ' + (error.message || 'Unknown error'));
-            }
-        }
-    };
+const UnassignedTasksView = ( { onBack, onTaskAction, privateOnly } ) => {
+	const { data: tasks, isLoading, isError, error } = useTasks( {
+		project: 'none',
+		archived: false,
+		status: 'pending_in-progress',
+		onlyMyTasks: privateOnly,
+	} );
 
-    const toggleTask = useCallback((taskId) => {
-        setExpandedTaskIds((current) => {
-            const next = new Set(current);
-            if (next.has(taskId)) {
-                next.delete(taskId);
-            } else {
-                next.add(taskId);
-            }
-            return next;
-        });
-    }, []);
+	return (
+		<section
+			className="pandat69-project-unassigned"
+			aria-labelledby="pandatask-unassigned-title"
+		>
+			<div className="pandat69-project-workspace-breadcrumb">
+				<button type="button" onClick={ onBack }>
+					<Icon name="chevron-left" size={ 15 } /> All projects
+				</button>
+			</div>
+			<header className="pandat69-project-workspace-header">
+				<div>
+					<p className="pandat69-eyebrow">Board housekeeping</p>
+					<h3 id="pandatask-unassigned-title">Unassigned work</h3>
+					<p>
+						Tasks without a project live here until they need a shared
+						outcome and plan.
+					</p>
+				</div>
+			</header>
+			{ isLoading && (
+				<div className="pandat69-loading">Loading unassigned work…</div>
+			) }
+			{ isError && (
+				<div className="pandat69-error" role="alert">
+					{ error?.message || 'Unassigned tasks could not be loaded.' }
+				</div>
+			) }
+			{ ! isLoading && ! isError && (
+				<TaskList
+					tasks={ tasks || [] }
+					onTaskAction={ onTaskAction }
+					groupByProject={ false }
+				/>
+			) }
+		</section>
+	);
+};
 
-    if (isLoadingProjects) return <div className="pandat69-loading">Loading projects...</div>;
+const ProjectsView = ( {
+	onEditProject,
+	onTaskAction,
+	privateOnly,
+	selectedProjectId,
+	onSelectProject,
+	currentProjectView,
+	onProjectViewChange,
+} ) => {
+	const { data: projects, isLoading, isError, error } = useProjects(
+		undefined,
+		{ privateOnly }
+	);
+	const { deleteProject } = useProjectMutations();
+	const hasSelectedProject =
+		Number.isInteger( Number( selectedProjectId ) ) &&
+		Number( selectedProjectId ) > 0;
 
-    return (
-        <div className="pandat69-projects-view">
-            <div className="pandat69-header-actions">
-                <button 
-                    type="button"
-                    className="pandat69-button pandat69-add-project-btn"
-                    onClick={() => onEditProject(null)}
-                >
-                    <Icon name="plus" /> Add Project
-                </button>
-            </div>
+	const handleDelete = async ( project ) => {
+		if (
+			deleteProject.isPending ||
+			! window.confirm(
+				`Delete “${ project.name }”? Its tasks will become unassigned.`
+			)
+		) {
+			return;
+		}
+		try {
+			await deleteProject.mutateAsync( project.id );
+			if ( String( selectedProjectId ) === String( project.id ) ) {
+				onSelectProject( 'all' );
+			}
+		} catch ( mutationError ) {
+			window.alert(
+				`Failed to delete project: ${
+					mutationError?.message || 'Unknown error'
+				}`
+			);
+		}
+	};
 
-            <div className="pandat69-project-list-container-view">
-                <ul className="pandat69-project-list-view">
-                    {projects && projects.length > 0 ? projects.map(project => {
-                        const taskTree = projectTaskTrees.get(project.id);
+	if ( selectedProjectId === 'none' ) {
+		return (
+			<UnassignedTasksView
+				onBack={ () => onSelectProject( 'all' ) }
+				onTaskAction={ onTaskAction }
+				privateOnly={ privateOnly }
+			/>
+		);
+	}
 
-                        return (
-                        <li key={project.id} className="pandat69-project-list-item">
-                            <div className="pandat69-project-item-header">
-                                <div className="pandat69-project-item-header-main">
-                                    <div className="pandat69-project-title-row">
-                                        <h4>{project.name}</h4>
-                                        {project.board_scope === 'group' && (
-                                            <span className="pandat69-project-source-badge">
-                                                <Icon name="users" size={14} />
-                                                {project.board_display_name}
-                                            </span>
-                                        )}
-                                        <span className={`pandat69-project-deadline-meta ${project.deadline ? '' : 'is-empty'}`}>
-                                            <Icon name="calendar" size={13} />
-                                            {project.deadline ? `Due ${project.deadline}` : 'No deadline'}
-                                        </span>
-                                    </div>
-                                    <p>{project.description}</p>
-                                </div>
-                                {project.can_manage !== false && (
-                                    <div className="pandat69-project-item-actions">
-                                        <button
-                                            type="button"
-                                            className="pandat69-icon-button pandat69-edit-project-btn"
-                                            title="Edit Project"
-                                            aria-label={`Edit project ${project.name}`}
-                                            onClick={() => onEditProject(project)}
-                                        >
-                                            <Icon name="pencil" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="pandat69-icon-button pandat69-delete-project-btn"
-                                            title="Delete Project"
-                                            aria-label={`Delete project ${project.name}`}
-                                            onClick={() => handleDelete(project.id)}
-                                            disabled={deleteProject.isPending}
-                                        >
-                                            <Icon name="trash" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="pandat69-project-task-list-container">
-                                <div className="pandat69-project-task-heading">
-                                    <h5>Active tasks</h5>
-                                    <span>{taskTree.total}</span>
-                                </div>
-                                {taskTree.total > 0 ? (
-                                    <ProjectTaskTree
-                                        expandedTaskIds={expandedTaskIds}
-                                        nodes={taskTree.roots}
-                                        onTaskAction={onTaskAction}
-                                        onToggle={toggleTask}
-                                    />
-                                ) : (
-                                    <p className="pandat69-project-empty-tasks">No active tasks in this project.</p>
-                                )}
-                            </div>
-                        </li>
-                    )}) : (
-                        <li className="pandat69-no-projects">No projects found.</li>
-                    )}
-                </ul>
-            </div>
+	if ( hasSelectedProject ) {
+		return (
+			<ProjectWorkspace
+				projectId={ Number( selectedProjectId ) }
+				currentView={ currentProjectView }
+				onViewChange={ onProjectViewChange }
+				onBack={ () => onSelectProject( 'all' ) }
+				onEditProject={ onEditProject }
+				onTaskAction={ onTaskAction }
+			/>
+		);
+	}
 
-            <div className="pandat69-tasks-without-project-container">
-                <h4>
-                    Tasks without a project
-                </h4>
-                {isLoadingTasks ? (
-                    <div className="pandat69-loading">Loading tasks...</div>
-                ) : (
-                    <TaskList tasks={noProjectTasks} onTaskAction={onTaskAction} />
-                )}
-            </div>
-        </div>
-    );
+	if ( isLoading ) {
+		return <div className="pandat69-loading">Loading projects…</div>;
+	}
+	if ( isError ) {
+		return (
+			<div className="pandat69-error" role="alert">
+				{ error?.message || 'Projects could not be loaded.' }
+			</div>
+		);
+	}
+
+	return (
+		<ProjectIndex
+			projects={ projects || [] }
+			onAddProject={ () => onEditProject( null ) }
+			onDeleteProject={ handleDelete }
+			onEditProject={ onEditProject }
+			onOpenProject={ onSelectProject }
+			isDeleting={ deleteProject.isPending }
+			onOpenUnassigned={ () => onSelectProject( 'none' ) }
+		/>
+	);
 };
 
 export default ProjectsView;

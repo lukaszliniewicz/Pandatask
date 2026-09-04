@@ -177,6 +177,29 @@ final class TaskCommandRepository {
         );
     }
 
+    public function deleteTaskProjectReferences( $task_id ) {
+        global $wpdb;
+
+        $references_table = DatabaseContext::getDbPrefix() . 'project_task_references';
+
+        return false !== $wpdb->delete( $references_table, array( 'task_id' => (int) $task_id ), array( '%d' ) );
+    }
+
+    public function deleteProjectTaskReference( $project_id, $task_id ) {
+        global $wpdb;
+
+        $references_table = DatabaseContext::getDbPrefix() . 'project_task_references';
+
+        return false !== $wpdb->delete(
+            $references_table,
+            array(
+                'project_id' => (int) $project_id,
+                'task_id'    => (int) $task_id,
+            ),
+            array( '%d', '%d' )
+        );
+    }
+
     public function deleteTask( $task_id ) {
         global $wpdb;
 

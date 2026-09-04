@@ -178,7 +178,7 @@ if [ -f $RemoteStagingDirQ/composer.json ] && command -v composer >/dev/null 2>&
 fi
 db_prefix=`$(sudo -u iarf -- wp db prefix --path=$RemoteWordPressDirQ)
 existing_tables=`$(sudo -u iarf -- wp db query 'SHOW TABLES;' --skip-column-names --path=$RemoteWordPressDirQ)
-db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions `${db_prefix}pandat69_work_log_group_shares"
+db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_project_task_references `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions `${db_prefix}pandat69_work_log_group_shares"
 db_tables=""
 for table in `$db_candidates; do
     if printf '%s\n' "`$existing_tables" | grep -Fxq "`$table"; then

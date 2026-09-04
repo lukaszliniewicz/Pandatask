@@ -35,6 +35,13 @@ test('fresh stdio core profile advertises the required tools and response contra
     'work_log',
     'work_list',
     'work_report',
+    'project_workspace_get',
+    'project_reference_list',
+    'project_reference_add',
+    'project_reference_update',
+    'project_reference_remove',
+    'project_reference_export',
+    'project_reference_import',
   ]) {
     assert.ok(names.has(required), `Core profile is missing ${required}.`);
   }
@@ -65,4 +72,28 @@ test('fresh stdio core profile advertises the required tools and response contra
   assert.ok(recurrenceFrequency?.enum?.includes('monthly_weekday'), 'task_create must advertise monthly_weekday recurrence.');
   assert.deepEqual(recurrenceMonthWeek?.enum, ['first', 'second', 'third', 'fourth', 'last']);
   assert.match(recurrenceDays?.description ?? '', /Sunday is 7, never 0/);
+
+  for (const name of ['project_workspace_get', 'project_reference_list', 'project_reference_export']) {
+    const tool = listed.tools.find((item) => item.name === name);
+    assert.ok(tool, `Core profile must advertise ${name}.`);
+    assert.equal(tool.annotations?.readOnlyHint, true);
+    const properties = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+    assert.ok(!('response_mode' in properties), `${name} must not advertise response_mode.`);
+  }
+
+  for (const name of ['project_reference_add', 'project_reference_update', 'project_reference_remove', 'project_reference_import']) {
+    const tool = listed.tools.find((item) => item.name === name);
+    assert.ok(tool, `Core profile must advertise ${name}.`);
+    assert.equal(tool.annotations?.readOnlyHint, false);
+    const properties = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+    assert.ok('response_mode' in properties, `${name} must advertise response_mode.`);
+    assert.ok('dry_run' in properties, `${name} must advertise dry_run.`);
+    assert.ok('idempotency_key' in properties, `${name} must advertise idempotency_key.`);
+  }
+
+  const add = listed.tools.find((item) => item.name === 'project_reference_add');
+  const addProperties = (add?.inputSchema as { properties?: Record<string, unknown> } | undefined)?.properties ?? {};
+  const relationType = addProperties.relation_type as { enum?: readonly unknown[] } | undefined;
+  assert.deepEqual(relationType?.enum, ['included', 'related', 'dependency']);
+  assert.match(String((relationType as { description?: string } | undefined)?.description), /dependency requires/);
 });

@@ -35,10 +35,17 @@ const GanttRow = ({
                         <span className="pandat69-gantt-expand-spacer" />
                     )}
                     <span className={`pandat69-gantt-status status-${row.task.status}`} aria-hidden="true" />
-                    <button type="button" className="pandat69-gantt-task-name" onClick={() => onTaskAction('view', row.task)} title={row.task.name}>
-                        {row.task.name}
-                        <span className="pandat69-visually-hidden">, {getGanttStatusLabel(row.task.status)}</span>
-                    </button>
+					{row.task.restricted ? (
+						<span className="pandat69-gantt-task-name is-restricted">
+							{row.task.name}
+							<span className="pandat69-visually-hidden">, restricted by source permissions</span>
+						</span>
+					) : (
+						<button type="button" className="pandat69-gantt-task-name" onClick={() => onTaskAction('view', row.task)} title={row.task.name}>
+							{row.task.name}
+							<span className="pandat69-visually-hidden">, {getGanttStatusLabel(row.task.status)}</span>
+						</button>
+					)}
                     {row.warnings.length > 0 && (
                         <span className="pandat69-gantt-warning" title={warnings} aria-label={warnings}>
                             <Icon name="circle-alert" size={15} />
@@ -46,7 +53,10 @@ const GanttRow = ({
                     )}
                 </div>
                 <div className="pandat69-gantt-task-meta">
-                    {row.task.project_name || row.task.board_display_name || 'No project'}
+					{row.task.origin === 'external' ? 'External · ' : ''}
+					{row.task.restricted
+						? 'Source hidden'
+						: row.task.project_name || row.task.board_display_name || 'No project'}
                     {row.scheduleKind.includes('summary') || row.scheduleKind === 'rollup-only' ? ' · roll-up' : ''}
                     {row.task.is_blocked ? ' · blocked' : ''}
                 </div>

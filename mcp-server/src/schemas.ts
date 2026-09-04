@@ -91,6 +91,7 @@ export const taskCollectionFieldNames = [
   'capture_url',
   'predecessors',
   'predecessor_ids',
+  'restricted_predecessor_count',
   'is_blocked',
   'assigned_users',
   'assigned_user_ids',
@@ -222,7 +223,7 @@ export const taskMutableFields = {
   category_id: z.number().int().nonnegative().optional().describe('Board category ID; use 0 to remove the category.'),
   project_id: z.number().int().nonnegative().optional().describe('Board project ID; use 0 to remove the project.'),
   parent_task_id: z.number().int().nonnegative().optional().describe('Parent task ID on the same board; use 0 to remove the parent.'),
-  predecessors: idList.optional().describe('Predecessor task IDs on the same board.'),
+  predecessors: idList.optional().describe('Readable predecessor task IDs. Dependencies may cross boards; the server enforces task visibility and global cycle safety.'),
   is_recurring: z.boolean().optional().describe('Whether this task repeats after its current occurrence.'),
   recurrence_frequency: z
     .enum(['weekly', 'bi-weekly', 'monthly', 'custom_weekly', 'monthly_weekday'])
@@ -299,6 +300,118 @@ export const projectCreateData = z.object({
 export const projectUpdateData = z
   .object(projectMutableFields)
   .refine((value) => Object.values(value).some((item) => item !== undefined), 'Provide at least one project field to update.');
+
+const projectReferenceAssociationFields = {
+  relation_type: z
+    .enum(['included', 'related'])
+    .describe('Association relation: included shows the canonical task in this additional project; related is contextual and stays out of project visuals.'),
+  task_id: positiveId.describe('Stable ID of the canonical task. Adding the association does not move or copy the task; authorization and visibility remain server-enforced.'),
+};
+
+const projectReferenceDependencyFields = {
+  relation_type: z
+    .literal('dependency')
+    .describe('Canonical task dependency relation. This is distinct from an included or related project association.'),
+  predecessor_task_id: positiveId.describe('Stable ID of the predecessor task.'),
+  successor_task_id: positiveId.describe('Stable ID of the successor task. The successor must be native to the target project; the server validates this and all authorization.'),
+};
+
+/**
+ * Stable task-ID payload for creating one project reference. The REST API
+ * deliberately keeps associations separate from canonical dependencies.
+ */
+export const projectReferenceRelationData = z.discriminatedUnion('relation_type', [
+  z.object(projectReferenceAssociationFields).strict(),
+  z.object(projectReferenceDependencyFields).strict(),
+]);
+
+export const projectWorkspaceGetData = z.object({
+  project_id: positiveId,
+});
+
+export const projectReferenceListData = z.object({
+  project_id: positiveId,
+});
+
+export const projectReferenceExportData = z.object({
+  project_id: positiveId,
+});
+
+export const projectReferenceAddData = z
+  .object({
+    project_id: positiveId,
+    relation_type: z
+      .enum(['included', 'related', 'dependency'])
+      .describe('Discriminant: included/related require task_id; dependency requires predecessor_task_id and successor_task_id.'),
+    task_id: positiveId.optional().describe('Stable associated task ID for included or related associations only.'),
+    predecessor_task_id: positiveId.optional().describe('Stable predecessor task ID for dependency relations only.'),
+    successor_task_id: positiveId.optional().describe('Stable successor task ID for dependency relations only. It must be native to the target project; the server validates this.'),
+    dry_run: dryRunField,
+    idempotency_key: idempotencyKey,
+    response_mode: responseModeField,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.relation_type === 'dependency') {
+      if (value.predecessor_task_id === undefined) {
+        context.addIssue({ code: 'custom', path: ['predecessor_task_id'], message: 'Dependency references require predecessor_task_id.' });
+      }
+      if (value.successor_task_id === undefined) {
+        context.addIssue({ code: 'custom', path: ['successor_task_id'], message: 'Dependency references require successor_task_id.' });
+      }
+      if (value.task_id !== undefined) {
+        context.addIssue({ code: 'custom', path: ['task_id'], message: 'Dependency references cannot include task_id.' });
+      }
+    } else {
+      if (value.task_id === undefined) {
+        context.addIssue({ code: 'custom', path: ['task_id'], message: 'Association references require task_id.' });
+      }
+      if (value.predecessor_task_id !== undefined) {
+        context.addIssue({ code: 'custom', path: ['predecessor_task_id'], message: 'Association references cannot include predecessor_task_id.' });
+      }
+      if (value.successor_task_id !== undefined) {
+        context.addIssue({ code: 'custom', path: ['successor_task_id'], message: 'Association references cannot include successor_task_id.' });
+      }
+    }
+  });
+
+export const projectReferenceKey = z
+  .string()
+  .regex(/^reference-[1-9][0-9]*$/, 'Use an association reference key such as reference-12.')
+  .describe('Stable association reference key returned by the project reference API; only association keys can be relation-updated.');
+
+export const projectDependencyReferenceKey = z
+  .string()
+  .regex(/^(?:reference|dependency)-[1-9][0-9]*$/, 'Use a reference-N or dependency-N key.')
+  .describe('Reference key returned by the project reference API. Association keys use reference-N; canonical dependency keys use dependency-N.');
+
+export const projectReferenceUpdateData = z.object({
+  project_id: positiveId,
+  reference_key: projectReferenceKey,
+  relation_type: z
+    .enum(['included', 'related'])
+    .describe('Replacement association relation. This operation cannot update canonical dependency keys.'),
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
+}).strict();
+
+export const projectReferenceRemoveData = z.object({
+  project_id: positiveId,
+  reference_key: projectDependencyReferenceKey,
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
+}).strict();
+
+export const projectReferenceImportData = z.object({
+  project_id: positiveId,
+  version: z.literal(1).optional().default(1).describe('Reference interchange format version. Only version 1 is currently supported.'),
+  references: z
+    .array(projectReferenceRelationData)
+    .max(500)
+    .describe('Stable task-ID references to import. Restricted or unresolvable entries are safely skipped and reported by the server; canonical metadata is never required or exposed.'),
+  dry_run: dryRunField,
+  idempotency_key: idempotencyKey,
+}).strict();
 
 export const periodSchema = z
   .enum(['this_week', 'last_week', 'last_7_days', 'this_month', 'last_month', 'last_30_days', 'custom'])

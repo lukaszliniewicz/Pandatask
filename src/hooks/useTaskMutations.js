@@ -135,6 +135,9 @@ export const useTaskMutations = () => {
 			queryClient.invalidateQueries( {
 				queryKey: queryKeys.reports.board( boardName ),
 			} );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.all(),
+			} );
 		},
 	} );
 
@@ -160,6 +163,9 @@ export const useTaskMutations = () => {
 			queryClient.invalidateQueries( { queryKey: queryKeys.work.all() } );
 			queryClient.invalidateQueries( {
 				queryKey: queryKeys.reports.board( boardName ),
+			} );
+			queryClient.invalidateQueries( {
+				queryKey: queryKeys.projects.all(),
 			} );
 		},
 	} );

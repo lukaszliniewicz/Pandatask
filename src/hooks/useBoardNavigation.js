@@ -91,6 +91,20 @@ export const useBoardNavigation = (
 		);
 	}, [] );
 
+	const setCurrentProjectView = useCallback( ( currentProjectView ) => {
+		if ( ! [ 'list', 'flow', 'timeline' ].includes( currentProjectView ) ) {
+			return;
+		}
+		setNavigation( ( current ) => ( { ...current, currentProjectView } ) );
+		writeLocation(
+			{
+				pandatask_project_view:
+					currentProjectView === 'list' ? null : currentProjectView,
+			},
+			'push'
+		);
+	}, [] );
+
 	const setSelectedProject = useCallback( ( projectId ) => {
 		const selectedProjectId = projectSelectionQueryValue( projectId );
 		setNavigation( ( current ) => ( {
@@ -137,6 +151,7 @@ export const useBoardNavigation = (
 		isDetailModalOpen: navigation.selectedTaskId !== null,
 		setCurrentTab,
 		setCurrentView,
+		setCurrentProjectView,
 		setSelectedProject,
 		openTask,
 		closeTask,

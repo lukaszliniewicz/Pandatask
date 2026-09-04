@@ -98,6 +98,7 @@ final class RequestHelper {
             'supervisor_user_ids',
             'predecessors',
             'predecessor_ids',
+            'restricted_predecessor_count',
             'is_blocked',
             'follow_up_of_task_id',
             'follow_up_of_task_name',

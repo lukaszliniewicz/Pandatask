@@ -42,6 +42,9 @@ export const getGanttStatusLabel = ( status ) => {
 	if ( status === 'done' ) {
 		return 'Done';
 	}
+	if ( status === 'restricted' ) {
+		return 'Restricted';
+	}
 	return 'Pending';
 };
 

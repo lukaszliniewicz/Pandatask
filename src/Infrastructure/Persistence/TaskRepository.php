@@ -354,7 +354,7 @@ final class TaskRepository {
             }
         }
 
-        $task->creator_id = (int) $task->creator_id;
+        $task->creator_id = null === $task->creator_id ? null : (int) $task->creator_id;
 
         return $task;
     }
@@ -407,16 +407,10 @@ final class TaskRepository {
     }
 
     public function wouldCreateDependencyCycle( $task_id, $predecessor_id, $board_name = '', $proposed_predecessors = null ) {
-        if ( ! $board_name ) {
-            $predecessor = $this->findHierarchyRecordById( $predecessor_id );
-            $board_name = $predecessor ? $predecessor->board_name : '';
-        }
-
-        if ( ! $board_name ) {
-            return false;
-        }
-
-        $graph = $this->findDependencyGraphForBoard( $board_name );
+        // Dependencies are allowed to cross board boundaries.  Keep the
+        // board argument for callers that still provide it, but never use it
+        // to narrow the canonical dependency graph.
+        $graph = $this->findDependencyGraph();
 
         if ( is_array( $proposed_predecessors ) ) {
             $graph[ (int) $task_id ] = array_values( array_unique( array_map( 'intval', $proposed_predecessors ) ) );
@@ -427,6 +421,37 @@ final class TaskRepository {
             (int) $task_id,
             (int) $predecessor_id
         );
+    }
+
+    /**
+     * Return the canonical dependency graph across every board.
+     *
+     * Orphan and self edges are not valid graph edges.  The repair routine
+     * removes them from storage, while this query keeps a concurrent invalid
+     * row from making an otherwise valid update appear cyclic.
+     *
+     * @return array<int,array<int,int>>
+     */
+    public function findDependencyGraph() {
+        global $wpdb;
+
+        $prefix              = DatabaseContext::getDbPrefix();
+        $tasks_table         = $prefix . 'tasks';
+        $relationships_table = $prefix . 'task_relationships';
+        $rows = $wpdb->get_results(
+            "SELECT relationship.task_id, relationship.predecessor_id
+             FROM {$relationships_table} relationship
+             INNER JOIN {$tasks_table} task ON task.id = relationship.task_id
+             INNER JOIN {$tasks_table} predecessor ON predecessor.id = relationship.predecessor_id
+             WHERE relationship.task_id <> relationship.predecessor_id"
+        );
+        $graph = array();
+
+        foreach ( $rows as $row ) {
+            $graph[ (int) $row->task_id ][] = (int) $row->predecessor_id;
+        }
+
+        return $graph;
     }
 
     public function findParentGraphForBoard( $board_name ) {
@@ -506,6 +531,115 @@ final class TaskRepository {
             $row->project_id = $row->project_id ? (int) $row->project_id : null;
             $row->parent_task_id = $row->parent_task_id ? (int) $row->parent_task_id : null;
             $records[ $row->id ] = $row;
+        }
+
+        return $records;
+    }
+
+    /**
+     * Look up task records by canonical ID without imposing a board scope.
+     * Parent/category/project validation deliberately continues to use the
+     * board-scoped lookup above; dependency validation uses this method.
+     *
+     * @param array<int,mixed> $task_ids
+     * @return array<int,object>
+     */
+    public function findTaskRecordsByIds( $task_ids ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $task_ids ) ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return array();
+        }
+
+        $tasks_table  = DatabaseContext::getDbPrefix() . 'tasks';
+        $placeholders = implode( ', ', array_fill( 0, count( $task_ids ), '%d' ) );
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, board_name, status, archived, project_id, parent_task_id
+                 FROM {$tasks_table}
+                 WHERE id IN ({$placeholders})",
+                ...$task_ids
+            )
+        );
+        $records = array();
+
+        foreach ( $rows as $row ) {
+            $row->id = (int) $row->id;
+            $row->archived = (int) $row->archived;
+            $row->project_id = $row->project_id ? (int) $row->project_id : null;
+            $row->parent_task_id = $row->parent_task_id ? (int) $row->parent_task_id : null;
+            $records[ $row->id ] = $row;
+        }
+
+        return $records;
+    }
+
+    /**
+     * Batch-load the access fields used by TaskAccessPolicy.
+     *
+     * This lets REST task decoration evaluate the canonical policy without a
+     * query per predecessor while preserving direct participation access on
+     * private boards.
+     *
+     * @param array<int,mixed> $task_ids
+     * @return array<int,object>
+     */
+    public function findAccessRecordsByIds( $task_ids ) {
+        global $wpdb;
+
+        $task_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $task_ids ) ) ) );
+
+        if ( empty( $task_ids ) ) {
+            return array();
+        }
+
+        $prefix            = DatabaseContext::getDbPrefix();
+        $tasks_table       = $prefix . 'tasks';
+        $assignments_table = $prefix . 'assignments';
+        $placeholders      = implode( ', ', array_fill( 0, count( $task_ids ), '%d' ) );
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT t.id, t.board_name, t.creator_id, t.inbox_state, t.follow_up_of_task_id, t.status
+                 FROM {$tasks_table} t
+                 WHERE t.id IN ({$placeholders})",
+                ...$task_ids
+            )
+        );
+        $records = array();
+
+        foreach ( $task_ids as $task_id ) {
+            $records[ (int) $task_id ] = null;
+        }
+        foreach ( $rows as $row ) {
+            $row->id = (int) $row->id;
+            $row->creator_id = null === $row->creator_id ? null : (int) $row->creator_id;
+            $row->assigned_user_ids = array();
+            $row->supervisor_user_ids = array();
+            $records[ $row->id ] = $row;
+        }
+
+        $assignment_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT task_id, user_id, role
+                 FROM {$assignments_table}
+                 WHERE task_id IN ({$placeholders})
+                 ORDER BY task_id ASC, user_id ASC",
+                ...$task_ids
+            )
+        );
+
+        foreach ( $assignment_rows as $assignment ) {
+            $task_id = (int) $assignment->task_id;
+            if ( ! isset( $records[ $task_id ] ) || ! is_object( $records[ $task_id ] ) ) {
+                continue;
+            }
+            if ( 'supervisor' === $assignment->role ) {
+                $records[ $task_id ]->supervisor_user_ids[] = (int) $assignment->user_id;
+            } else {
+                $records[ $task_id ]->assigned_user_ids[] = (int) $assignment->user_id;
+            }
         }
 
         return $records;

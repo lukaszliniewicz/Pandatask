@@ -50,6 +50,36 @@ final class TaskGraph {
     }
 
     /**
+     * Determine whether an existing directed edge participates in a cycle.
+     *
+     * @param array<int,array<int,int>> $edges Existing adjacency list.
+     */
+    public static function edgeParticipatesInCycle( array $edges, int $from, int $to ): bool {
+        if ( $from <= 0 || $to <= 0 || ! in_array( $to, array_map( 'intval', $edges[ $from ] ?? array() ), true ) ) {
+            return false;
+        }
+
+        $without_edge = $edges;
+        $removed       = false;
+        $without_edge[ $from ] = array_values(
+            array_filter(
+                $without_edge[ $from ],
+                static function ( $candidate ) use ( $to, &$removed ) {
+                    if ( ! $removed && (int) $candidate === $to ) {
+                        $removed = true;
+
+                        return false;
+                    }
+
+                    return true;
+                }
+            )
+        );
+
+        return self::wouldCreateCycle( $without_edge, $from, $to );
+    }
+
+    /**
      * Return every node that participates in at least one directed cycle.
      *
      * @param array<int,array<int,int>> $edges Adjacency list.

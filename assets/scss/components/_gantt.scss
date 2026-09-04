@@ -296,6 +296,10 @@ body.pandat69-gantt-viewport-open {
 	&.status-done {
 		background: $success-color;
 	}
+
+	&.status-restricted {
+		background: #858e97;
+	}
 }
 
 .pandat69-gantt-task-name {
@@ -313,6 +317,11 @@ body.pandat69-gantt-viewport-open {
 	font-weight: 600;
 	line-height: 1.25;
 	text-align: left;
+
+	&.is-restricted {
+		cursor: default;
+		color: #68727b;
+	}
 	text-overflow: ellipsis;
 	white-space: nowrap;
 
@@ -399,6 +408,12 @@ body.pandat69-gantt-viewport-open {
 		border-color: #327653;
 		background: $success-color;
 		color: $white;
+	}
+
+	&.status-restricted {
+		border-color: #858e97;
+		background: #e8ebed;
+		color: #535d65;
 	}
 
 	&.kind-parent-summary,

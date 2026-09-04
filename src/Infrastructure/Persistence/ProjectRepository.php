@@ -310,6 +310,7 @@ final class ProjectRepository {
         $prefix            = DatabaseContext::getDbPrefix();
         $projects_table    = $prefix . 'projects';
         $assignments_table = $prefix . 'project_assignments';
+        $references_table  = $prefix . 'project_task_references';
         $tasks_table       = $prefix . 'tasks';
 
         if ( ! DatabaseContext::beginTransaction() ) {
@@ -319,6 +320,7 @@ final class ProjectRepository {
         if (
             false === $wpdb->update( $tasks_table, array( 'project_id' => null ), array( 'project_id' => $project_id ), array( '%s' ), array( '%d' ) )
             || false === $wpdb->delete( $assignments_table, array( 'project_id' => $project_id ), array( '%d' ) )
+            || false === $wpdb->delete( $references_table, array( 'project_id' => $project_id ), array( '%d' ) )
         ) {
             DatabaseContext::rollback();
 

@@ -3,7 +3,7 @@ Contributors: l.liniewicz
 Tags: task management, project management, buddypress, kanban, todo, tasks, calendar, subtasks, recurring tasks, gantt, bug tracker
 Requires at least: 5.0
 Tested up to: 7.0
-Stable tag: 1.0.32
+Stable tag: 1.0.33
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -22,12 +22,12 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 *   **Five view modes** – Compact list (with subtask tree and drag-and-drop reparenting), full list (with inline actions), Kanban (drag between columns), monthly calendar, and a dependency-aware Gantt with parent roll-ups and an unscheduled-work tray.
 *   **Board and personal workspace tabs** – All Tasks, Projects, Overview, Archive, and Report on boards, with Inbox and Work Log added to personal workspaces.
 *   **Task hierarchy** – Tasks can have same-board parent-child relationships (subtasks). Subtasks inherit the parent's project, including descendant cascades when the project changes; parent board moves are blocked until children are moved or detached.
-*   **Task dependencies and lifecycle** – Tasks can list predecessors. Completion has an explicit work-accounting boundary, while reopen, post-completion work, and causal follow-up tasks remain distinct auditable operations.
+*   **Task dependencies and lifecycle** – Tasks can list readable predecessors across boards, with global cycle checks and permission-safe redaction. Completion has an explicit work-accounting boundary, while reopen, post-completion work, and causal follow-up tasks remain distinct auditable operations.
 *   **Recurring tasks** – Configurable weekly intervals, selected weekdays, fixed-date monthly schedules, or first/second/third/fourth/last weekday-of-month rules. A daily cron rolls over completed instances to the next occurrence.
 *   **Deadline management** – Fixed dates or relative duration (days after start). Per-task deadline reminders with configurable lead time.
 *   **User roles** – Assignees (responsible) and supervisors (oversight). Both receive notifications.
 *   **Categories** – Named groupings scoped to each board, manageable from the board header or inline in the task form.
-*   **Projects** – Named groupings that cross-cut categories. Personal workspaces include enabled group projects by default and offer a private-only filter.
+*   **Project workspaces** – Each project has focused List, dependency Flow, and Timeline modes. Included/related references add cross-project context without copying or moving canonical tasks; personal workspaces include enabled group projects and a private-only filter.
 *   **Comments with @mentions** – Autocomplete user search, email and BuddyPress notifications for mentions.
 *   **Attachments** – Upload via the WordPress media library or attach an external URL.
 *   **Audit log** – Every field change is recorded. Multiple rapid changes are aggregated into a single history entry with a digest email.
@@ -37,7 +37,7 @@ When BuddyPress is active, boards can be attached to BuddyPress groups (with per
 *   **Bug tracker shortcode** – `[pandatask_bug_tracker board_name="..."]` renders a standalone bug list and submission form.
 *   **Reports** – Tab showing tasks added, completed, and missed deadlines for configurable periods, plus workload distribution per user.
 *   **AI assistant** – Admin page that generates structured prompts for LLMs based on board context (projects, categories, users, API schema). Paste the LLM's JSON response to execute batch operations.
-*   **REST API** – Full CRUD plus explicit task move/preview, lifecycle, Inbox, work-accounting, batch, and report endpoints.
+*   **REST API** – Full CRUD plus project workspace/reference export/import, explicit task move/preview, lifecycle, Inbox, work-accounting, batch, and report endpoints.
 *   **Personal Inbox and quick capture** – Capture normal tasks before classifying them, delegate submit-only or triage access, and move items to writable boards without changing task identity.
 *   **Browser quick capture** – An optional Manifest V3 extension in the source repository captures the current page or selection into My Inbox or a writable board.
 *   **Caching** – Transient-based with version invalidation per board and per user. All mutations clear relevant caches.
@@ -97,6 +97,12 @@ Yes. All operations are available via the `pandatask/v1` REST API, including a b
 6. BuddyPress group Tasks tab
 
 == Changelog ==
+
+= 1.0.33 =
+
+* Replace the cramped all-project stack with dedicated project workspaces offering focused List, dependency Flow, and Timeline modes.
+* Add permission-safe cross-project included/related references and cross-board dependencies without duplicating canonical tasks.
+* Expose project workspace/reference CRUD and versioned export/import through REST and the core MCP profile, with restricted-source redaction.
 
 = 1.0.32 =
 

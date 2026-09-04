@@ -24,6 +24,7 @@ const BoardShell = ({ controller }) => (
             fullscreenToggleRef={controller.fullscreenToggleRef}
             currentView={controller.currentView}
             onViewChange={controller.setCurrentView}
+			currentTab={controller.currentTab}
             toggleSidebar={controller.toggleSidebar}
             isSidebarOpen={controller.isSidebarOpen}
         />

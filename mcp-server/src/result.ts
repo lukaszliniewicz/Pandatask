@@ -17,6 +17,12 @@ const MINIMAL_RESULT_KEYS = new Set([
   'id',
   'task_id',
   'project_id',
+  'reference_id',
+  'reference_key',
+  'task_key',
+  'predecessor_key',
+  'successor_key',
+  'relationship_id',
   'entry_id',
   'category_id',
   'comment_id',
@@ -37,6 +43,7 @@ const MINIMAL_RESULT_KEYS = new Set([
   'archived',
   'deleted',
   'created',
+  'skipped',
   'updated',
   'complete',
   'success',
@@ -74,6 +81,13 @@ const MINIMAL_RESULT_KEYS = new Set([
   'requested_tasks',
   'created_tasks',
   'error',
+  'errors',
+  'relation_type',
+  'predecessor_task_id',
+  'successor_task_id',
+  'restricted',
+  'is_restricted',
+  'is_external',
   'code',
   'http_status',
 ]);
@@ -81,6 +95,8 @@ const MINIMAL_RESULT_KEYS = new Set([
 const MINIMAL_STRUCTURED_KEYS = new Set([
   'task',
   'project',
+  'reference',
+  'references',
   'entry',
   'category',
   'comment',
@@ -110,6 +126,7 @@ const INPUT_IDENTITY_KEYS = [
   'board_name',
   'destination_board',
   'key',
+  'reference_key',
 ] as const;
 
 export const toolOutputSchema = z.object({

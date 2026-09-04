@@ -82,7 +82,13 @@ export const queryKeys = {
 			[ ...root, 'projects', boardName ] as const,
 		list: ( boardName: string, privateOnly: boolean ) =>
 			[ ...root, 'projects', boardName, { privateOnly } ] as const,
+		workspace: ( projectId: number | string ) =>
+			[ ...root, 'projects', 'workspace', Number( projectId ) ] as const,
+		references: ( projectId: number | string ) =>
+			[ ...root, 'projects', 'references', Number( projectId ) ] as const,
 	},
+	visibleTasks: ( search: string ) =>
+		[ ...root, 'visible-tasks', search ] as const,
 	users: (
 		boardName: string,
 		search: string,

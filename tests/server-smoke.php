@@ -200,6 +200,7 @@ $index_requirements = array(
     'work_audit_log' => array( 'entity_history', 'actor_id', 'created_at' ),
     'work_suggestion_decisions' => array( 'user_provider_external', 'user_decision', 'work_entry_id' ),
     'work_log_group_shares' => array( 'user_group', 'group_user', 'user_id', 'group_id' ),
+    'project_task_references' => array( 'project_task', 'task_id', 'relation_type' ),
 );
 $result['indexes'] = array();
 
@@ -258,8 +259,8 @@ if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.20', '<' ) ) {
-    $failures[] = 'Expected a loaded plugin with database schema 1.0.20 or newer.';
+if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.21', '<' ) ) {
+    $failures[] = 'Expected a loaded plugin with database schema 1.0.21 or newer.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

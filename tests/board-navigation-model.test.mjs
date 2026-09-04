@@ -14,9 +14,23 @@ test( 'reads canonical task and project deep links', () => {
 		{
 			currentTab: 'tasks',
 			currentView: 'gantt',
+			currentProjectView: 'list',
 			selectedProjectId: 12,
 			selectedTaskId: 484,
 		}
+	);
+} );
+
+test( 'reads and normalizes the dedicated project workspace view', () => {
+	assert.equal(
+		readBoardNavigationSearch( '?pandatask_project_view=flow' )
+			.currentProjectView,
+		'flow'
+	);
+	assert.equal(
+		readBoardNavigationSearch( '?pandatask_project_view=wall-of-yarn' )
+			.currentProjectView,
+		'list'
 	);
 } );
 

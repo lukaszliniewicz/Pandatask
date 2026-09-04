@@ -21,6 +21,7 @@ const Header = ({
     fullscreenToggleRef,
     currentView,
     onViewChange,
+	currentTab,
     toggleSidebar,
     isSidebarOpen,
 }) => {
@@ -54,7 +55,7 @@ const Header = ({
             </div>
 
             <div className="pandat69-header-actions">
-                <div className="pandat69-view-controls-container">
+				{currentTab === 'tasks' && <div className="pandat69-view-controls-container">
                     <span className="pandat69-view-label">View:</span>
                     {VIEWS.map(view => (
                         <button
@@ -69,7 +70,7 @@ const Header = ({
                             <Icon name={view.icon} />
                         </button>
                     ))}
-                </div>
+				</div>}
 
                 <div className="pandat69-header-buttons">
                     <QuickAddMenu workLogEnabled={workLogEnabled} onAddTask={onAddTask} onLogWork={onLogWork} />

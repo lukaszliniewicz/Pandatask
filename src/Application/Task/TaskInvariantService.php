@@ -153,18 +153,22 @@ final class TaskInvariantService {
             : array();
 
         if ( $validate_predecessors ) {
-            $predecessors = $this->task_repository->findBoardTaskRecordsByIds( $board_name, $predecessor_ids );
+            $predecessors = method_exists( $this->task_repository, 'findTaskRecordsByIds' )
+                ? $this->task_repository->findTaskRecordsByIds( $predecessor_ids )
+                : $this->task_repository->findBoardTaskRecordsByIds( $board_name, $predecessor_ids );
 
             if ( count( $predecessors ) !== count( $predecessor_ids ) || ( $task_id > 0 && in_array( $task_id, $predecessor_ids, true ) ) ) {
                 return new WP_Error(
                     'rest_invalid_reference',
-                    __( 'A selected predecessor is invalid for this board.', 'pandatask' ),
+                    __( 'A selected predecessor is invalid.', 'pandatask' ),
                     array( 'status' => 422 )
                 );
             }
 
             if ( $task_id > 0 ) {
-                $graph = $this->task_repository->findDependencyGraphForBoard( $board_name );
+                $graph = method_exists( $this->task_repository, 'findDependencyGraph' )
+                    ? $this->task_repository->findDependencyGraph()
+                    : array();
                 $graph[ $task_id ] = $predecessor_ids;
 
                 if ( in_array( $task_id, TaskGraph::findCycleNodes( $graph ), true ) ) {

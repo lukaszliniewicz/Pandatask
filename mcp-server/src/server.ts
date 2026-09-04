@@ -18,6 +18,13 @@ import {
   periodSchema,
   positiveId,
   projectCreateData,
+  projectReferenceAddData,
+  projectReferenceExportData,
+  projectReferenceImportData,
+  projectReferenceListData,
+  projectReferenceRemoveData,
+  projectReferenceUpdateData,
+  projectWorkspaceGetData,
   projectUpdateData,
   responseModeField,
   taskCreateData,
@@ -32,7 +39,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.4';
+const VERSION = '1.3.5';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -859,7 +866,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_set_dependencies',
     'Set task dependencies',
-    'Replaces the task predecessor list. Pandatask validates same-board references and dependency cycles.',
+    'Replaces the task predecessor list. Dependencies may cross boards; Pandatask requires every supplied predecessor to be readable and validates cycles globally.',
     z.object({
       task_id: positiveId,
       predecessor_ids: idList,
@@ -911,7 +918,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     project_id: z.number().int().nonnegative().optional().describe('Optional destination project override; 0 clears it.'),
     category_id: z.number().int().nonnegative().optional().describe('Optional destination category override; 0 clears it.'),
     parent_task_id: z.number().int().nonnegative().optional().describe('Optional destination parent override; 0 clears it.'),
-    predecessors: idList.optional().describe('Optional destination predecessor list.'),
+    predecessors: idList.optional().describe('Optional readable predecessor list. Existing hidden predecessors are preserved when this field is omitted.'),
     assigned_persons: idList.optional().describe('Optional destination assignee list.'),
     supervisor_persons: idList.optional().describe('Optional destination supervisor list.'),
     change_comment: z.string().max(2000).optional().describe('Audit-history explanation for moving the task.'),
@@ -1220,6 +1227,102 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     z.object({ project_id: positiveId }),
     readOnly,
     async ({ project_id }, extra) => client.request({ path: `/projects/${project_id}`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'project_workspace_get',
+    'Get project workspace',
+    'Gets one project workspace with its project, visible tasks, canonical dependencies, project references, and counts. The server enforces authorization and redaction; restricted entries do not expose canonical task or project metadata.',
+    projectWorkspaceGetData,
+    readOnly,
+    async ({ project_id }, extra) => client.request({ path: `/projects/${project_id}/workspace`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'project_reference_list',
+    'List project references',
+    'Lists visible references for one project, including included and related associations plus canonical dependencies and counts. Referenced tasks keep one canonical home; authorization and restricted-data redaction remain server-enforced.',
+    projectReferenceListData,
+    readOnly,
+    async ({ project_id }, extra) => client.request({ path: `/projects/${project_id}/references`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'project_reference_add',
+    'Add project reference',
+    'Adds one included or related project association, or one canonical dependency. Associations are distinct from dependencies; for a dependency, the successor must be native to the target project. The server enforces authorization, canonical-home invariants, and visibility.',
+    projectReferenceAddData,
+    write,
+    async (input, extra) => {
+      const { project_id, dry_run, idempotency_key } = input;
+      return client.mutate({
+        method: 'POST',
+        path: `/projects/${project_id}/references`,
+        body: mutationBody(input, ['project_id', 'dry_run', 'idempotency_key']),
+        idempotencyKey: idempotency_key,
+        signal: extra.signal,
+      }, dry_run);
+    },
+  );
+
+  register(
+    server,
+    'project_reference_update',
+    'Update project reference',
+    'Changes an included association to related or a related association to included. Only association keys matching reference-N may be updated; canonical dependency keys cannot be relation-updated.',
+    projectReferenceUpdateData,
+    write,
+    async ({ project_id, reference_key, relation_type, dry_run, idempotency_key }, extra) => client.mutate({
+      method: 'PATCH',
+      path: `/projects/${project_id}/references/${reference_key}`,
+      body: { relation_type },
+      idempotencyKey: idempotency_key,
+      signal: extra.signal,
+    }, dry_run),
+  );
+
+  register(
+    server,
+    'project_reference_remove',
+    'Remove project reference',
+    'Removes one visible project association or canonical dependency by its returned reference-N or dependency-N key. Restricted or inaccessible metadata is never inferred; the server remains authoritative.',
+    projectReferenceRemoveData,
+    destructive,
+    async ({ project_id, reference_key, dry_run, idempotency_key }, extra) => client.mutate({
+      method: 'DELETE',
+      path: `/projects/${project_id}/references/${reference_key}`,
+      idempotencyKey: idempotency_key,
+      signal: extra.signal,
+    }, dry_run),
+  );
+
+  register(
+    server,
+    'project_reference_export',
+    'Export project references',
+    'Exports versioned stable task-ID references for one project. Restricted references are safely omitted and reported in omitted_restricted; canonical metadata is not exposed.',
+    projectReferenceExportData,
+    readOnly,
+    async ({ project_id }, extra) => client.request({ path: `/projects/${project_id}/references/export`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'project_reference_import',
+    'Import project references',
+    'Imports version 1 stable task-ID references into one project. Included and related associations remain distinct from canonical dependencies; restricted or unresolvable entries are safely skipped and returned in the created, skipped, and errors counts.',
+    projectReferenceImportData,
+    write,
+    async ({ project_id, version, references, dry_run, idempotency_key }, extra) => client.mutate({
+      method: 'POST',
+      path: `/projects/${project_id}/references/import`,
+      body: { version, references },
+      idempotencyKey: idempotency_key,
+      signal: extra.signal,
+    }, dry_run),
   );
 
   register(

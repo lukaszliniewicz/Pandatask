@@ -79,7 +79,7 @@ final class PermissionChecker {
     }
 
     public function check_project_permission( $request ) {
-        $project = $this->project_service->getProject( (int) $request['id'] );
+        $project = $this->projectForPermission( (int) $request['id'] );
 
         if ( ! $project ) {
             return new WP_Error( 'rest_not_found', 'Project not found', array( 'status' => 404 ) );
@@ -89,7 +89,7 @@ final class PermissionChecker {
     }
 
     public function check_project_manage_permission( $request ) {
-        $project = $this->project_service->getProject( (int) $request['id'] );
+        $project = $this->projectForPermission( (int) $request['id'] );
 
         if ( ! $project ) {
             return new WP_Error( 'rest_not_found', 'Project not found', array( 'status' => 404 ) );
@@ -126,6 +126,12 @@ final class PermissionChecker {
         }
 
         return $this->check_admin_permission( $request );
+    }
+
+    private function projectForPermission( $project_id ) {
+        return method_exists( $this->project_service, 'getProjectUncached' )
+            ? $this->project_service->getProjectUncached( (int) $project_id )
+            : $this->project_service->getProject( (int) $project_id );
     }
 
     public function check_comment_permission( $request ) {

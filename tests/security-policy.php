@@ -96,6 +96,48 @@ class WP_Error {
     }
 }
 
+final class SecurityPolicyTestWpdb {
+    public $prefix = 'wp_';
+
+    public function prepare( $query, ...$args ) {
+        unset( $args );
+        return $query;
+    }
+
+    public function get_row( $query ) {
+        unset( $query );
+
+        return (object) array(
+            'id'                  => 41,
+            'board_name'          => 'group_12',
+            'creator_id'          => null,
+            'inbox_state'         => null,
+            'follow_up_of_task_id' => null,
+            'status'              => 'pending',
+        );
+    }
+
+    public function get_results( $query ) {
+        if ( false !== strpos( $query, 'SELECT t.id' ) ) {
+            return array(
+                (object) array(
+                    'id'                  => 41,
+                    'board_name'          => 'group_12',
+                    'creator_id'          => null,
+                    'inbox_state'         => null,
+                    'follow_up_of_task_id' => null,
+                    'status'              => 'pending',
+                ),
+            );
+        }
+
+        return array();
+    }
+}
+
+require_once __DIR__ . '/../src/Infrastructure/Persistence/DatabaseContext.php';
+require_once __DIR__ . '/../src/Infrastructure/Persistence/TaskRepository.php';
+
 function assert_same( $expected, $actual, $message ) {
     if ( $expected !== $actual ) {
         fwrite( STDERR, $message . "\nExpected: " . var_export( $expected, true ) . "\nActual: " . var_export( $actual, true ) . "\n" );
@@ -190,6 +232,61 @@ assert_same( true, $task_policy->canMoveTask( 41, 7 ), 'Board managers should be
 $unrelated_read_result = $task_policy->canReadTask( 41, 8 );
 assert_same( true, $unrelated_read_result instanceof WP_Error || false === $unrelated_read_result, 'Unrelated users should not receive read access.' );
 assert_same( true, $task_policy->canReadTask( 999, 4 ) instanceof WP_Error, 'Missing tasks should return a not-found error.' );
+
+$anonymous_task = (object) array(
+    'id'                  => 43,
+    'board_name'          => 'user_8',
+    'creator_id'          => null,
+    'assigned_user_ids'   => array( 0 ),
+    'supervisor_user_ids' => array( 0 ),
+    'inbox_state'         => 'untriaged',
+);
+$anonymous_task_service = new class( $anonymous_task ) {
+    private $task;
+
+    public function __construct( $task ) {
+        $this->task = $task;
+    }
+
+    public function getTaskForAuthorization( $task_id ) {
+        return 43 === (int) $task_id ? $this->task : null;
+    }
+};
+$anonymous_board_policy = new class() {
+    public function canReadBoard( $board_name, $user_id ) {
+        unset( $board_name, $user_id );
+        return true;
+    }
+
+    public function canManageBoard( $board_name, $user_id ) {
+        unset( $board_name, $user_id );
+        return true;
+    }
+};
+$anonymous_inbox_policy = new class() {
+    public function canTriageInbox( $owner_user_id, $user_id ) {
+        unset( $owner_user_id, $user_id );
+        return true;
+    }
+};
+$pandatask_test_caps[0] = array( 'manage_options' => true );
+$anonymous_task_policy = new TaskAccessPolicy( $anonymous_task_service, $anonymous_board_policy, $anonymous_inbox_policy );
+foreach ( array( null, 0 ) as $creator_id ) {
+    $anonymous_task->creator_id = $creator_id;
+
+    foreach ( array( 'canReadTask', 'canAccessTask', 'canUpdateTask', 'canDeleteTask', 'canManageTaskRoles', 'canMoveTask' ) as $method ) {
+        $anonymous_result = $anonymous_task_policy->{$method}( 43, 0 );
+        assert_same( true, $anonymous_result instanceof WP_Error, 'Anonymous actors must not authorize tasks with a null or zero creator through ' . $method . '.' );
+        assert_same( 401, $anonymous_result->data['status'] ?? null, 'Anonymous task authorization must return HTTP 401 through ' . $method . '.' );
+    }
+}
+
+$GLOBALS['wpdb'] = new SecurityPolicyTestWpdb();
+$task_repository = new \Pandatask\Infrastructure\Persistence\TaskRepository();
+$single_access_record = $task_repository->findAccessRecordById( 41 );
+assert_same( null, $single_access_record->creator_id, 'Single-task access normalization must preserve a NULL creator ID.' );
+$batch_access_records = $task_repository->findAccessRecordsByIds( array( 41 ) );
+assert_same( null, $batch_access_records[41]->creator_id, 'Batch-task access normalization must preserve a NULL creator ID.' );
 
 $inbox_task = (object) array(
     'id'                  => 42,

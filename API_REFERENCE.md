@@ -81,7 +81,7 @@ If you are an AI agent or building an automation script, follow these best pract
 -   **Response Example:**
     ```json
     {
-        "plugin_version": "1.0.32",
+        "plugin_version": "1.0.33",
         "today": "2026-07-24",
         "now": "2026-07-24T12:30:00+02:00",
         "timezone": "Europe/Warsaw",
@@ -214,7 +214,7 @@ Fields available when creating or updating tasks.
 | `deadline_days_after_start` | Integer | Relative deadline: days after start date |
 | `assigned_persons` | Array[Int] | IDs of assigned users |
 | `supervisor_persons` | Array[Int] | IDs of supervisor users |
-| `predecessors` | Array[Int] | IDs of tasks this task depends on |
+| `predecessors` | Array[Int] | IDs of readable tasks this task depends on. Dependencies may cross boards and are cycle-checked globally. |
 | `category_id` | Integer | ID of category |
 | `project_id` | Integer | ID of project. For a subtask, the server always replaces this with the parent task's project. |
 | `parent_task_id` | Integer | ID of a same-board parent task. Changing a parent task's project cascades to all descendants; a task with descendants cannot change boards until they are moved or detached. |
@@ -288,9 +288,11 @@ Fields available when creating or updating tasks.
     }
     ```
 
-    The projection allowlist is: `id`, `board_name`, `board_display_name`, `frontend_url`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_month_week`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
+    The projection allowlist is: `id`, `board_name`, `board_display_name`, `frontend_url`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_month_week`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `restricted_predecessor_count`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
 
     `frontend_url` is the canonical current-board link for opening the task and is safe to surface to users. It is `false` only when Pandatask cannot resolve a published board route. `description_rendered` is computed only for an unprojected response or when explicitly requested. For example, `fields=name,description` returns exactly those two task properties without rendering or returning the rest of each record.
+
+	When a task has predecessors the viewer cannot read, those predecessors are omitted from both `predecessors` and `predecessor_ids`; `restricted_predecessor_count` reports only how many were withheld. Blocking state remains authoritative, and an ordinary edit that does not explicitly replace predecessors preserves hidden relationships.
 
 ### 1A. Get All Tasks Visible to the Current User
 
@@ -568,6 +570,74 @@ Fields available when creating or updating tasks.
     ```json
     { "message": "Deleted" }
     ```
+
+### 6. Get a Project Workspace
+
+-   **Endpoint:** `GET /projects/{project_id}/workspace`
+-   **Description:** Retrieves the project, visible tasks, canonical dependencies, visible project references, and aggregate counts in one response.
+-   **Permissions:** User must have read access to the project. Authorization and redaction are enforced by the server; restricted entries do not expose canonical task or project metadata.
+-   **Response Shape:** `{ "project": {}, "tasks": [], "dependencies": [], "references": [], "counts": {} }`
+
+### 7. List Project References
+
+-   **Endpoint:** `GET /projects/{project_id}/references`
+-   **Description:** Lists visible included/related project associations and canonical task dependencies, with reference counts.
+-   **Permissions:** User must have read access to the project. Unreadable external endpoints are returned only as restricted placeholders without canonical identifiers or source metadata.
+-   **Response Shape:** Project references and counts. An `included` association shows a canonical task in this additional project without moving or copying it; `related` is contextual and is not a dependency.
+
+### 8. Add a Project Reference
+
+-   **Endpoint:** `POST /projects/{project_id}/references`
+-   **Description:** Adds one project association or one canonical dependency. The successor in a dependency must be native to the target project.
+-   **Body:** Exactly one of:
+    -   `{ "relation_type": "included"|"related", "task_id": 123 }`
+    -   `{ "relation_type": "dependency", "predecessor_task_id": 123, "successor_task_id": 456 }`
+-   **Response Shape:** `{ "message": "...", "reference": {} }`
+-   **Permissions:** The server enforces project/task relationship authorization, canonical-home invariants, the project-native successor rule, global cycle safety, and visibility.
+
+### 9. Update a Project Association
+
+-   **Endpoint:** `PATCH /projects/{project_id}/references/{reference_key}`
+-   **Description:** Changes an association between `included` and `related`.
+-   **URL Parameter:** `reference_key` must match `reference-N`. Canonical dependency keys (`dependency-N`) cannot be relation-updated.
+-   **Body:** `{ "relation_type": "included"|"related" }`
+-   **Response Shape:** `{ "message": "...", "reference": {} }`
+
+### 10. Remove a Project Reference
+
+-   **Endpoint:** `DELETE /projects/{project_id}/references/{reference_key}`
+-   **Description:** Removes an association or a readable canonical dependency. A restricted dependency cannot be removed without source-task access.
+-   **URL Parameter:** `reference_key` must match `reference-N` or `dependency-N`.
+-   **Response Shape:** `{ "message": "..." }`
+
+### 11. Export Project References
+
+-   **Endpoint:** `GET /projects/{project_id}/references/export`
+-   **Description:** Exports version 1 stable task-ID references for safe interchange.
+-   **Response Shape:** `{ "version": 1, "references": [], "omitted_restricted": 0 }`
+-   **Privacy:** Restricted references are omitted and reported; canonical task/project metadata is never included merely to make an export complete.
+
+### 12. Import Project References
+
+-   **Endpoint:** `POST /projects/{project_id}/references/import`
+-   **Description:** Imports stable task-ID references into a project without accepting display names or copied canonical metadata.
+-   **Body:** `{ "version": 1, "references": [...] }`, where each reference uses one of the add-reference bodies above.
+-   **Response Shape:** `{ "created": 0, "skipped": 0, "errors": [] }`
+-   **Privacy and safety:** Restricted or unresolvable references are safely skipped and reported. The server remains authoritative for authorization, canonical-home rules, project-native successors, duplicate detection, and dependency validity.
+
+## MCP Project Workspace and Reference Tools
+
+The local MCP adapter exposes the same contracts through these first-class,
+core-profile tools: `project_workspace_get`, `project_reference_list`,
+`project_reference_add`, `project_reference_update`,
+`project_reference_remove`, `project_reference_export`, and
+`project_reference_import`. Read tools map to the corresponding `GET`
+endpoints. Mutation tools map to the `POST`, `PATCH`, or `DELETE` endpoints,
+accept `dry_run`, `idempotency_key`, and `response_mode`, and return the
+standard `{ok:true,data}` envelope. A dry run returns the exact request
+method, URL, body, and non-secret idempotency key without sending the mutation;
+`response_mode=minimal` keeps the operation/message, project/reference keys,
+and import counts/errors, while `response_mode=full` preserves the REST body.
 
 ---
 

@@ -398,6 +398,132 @@ test('task list tools forward arbitrary assignee and sparse-field filters', asyn
   assert.equal(calls.length, beforeConflict, 'Conflicting assignment filters must fail before REST access.');
 });
 
+test('project workspace and reference tools map REST contracts, previews, and response modes', async (t) => {
+  const calls: { method: string; path: string; body: Record<string, unknown> | undefined; idempotency: string | undefined }[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input, init) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? 'GET';
+    const headers = init?.headers as Record<string, string> | undefined;
+    const body = init?.body === undefined ? undefined : JSON.parse(String(init.body)) as Record<string, unknown>;
+    calls.push({ method, path: url.pathname, body, idempotency: headers?.['Idempotency-Key'] });
+
+    if (url.pathname.endsWith('/workspace')) {
+      return new Response(JSON.stringify({ project: { id: 8 }, tasks: [], dependencies: [], references: [], counts: {} }), { status: 200 });
+    }
+    if (url.pathname.endsWith('/references/export')) {
+		return new Response(JSON.stringify({ version: 1, references: [{ relation_type: 'related', task_id: 12 }], omitted_restricted: 0 }), { status: 200 });
+    }
+    if (url.pathname.endsWith('/references') && method === 'GET') {
+      return new Response(JSON.stringify({ references: [{ relation_type: 'included', task_id: 12 }], counts: { included: 1 } }), { status: 200 });
+    }
+    if (method === 'POST' && url.pathname.endsWith('/references/import')) {
+      return new Response(JSON.stringify({ created: 1, skipped: 1, errors: [{ index: 1, code: 'restricted' }] }), { status: 200 });
+    }
+    if (method === 'POST' && url.pathname.endsWith('/references')) {
+      return new Response(JSON.stringify({ message: 'Reference added', reference: { reference_key: 'reference-9', relation_type: 'included', task_id: 12, task_key: 'task-12', restricted: false, secret: 'omit' } }), { status: 201 });
+    }
+    if (method === 'PATCH') {
+      return new Response(JSON.stringify({ message: 'Reference updated', reference: { reference_key: 'reference-9', relation_type: 'related', task_id: 12, rich_data: 'keep in full' } }), { status: 200 });
+    }
+    if (method === 'DELETE') {
+      return new Response(JSON.stringify({ message: 'Reference removed' }), { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  });
+
+  const workspace = await client.callTool({ name: 'project_workspace_get', arguments: { project_id: 8 } });
+  assert.equal(workspace.isError, undefined);
+  const references = await client.callTool({ name: 'project_reference_list', arguments: { project_id: 8 } });
+  assert.equal(references.isError, undefined);
+  const exported = await client.callTool({ name: 'project_reference_export', arguments: { project_id: 8 } });
+  assert.equal(exported.isError, undefined);
+
+  const added = await client.callTool({
+    name: 'project_reference_add',
+    arguments: { project_id: 8, relation_type: 'included', task_id: 12, idempotency_key: 'project-reference-add-8' },
+  });
+  assert.equal(added.isError, undefined);
+  const addedData = (added.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.equal(addedData.operation, 'project_reference_add');
+  assert.equal(addedData.message, 'Reference added');
+  assert.deepEqual(addedData.reference, { reference_key: 'reference-9', relation_type: 'included', task_id: 12, task_key: 'task-12', restricted: false });
+
+  const updated = await client.callTool({
+    name: 'project_reference_update',
+    arguments: { project_id: 8, reference_key: 'reference-9', relation_type: 'related', response_mode: 'full', idempotency_key: 'project-reference-update-8' },
+  });
+  assert.equal(updated.isError, undefined);
+  assert.equal((((updated.structuredContent as Record<string, unknown>).data as Record<string, unknown>).reference as Record<string, unknown>).rich_data, 'keep in full');
+
+  const removed = await client.callTool({
+    name: 'project_reference_remove',
+    arguments: { project_id: 8, reference_key: 'dependency-7', idempotency_key: 'project-reference-remove-8' },
+  });
+  const removedData = (removed.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.equal(removedData.operation, 'project_reference_remove');
+  assert.equal(removedData.project_id, 8);
+  assert.equal(removedData.reference_key, 'dependency-7');
+  assert.equal(removedData.message, 'Reference removed');
+
+  const imported = await client.callTool({
+    name: 'project_reference_import',
+    arguments: {
+      project_id: 8,
+      references: [
+        { relation_type: 'related', task_id: 12 },
+        { relation_type: 'dependency', predecessor_task_id: 12, successor_task_id: 13 },
+      ],
+      idempotency_key: 'project-reference-import-8',
+    },
+  });
+  const importedData = (imported.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.equal(importedData.created, 1);
+  assert.equal(importedData.skipped, 1);
+  assert.deepEqual(importedData.errors, [{ index: 1, code: 'restricted' }]);
+
+  const beforePreview = calls.length;
+  const preview = await client.callTool({
+    name: 'project_reference_add',
+    arguments: {
+      project_id: 8,
+      relation_type: 'dependency',
+      predecessor_task_id: 12,
+      successor_task_id: 13,
+      dry_run: true,
+      idempotency_key: 'project-reference-preview-8',
+    },
+  });
+  assert.equal(calls.length, beforePreview, 'Reference dry-run must not send a mutation.');
+  const previewRequest = ((preview.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute as Record<string, unknown>;
+  assert.equal(previewRequest.method, 'POST');
+  assert.ok(String(previewRequest.url).endsWith('/projects/8/references'));
+  assert.deepEqual(previewRequest.body, { relation_type: 'dependency', predecessor_task_id: 12, successor_task_id: 13 });
+  assert.equal(previewRequest.idempotency_key, 'project-reference-preview-8');
+
+  assert.deepEqual(calls.map(({ method, path }) => ({ method, path })), [
+    { method: 'GET', path: '/wp-json/pandatask/v1/projects/8/workspace' },
+    { method: 'GET', path: '/wp-json/pandatask/v1/projects/8/references' },
+    { method: 'GET', path: '/wp-json/pandatask/v1/projects/8/references/export' },
+    { method: 'POST', path: '/wp-json/pandatask/v1/projects/8/references' },
+    { method: 'PATCH', path: '/wp-json/pandatask/v1/projects/8/references/reference-9' },
+    { method: 'DELETE', path: '/wp-json/pandatask/v1/projects/8/references/dependency-7' },
+    { method: 'POST', path: '/wp-json/pandatask/v1/projects/8/references/import' },
+  ]);
+  assert.deepEqual(calls[3]?.body, { relation_type: 'included', task_id: 12 });
+  assert.equal(calls[3]?.idempotency, 'project-reference-add-8');
+  assert.deepEqual(calls[4]?.body, { relation_type: 'related' });
+  assert.equal(calls[4]?.idempotency, 'project-reference-update-8');
+  assert.equal(calls[5]?.idempotency, 'project-reference-remove-8');
+  assert.deepEqual(calls[6]?.body, {
+    version: 1,
+    references: [
+      { relation_type: 'related', task_id: 12 },
+      { relation_type: 'dependency', predecessor_task_id: 12, successor_task_id: 13 },
+    ],
+  });
+  assert.equal(calls[6]?.idempotency, 'project-reference-import-8');
+});
+
 test('executed MCP writes default to minimal responses with an explicit full override', async (t) => {
   const requestBodies: Record<string, unknown>[] = [];
   const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (_input, init) => {
@@ -627,6 +753,17 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   const coreNames = new Set((await coreClient.listTools()).tools.map((tool) => tool.name));
   assert.ok(coreNames.has('daily_briefing'));
   assert.ok(coreNames.has('project_plan'));
+  for (const name of [
+    'project_workspace_get',
+    'project_reference_list',
+    'project_reference_add',
+    'project_reference_update',
+    'project_reference_remove',
+    'project_reference_export',
+    'project_reference_import',
+  ]) {
+    assert.ok(coreNames.has(name));
+  }
   assert.ok(coreNames.has('task_complete'));
   assert.ok(coreNames.has('task_time_resolve'));
   assert.ok(coreNames.has('task_time_log'));
@@ -642,7 +779,7 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   assert.ok(coreNames.has('work_type_update'));
   assert.ok(coreNames.has('work_type_archive'));
   assert.ok(coreNames.has('work_report'));
-  assert.equal(coreNames.size, 45);
+  assert.equal(coreNames.size, 52);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 

@@ -41,6 +41,14 @@ $graph = array(
     2 => array( 3 ),
 );
 $assert_same( true, TaskGraph::wouldCreateCycle( $graph, 3, 1 ), 'Dependency cycle detection failed.' );
+$disjoint_cycles_with_bridge = array(
+    1 => array( 2, 3 ),
+    2 => array( 1 ),
+    3 => array( 4 ),
+    4 => array( 3 ),
+);
+$assert_same( false, TaskGraph::edgeParticipatesInCycle( $disjoint_cycles_with_bridge, 1, 3 ), 'A bridge between distinct cycles must not be treated as a cycle edge.' );
+$assert_same( true, TaskGraph::edgeParticipatesInCycle( $disjoint_cycles_with_bridge, 3, 4 ), 'An edge that closes a cycle should be repairable.' );
 $assert_same( false, TaskGraph::wouldCreateCycle( $graph, 4, 1 ), 'Acyclic dependency was rejected.' );
 $assert_same(
     array( 1, 2, 3 ),

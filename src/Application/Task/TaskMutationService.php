@@ -6,6 +6,7 @@ use DateInterval;
 use DateTime;
 use Exception;
 use Throwable;
+use Pandatask\Application\Security\TaskAccessPolicy;
 use Pandatask\Domain\Task\RecurrenceCalculator;
 use Pandatask\Infrastructure\Notifications\BuddyPressNotifier;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
@@ -40,7 +41,9 @@ final class TaskMutationService {
 
     private $feature_settings;
 
-    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null, $feature_settings = null ) {
+    private $task_access_policy;
+
+    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null, $feature_settings = null, $task_access_policy = null ) {
         $this->repository      = $repository ?: new TaskCommandRepository();
         $this->task_repository = $task_repository ?: new TaskRepository();
         $this->history_service = $history_service ?: new HistoryService();
@@ -51,6 +54,7 @@ final class TaskMutationService {
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceLifecycleService();
         $this->task_time_service = $task_time_service ?: new TaskTimeService();
         $this->feature_settings = $feature_settings ?: new FeatureSettings();
+        $this->task_access_policy = $task_access_policy;
     }
 
     /**
@@ -61,15 +65,37 @@ final class TaskMutationService {
      * the submitting delegate as the actor recorded by audit integrations.
      */
     public function createTask( $data, array $context = array() ) {
+        $predecessors_explicit = array_key_exists( 'predecessors', $data );
+        $dependency_lock_acquired = false;
+
+        try {
+            if ( $predecessors_explicit ) {
+                if ( ! DatabaseContext::acquireDependencyGraphLock() ) {
+                    return new WP_Error(
+                        'pandatask_dependency_graph_unavailable',
+                        __( 'The dependency graph is busy. Please try again.', 'pandatask' ),
+                        array( 'status' => 503 )
+                    );
+                }
+                $dependency_lock_acquired = true;
+            }
+
+        $actor_id    = array_key_exists( 'actor_id', $context ) ? absint( $context['actor_id'] ) : get_current_user_id();
+        $creator_id  = array_key_exists( 'creator_id', $context ) ? absint( $context['creator_id'] ) : $actor_id;
         $data = $this->invariant_service->applyAndValidate( $data );
 
         if ( is_wp_error( $data ) ) {
             return $data;
         }
 
+        if ( $predecessors_explicit ) {
+            $predecessor_permission = $this->validatePredecessorsReadable( $data['predecessors'] ?? array(), $actor_id );
+            if ( is_wp_error( $predecessor_permission ) ) {
+                return $predecessor_permission;
+            }
+        }
+
         $is_recurring = ! empty( $data['is_recurring'] ) ? 1 : 0;
-        $actor_id    = array_key_exists( 'actor_id', $context ) ? absint( $context['actor_id'] ) : get_current_user_id();
-        $creator_id  = array_key_exists( 'creator_id', $context ) ? absint( $context['creator_id'] ) : $actor_id;
         $task_data    = array(
             'board_name'               => $data['board_name'],
             'name'                     => $data['name'],
@@ -237,6 +263,11 @@ final class TaskMutationService {
             return new WP_Error( 'pandatask_create_failed', __( 'The task could not be created.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
+        if ( $dependency_lock_acquired ) {
+            DatabaseContext::releaseDependencyGraphLock();
+            $dependency_lock_acquired = false;
+        }
+
         ProtectedAttachmentService::finalizeSync( $attachment_sync );
 
         $this->sendAssignmentNotifications( $task_id, $assignment_changes, $actor_id );
@@ -249,11 +280,32 @@ final class TaskMutationService {
         $this->dispatchLifecycleEvent( 'pandatask_task_created', $task_id, $created_task, $actor_id );
 
         return $task_id;
+        } finally {
+            if ( $dependency_lock_acquired ) {
+                DatabaseContext::releaseDependencyGraphLock();
+            }
+        }
     }
 
     public function updateTask( $task_id, $data, $change_comment = '', $actor_id = null, $completion = null, $lifecycle_operation = '' ) {
         $task_id   = (int) $task_id;
         $actor_id  = is_null( $actor_id ) ? get_current_user_id() : (int) $actor_id;
+        $dependency_graph_lock_required = array_key_exists( 'predecessors', $data );
+        $predecessors_explicit = $dependency_graph_lock_required;
+        $dependency_lock_acquired = false;
+
+        try {
+            if ( $dependency_graph_lock_required ) {
+                if ( ! DatabaseContext::acquireDependencyGraphLock() ) {
+                    return new WP_Error(
+                        'pandatask_dependency_graph_unavailable',
+                        __( 'The dependency graph is busy. Please try again.', 'pandatask' ),
+                        array( 'status' => 503 )
+                    );
+                }
+                $dependency_lock_acquired = true;
+            }
+
         $current_task = $this->task_repository->findById( $task_id );
 
         if ( ! $current_task ) {
@@ -262,6 +314,35 @@ final class TaskMutationService {
 
         if ( 'complete' === $lifecycle_operation && 'done' === $current_task->status ) {
             return $this->alreadyCompletedError();
+        }
+
+        $explicit_predecessors_for_auth = array();
+        if ( $predecessors_explicit ) {
+            $explicit_predecessors_for_auth = $this->normalizePredecessorIds( $data['predecessors'] ?? array() );
+            $current_predecessors = method_exists( $this->repository, 'getTaskPredecessorIds' )
+                ? $this->normalizePredecessorIds( $this->repository->getTaskPredecessorIds( $task_id ) )
+                : $this->normalizePredecessorIds( $current_task->predecessor_ids ?? array() );
+            $requested_board = $data['board_name'] ?? $current_task->board_name;
+            $board_is_changing_in_input = (string) $requested_board !== (string) $current_task->board_name;
+
+            // TaskMoveService supplies the current relationship set while
+            // moving a task even when the caller did not explicitly edit
+            // predecessors. Treat that unchanged set as implicit so opaque
+            // edges survive a board move without a new read requirement.
+            if ( $board_is_changing_in_input ) {
+                $comparison_requested = $explicit_predecessors_for_auth;
+                $comparison_current = $current_predecessors;
+                sort( $comparison_requested );
+                sort( $comparison_current );
+                if ( $comparison_requested === $comparison_current ) {
+                    $predecessors_explicit = false;
+                }
+            }
+
+            if ( $predecessors_explicit ) {
+                $preserved_predecessors = $this->unreadableExistingPredecessors( $current_predecessors, $explicit_predecessors_for_auth, $actor_id );
+                $data['predecessors'] = array_values( array_unique( array_merge( $explicit_predecessors_for_auth, $preserved_predecessors ) ) );
+            }
         }
 
         $data = $this->invariant_service->applyAndValidate( $data, $current_task );
@@ -303,6 +384,14 @@ final class TaskMutationService {
         $project_is_changing = array_key_exists( 'project_id', $data ) && $next_project_id !== $current_project_id;
         $next_board_name = $data['board_name'] ?? $current_task->board_name;
         $board_is_changing = $next_board_name !== $current_task->board_name;
+
+        if ( $predecessors_explicit ) {
+            $predecessor_permission = $this->validatePredecessorsReadable( $explicit_predecessors_for_auth, $actor_id );
+            if ( is_wp_error( $predecessor_permission ) ) {
+                return $predecessor_permission;
+            }
+        }
+
         $descendant_records = ( $project_is_changing || $board_is_changing )
             ? $this->task_repository->findDescendantProjectRecords( $task_id, $current_task->board_name )
             : array();
@@ -640,6 +729,10 @@ final class TaskMutationService {
                 throw new Exception( 'The task database update failed.' );
             }
 
+            if ( $project_is_changing && $next_project_id > 0 && ! $this->repository->deleteProjectTaskReference( $next_project_id, $task_id ) ) {
+                throw new Exception( 'The redundant project task reference could not be removed.' );
+            }
+
         }
 
         $current_occurrence = $this->occurrence_repository->findCurrentForTask( $task_id );
@@ -732,6 +825,14 @@ final class TaskMutationService {
                 throw new Exception( 'The descendant project update failed.' );
             }
 
+			if ( $next_project_id > 0 ) {
+				foreach ( $descendant_ids as $descendant_id ) {
+					if ( ! $this->repository->deleteProjectTaskReference( $next_project_id, $descendant_id ) ) {
+						throw new Exception( 'A redundant descendant project reference could not be removed.' );
+					}
+				}
+			}
+
             foreach ( $descendant_records as $descendant ) {
                 $old_project_id = $descendant->project_id ? (int) $descendant->project_id : null;
 
@@ -791,6 +892,11 @@ final class TaskMutationService {
             return new WP_Error( 'pandatask_update_failed', __( 'The task could not be updated.', 'pandatask' ), array( 'status' => 500 ) );
         }
 
+        if ( $dependency_lock_acquired ) {
+            DatabaseContext::releaseDependencyGraphLock();
+            $dependency_lock_acquired = false;
+        }
+
         ProtectedAttachmentService::finalizeSync( $attachment_sync );
 
         foreach ( $descendant_ids as $descendant_id ) {
@@ -840,6 +946,11 @@ final class TaskMutationService {
         );
 
         return true;
+        } finally {
+            if ( $dependency_lock_acquired ) {
+                DatabaseContext::releaseDependencyGraphLock();
+            }
+        }
     }
 
     public function completeTask( $task_id, array $completion, $change_comment = '', $actor_id = null ) {
@@ -863,6 +974,18 @@ final class TaskMutationService {
     }
 
     public function deleteTask( $task_id, $delete_scope = null ) {
+        $dependency_lock_acquired = false;
+
+        try {
+            if ( ! DatabaseContext::acquireDependencyGraphLock() ) {
+                return new WP_Error(
+                    'pandatask_dependency_graph_unavailable',
+                    __( 'The dependency graph is busy. Please try again.', 'pandatask' ),
+                    array( 'status' => 503 )
+                );
+            }
+            $dependency_lock_acquired = true;
+
         $task_id         = (int) $task_id;
         $task_to_delete = $this->task_repository->findById( $task_id );
 
@@ -949,6 +1072,7 @@ final class TaskMutationService {
                 || ! $this->repository->deleteTaskHistory( $task_id )
                 || ! $this->repository->deleteTaskChangeBuffers( $task_id )
                 || ! $this->repository->deleteTaskRelationships( $task_id )
+                || ! $this->repository->deleteTaskProjectReferences( $task_id )
                 || false === $this->repository->unlinkChildTasks( $task_id )
                 || false === $this->repository->deleteTask( $task_id )
             ) {
@@ -963,6 +1087,9 @@ final class TaskMutationService {
 
             return new WP_Error( 'pandatask_delete_failed', __( 'The task could not be deleted.', 'pandatask' ), array( 'status' => 500 ) );
         }
+
+        DatabaseContext::releaseDependencyGraphLock();
+        $dependency_lock_acquired = false;
 
         ProtectedAttachmentService::deleteTaskFiles( $task_id );
 
@@ -979,6 +1106,11 @@ final class TaskMutationService {
         $this->dispatchLifecycleEvent( 'pandatask_task_deleted', $task_id, $task_to_delete, get_current_user_id() );
 
         return true;
+        } finally {
+            if ( $dependency_lock_acquired ) {
+                DatabaseContext::releaseDependencyGraphLock();
+            }
+        }
     }
 
     public function processDependencyCascade( $completed_task_id ) {
@@ -1218,6 +1350,86 @@ final class TaskMutationService {
                 error_log( sprintf( 'Pandatask lifecycle hook %s failed: %s', $hook, $exception->getMessage() ) );
             }
         }
+    }
+
+    /**
+     * Require read access for every explicitly submitted predecessor.
+     *
+     * This is intentionally delegated to TaskAccessPolicy.  Constructing the
+     * policy lazily avoids the normal TaskService -> TaskMutationService cycle,
+     * while still using the same participation, Inbox, and board rules as REST
+     * authorization.
+     *
+     * @param array<int,mixed> $predecessor_ids
+     * @return true|WP_Error
+     */
+    private function validatePredecessorsReadable( $predecessor_ids, $actor_id ) {
+		$predecessor_ids = $this->normalizePredecessorIds( $predecessor_ids );
+
+        foreach ( $predecessor_ids as $predecessor_id ) {
+            $permission = $this->getTaskAccessPolicy()->canReadTask( $predecessor_id, (int) $actor_id );
+            if ( true !== $permission ) {
+                return new WP_Error(
+                    'rest_predecessor_forbidden',
+                    __( 'You cannot read one of the selected predecessor tasks.', 'pandatask' ),
+                    array( 'status' => 403 )
+                );
+            }
+        }
+
+        return true;
+    }
+
+	/**
+	 * @param array<int,mixed> $predecessor_ids
+	 * @return array<int,int>
+	 */
+	private function normalizePredecessorIds( $predecessor_ids ) {
+		return array_values(
+			array_unique(
+				array_filter( array_map( 'absint', (array) $predecessor_ids ) )
+			)
+		);
+	}
+
+	/**
+	 * Keep opaque existing edges when a viewer submits only the predecessors
+	 * visible in their task form. This prevents an unrelated edit from silently
+	 * deleting a dependency whose source they cannot inspect.
+	 *
+	 * @param array<int,int> $current_predecessors
+	 * @param array<int,int> $requested_predecessors
+	 * @return array<int,int>
+	 */
+	private function unreadableExistingPredecessors( $current_predecessors, $requested_predecessors, $actor_id ) {
+		$preserved = array();
+		$removed = array_diff(
+			$this->normalizePredecessorIds( $current_predecessors ),
+			$this->normalizePredecessorIds( $requested_predecessors )
+		);
+
+		foreach ( $removed as $predecessor_id ) {
+			if ( true !== $this->getTaskAccessPolicy()->canReadTask( $predecessor_id, (int) $actor_id ) ) {
+				$preserved[] = $predecessor_id;
+			}
+		}
+
+		return $preserved;
+	}
+
+    /**
+     * Resolve the canonical task-read policy only when an explicit dependency
+     * mutation needs it. The authorization-only TaskService shares this
+     * mutation service and therefore does not recursively construct another
+     * mutation service.
+     */
+    private function getTaskAccessPolicy() {
+        if ( ! $this->task_access_policy ) {
+            $authorization_task_service = new TaskService( $this->task_repository, null, null, $this );
+            $this->task_access_policy = new TaskAccessPolicy( $authorization_task_service );
+        }
+
+        return $this->task_access_policy;
     }
 
     /**
