@@ -3,7 +3,7 @@ import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { PandataskClient } from './client.js';
 import { handled, toolOutputSchema } from './result.js';
-import { dryRunField, idempotencyKey, isoDate, periodSchema, positiveId } from './schemas.js';
+import { dryRunField, idempotencyKey, isoDate, periodSchema, positiveId, responseModeField } from './schemas.js';
 import { toolEnabledForServer } from './tool-profile.js';
 
 const readOnly: ToolAnnotations = { readOnlyHint: true, openWorldHint: false, destructiveHint: false, idempotentHint: true };
@@ -142,18 +142,32 @@ function register(
   operation: (input: Record<string, unknown>, extra: Parameters<ToolCallback<z.ZodType<Record<string, unknown>>>>[1]) => Promise<unknown>,
 ): void {
   if (!toolEnabledForServer(server, name)) return;
-  const callback = (async (input: unknown, extra) => handled(() => operation(inputSchema.parse(input), extra))) as ToolCallback<z.ZodType<Record<string, unknown>>>;
+  const isMutation = annotations.readOnlyHint === false;
+  const registeredInputSchema = isMutation
+    ? (inputSchema as unknown as z.ZodObject).safeExtend({ response_mode: responseModeField }) as unknown as z.ZodType<Record<string, unknown>>
+    : inputSchema;
+  const callback = (async (input: unknown, extra) => {
+    const parsed = registeredInputSchema.parse(input) as Record<string, unknown> & { response_mode?: 'minimal' | 'full' };
+    return handled(
+      () => operation(parsed, extra),
+      {
+        responseMode: isMutation ? parsed.response_mode ?? 'minimal' : undefined,
+        operation: name,
+        input: parsed,
+      },
+    );
+  }) as ToolCallback<z.ZodType<Record<string, unknown>>>;
   server.registerTool(name, {
     title,
-    description: `${description} Returns {ok:true,data} on success or {ok:false,error:{code,message,http_status?,details?}} on failure.`,
-    inputSchema,
+    description: `${description}${isMutation ? ' MCP writes return a minimal confirmation by default; set response_mode=full for the complete REST result. Dry-run previews remain detailed.' : ''} Returns {ok:true,data} on success or {ok:false,error:{code,message,http_status?,details?}} on failure.`,
+    inputSchema: registeredInputSchema,
     outputSchema: toolOutputSchema,
     annotations,
   }, callback);
 }
 
 function mutationBody(input: Record<string, unknown>, excluded: readonly string[]): Record<string, unknown> {
-  const excludedKeys = new Set(excluded);
+  const excludedKeys = new Set([...excluded, 'response_mode']);
   return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excludedKeys.has(key) && value !== undefined));
 }
 

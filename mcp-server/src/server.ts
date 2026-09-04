@@ -19,6 +19,7 @@ import {
   positiveId,
   projectCreateData,
   projectUpdateData,
+  responseModeField,
   taskCreateData,
   taskListInput,
   taskListQuery,
@@ -31,7 +32,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.1';
+const VERSION = '1.3.2';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -71,14 +72,27 @@ function register<T extends ZodToolSchema>(
   operation: (input: z.output<T>, extra: ToolExtra) => Promise<unknown>,
 ): void {
   if (!toolEnabledForServer(server, name)) return;
-  const callback = (async (input: unknown, extra: ToolExtra) =>
-    handled(() => operation(inputSchema.parse(input), extra))) as ToolCallback<T>;
+  const isMutation = annotations.readOnlyHint === false;
+  const registeredInputSchema = isMutation
+    ? (inputSchema as unknown as z.ZodObject).safeExtend({ response_mode: responseModeField }) as unknown as T
+    : inputSchema;
+  const callback = (async (input: unknown, extra: ToolExtra) => {
+    const parsed = registeredInputSchema.parse(input) as z.output<T> & { response_mode?: 'minimal' | 'full' };
+    return handled(
+      () => operation(parsed, extra),
+      {
+        responseMode: isMutation ? parsed.response_mode ?? 'minimal' : undefined,
+        operation: name,
+        input: parsed,
+      },
+    );
+  }) as ToolCallback<T>;
   server.registerTool(
     name,
     {
       title,
-      description: `${description} Returns {ok:true,data} on success or {ok:false,error:{code,message,http_status?,details?}} on failure.`,
-      inputSchema,
+      description: `${description}${isMutation ? ' MCP writes return a minimal confirmation by default; set response_mode=full for the complete REST result. Dry-run previews remain detailed.' : ''} Returns {ok:true,data} on success or {ok:false,error:{code,message,http_status?,details?}} on failure.`,
+      inputSchema: registeredInputSchema as T,
       outputSchema: toolOutputSchema,
       annotations,
     },
@@ -91,7 +105,7 @@ function boardPath(board: string, suffix: string): string {
 }
 
 function mutationBody(input: Record<string, unknown>, excluded: readonly string[]): JsonRecord {
-  const excludedKeys = new Set(excluded);
+  const excludedKeys = new Set([...excluded, 'response_mode']);
   return Object.fromEntries(Object.entries(input).filter(([key, value]) => !excludedKeys.has(key) && value !== undefined));
 }
 

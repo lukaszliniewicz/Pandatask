@@ -68,6 +68,34 @@ final class TaskRouteHandler {
         $board_name = $request['board_name'];
         $params     = $request->get_params();
 
+        $fields = null;
+        if ( array_key_exists( 'fields', $params ) ) {
+            $fields = RequestHelper::parseTaskFields( $params['fields'] );
+
+            if ( is_wp_error( $fields ) ) {
+                return $fields;
+            }
+        }
+
+        $assigned_to_me = isset( $params['assigned_to_me'] ) && rest_sanitize_boolean( $params['assigned_to_me'] );
+        $assignee_id    = null;
+
+        if ( array_key_exists( 'assignee_id', $params ) ) {
+            $assignee_id = RequestHelper::parsePositiveId( $params['assignee_id'] );
+
+            if ( is_wp_error( $assignee_id ) ) {
+                return $assignee_id;
+            }
+
+            if ( $assigned_to_me && $assignee_id !== get_current_user_id() ) {
+                return new WP_Error(
+                    'rest_invalid_param',
+                    __( 'assignee_id must match the current user when assigned_to_me is enabled.', 'pandatask' ),
+                    array( 'status' => 400, 'param' => 'assignee_id' )
+                );
+            }
+        }
+
         $search            = $params['search'] ?? '';
         $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? 'pending_in-progress';
@@ -101,18 +129,18 @@ final class TaskRouteHandler {
                 return new WP_Error( 'rest_forbidden', 'Access denied', array( 'status' => 403 ) );
             }
 
-            $tasks = $this->task_service->getTasksForUserAcrossBoards( $board_user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit + 1, $offset );
+            $tasks = $this->task_service->getTasksForUserAcrossBoards( $board_user_id, $search, $sort_by, $sort_order, $status_filter, $archived, $project_filter, $private_only, $include_templates, $limit + 1, $offset, $assignee_id );
         } else {
             $date_filter    = '';
             $start_date     = '';
             $end_date       = '';
             $filter_user_id = null;
 
-            if ( isset( $params['assigned_to_me'] ) && rest_sanitize_boolean( $params['assigned_to_me'] ) && is_user_logged_in() ) {
+            if ( $assigned_to_me && is_user_logged_in() ) {
                 $filter_user_id = get_current_user_id();
             }
 
-            $tasks = $this->task_service->getTasks( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $filter_user_id, $limit + 1, $offset );
+            $tasks = $this->task_service->getTasks( $board_name, $search, $sort_by, $sort_order, $status_filter, $date_filter, $start_date, $end_date, $archived, $project_filter, $include_templates, $task_type_filter, $filter_user_id, $limit + 1, $offset, null, $assignee_id );
         }
 
         $has_more = count( $tasks ) > $limit;
@@ -121,7 +149,13 @@ final class TaskRouteHandler {
             $tasks = array_slice( $tasks, 0, $limit );
         }
 
-        RequestHelper::renderTaskCollection( $tasks );
+        if ( null === $fields || in_array( 'description_rendered', $fields, true ) ) {
+            RequestHelper::renderTaskCollection( $tasks );
+        }
+
+        if ( null !== $fields ) {
+            $tasks = RequestHelper::projectTaskCollection( $tasks, $fields );
+        }
 
         return new WP_REST_Response(
             array(
@@ -146,6 +180,35 @@ final class TaskRouteHandler {
     public function get_visible_tasks( $request ) {
         $params = $request->get_params();
 
+        $fields = null;
+        if ( array_key_exists( 'fields', $params ) ) {
+            $fields = RequestHelper::parseTaskFields( $params['fields'] );
+
+            if ( is_wp_error( $fields ) ) {
+                return $fields;
+            }
+        }
+
+        $current_user_id = get_current_user_id();
+        $assigned_to_me  = isset( $params['assigned_to_me'] ) && rest_sanitize_boolean( $params['assigned_to_me'] );
+        $assignee_id     = null;
+
+        if ( array_key_exists( 'assignee_id', $params ) ) {
+            $assignee_id = RequestHelper::parsePositiveId( $params['assignee_id'] );
+
+            if ( is_wp_error( $assignee_id ) ) {
+                return $assignee_id;
+            }
+
+            if ( $assigned_to_me && $assignee_id !== $current_user_id ) {
+                return new WP_Error(
+                    'rest_invalid_param',
+                    __( 'assignee_id must match the current user when assigned_to_me is enabled.', 'pandatask' ),
+                    array( 'status' => 400, 'param' => 'assignee_id' )
+                );
+            }
+        }
+
         $search            = $params['search'] ?? '';
         $sort              = $params['sort'] ?? 'created_at_desc';
         $status_filter     = $params['status_filter'] ?? '';
@@ -156,7 +219,6 @@ final class TaskRouteHandler {
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : null;
         $include_templates = ! isset( $params['include_templates'] ) || rest_sanitize_boolean( $params['include_templates'] );
         $task_type_filter  = $params['task_type_filter'] ?? '';
-        $assigned_to_me    = isset( $params['assigned_to_me'] ) && rest_sanitize_boolean( $params['assigned_to_me'] );
         $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 500;
         $offset            = max( 0, (int) ( $params['offset'] ?? 0 ) );
         $last_underscore_pos = strrpos( $sort, '_' );
@@ -170,7 +232,7 @@ final class TaskRouteHandler {
         }
 
         $tasks = $this->task_service->getVisibleTasksForUser(
-            get_current_user_id(),
+            $current_user_id,
             $search,
             $sort_by,
             'DESC' === strtoupper( $sort_order ) ? 'DESC' : 'ASC',
@@ -181,7 +243,8 @@ final class TaskRouteHandler {
             $task_type_filter,
             $assigned_to_me,
             $limit + 1,
-            $offset
+            $offset,
+            $assignee_id
         );
 
         $has_more = count( $tasks ) > $limit;
@@ -190,7 +253,13 @@ final class TaskRouteHandler {
             $tasks = array_slice( $tasks, 0, $limit );
         }
 
-        RequestHelper::renderTaskCollection( $tasks );
+        if ( null === $fields || in_array( 'description_rendered', $fields, true ) ) {
+            RequestHelper::renderTaskCollection( $tasks );
+        }
+
+        if ( null !== $fields ) {
+            $tasks = RequestHelper::projectTaskCollection( $tasks, $fields );
+        }
 
         return new WP_REST_Response(
             array(

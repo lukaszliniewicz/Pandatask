@@ -21,6 +21,15 @@ if ( ! function_exists( 'absint' ) ) {
 if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
     function rest_sanitize_boolean( $value ) { return filter_var( $value, FILTER_VALIDATE_BOOLEAN ); }
 }
+if ( ! function_exists( 'wp_kses_allowed_html' ) ) {
+    function wp_kses_allowed_html( $context ) { return array(); }
+}
+if ( ! function_exists( 'wp_kses' ) ) {
+    function wp_kses( $string, $allowed_html ) { return (string) $string; }
+}
+if ( ! function_exists( 'wpautop' ) ) {
+    function wpautop( $text ) { return '<p>' . (string) $text . '</p>'; }
+}
 if ( ! function_exists( 'get_current_user_id' ) ) {
     function get_current_user_id() { return 7; }
 }
@@ -52,6 +61,7 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Media/ProtectedAttachmentService.php';
+require_once dirname( __DIR__ ) . '/src/Application/Task/TaskDescriptionService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Security/WorkEntryAccessPolicy.php';
 require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
@@ -132,6 +142,161 @@ $assert( null === $handler_service->call[5], 'Visible tasks must include active 
 $assert( true === $handler_service->call[7], 'Visible tasks must include recurring templates when no template filter is supplied.' );
 $assert( 3 === $handler_service->call[10] && 3 === $handler_service->call[11], 'Visible task pagination must use limit + 1 without changing the offset.' );
 $assert( 2 === count( $payload['tasks'] ) && true === $payload['pagination']['has_more'] && 5 === $payload['pagination']['next_offset'], 'Visible task pagination metadata is incorrect.' );
+
+$assignee_handler_service = new class {
+    public $call;
+    public function getVisibleTasksForUser( ...$arguments ) {
+        $this->call = $arguments;
+        return array( (object) array( 'id' => 1, 'name' => 'Visible', 'description' => 'Details', 'secret' => 'hidden' ) );
+    }
+};
+$assignee_handler = new TaskRouteHandler( $assignee_handler_service, new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass() );
+$assignee_request = new class( array( 'assignee_id' => 12 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$assignee_handler->get_visible_tasks( $assignee_request );
+$assert( 12 === $assignee_handler_service->call[12], 'Visible tasks must forward an arbitrary assignee_id.' );
+
+$same_user_request = new class( array( 'assigned_to_me' => true, 'assignee_id' => 7 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$same_user_response = $assignee_handler->get_visible_tasks( $same_user_request );
+$assert( 200 === $same_user_response->get_status() && true === $assignee_handler_service->call[9] && 7 === $assignee_handler_service->call[12], 'Matching assigned_to_me and assignee_id must behave as one current-user filter.' );
+
+$different_user_request = new class( array( 'assigned_to_me' => true, 'assignee_id' => 8 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$different_user_response = $assignee_handler->get_visible_tasks( $different_user_request );
+$assert( is_wp_error( $different_user_response ) && 400 === $different_user_response->get_error_data()['status'], 'A different assignee_id must conflict with assigned_to_me.' );
+
+$disabled_current_user_request = new class( array( 'assigned_to_me' => false, 'assignee_id' => 8 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$disabled_current_user_response = $assignee_handler->get_visible_tasks( $disabled_current_user_request );
+$assert( 200 === $disabled_current_user_response->get_status() && false === $assignee_handler_service->call[9] && 8 === $assignee_handler_service->call[12], 'assigned_to_me=false must not conflict with an arbitrary assignee_id.' );
+
+$board_assignee_service = new class {
+    public $call;
+    public function getTasks( ...$arguments ) {
+        $this->call = $arguments;
+        return array( (object) array( 'id' => 1, 'description' => '' ) );
+    }
+};
+$board_assignee_handler = new TaskRouteHandler( $board_assignee_service, new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass() );
+$board_assignee_request = new class( array( 'board_name' => 'standard', 'assignee_id' => 12 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$board_assignee_handler->get_tasks( $board_assignee_request );
+$assert( 12 === $board_assignee_service->call[16], 'Board tasks must forward an arbitrary assignee_id.' );
+
+$board_disabled_current_user_request = new class( array( 'board_name' => 'standard', 'assigned_to_me' => false, 'assignee_id' => 12 ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$board_disabled_current_user_response = $board_assignee_handler->get_tasks( $board_disabled_current_user_request );
+$assert( 200 === $board_disabled_current_user_response->get_status() && null === $board_assignee_service->call[12] && 12 === $board_assignee_service->call[16], 'Board assigned_to_me=false must not conflict with or duplicate an arbitrary assignee filter.' );
+
+$projection_service = new class {
+    public function getVisibleTasksForUser( ...$arguments ) {
+        return array( (object) array( 'id' => 1, 'name' => 'Projected', 'description' => 'Raw text', 'secret' => 'hidden' ) );
+    }
+};
+$projection_handler = new TaskRouteHandler( $projection_service, new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass() );
+$projection_request = new class( array( 'fields' => 'name,description,name' ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$projection_payload = $projection_handler->get_visible_tasks( $projection_request )->get_data();
+$assert( array( 'name', 'description' ) === array_keys( get_object_vars( $projection_payload['tasks'][0] ) ), 'Task projection must return exactly the requested deduplicated fields.' );
+
+$render_projection_service = new class {
+    public function getVisibleTasksForUser( ...$arguments ) {
+        return array( (object) array( 'id' => 1, 'description' => 'Rendered text' ) );
+    }
+};
+$render_projection_handler = new TaskRouteHandler( $render_projection_service, new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass() );
+$render_projection_request = new class( array( 'fields' => array( 'description_rendered' ) ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$render_projection_payload = $render_projection_handler->get_visible_tasks( $render_projection_request )->get_data();
+$assert( array( 'description_rendered' ) === array_keys( get_object_vars( $render_projection_payload['tasks'][0] ) ) && '<p>Rendered text</p>' === $render_projection_payload['tasks'][0]->description_rendered, 'description_rendered must be computed when requested without returning raw description.' );
+
+$invalid_projection_service = new class {
+    public $calls = 0;
+    public function getVisibleTasksForUser( ...$arguments ) { ++$this->calls; return array(); }
+};
+$invalid_projection_handler = new TaskRouteHandler( $invalid_projection_service, new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass(), new stdClass() );
+$invalid_projection_request = new class( array( 'fields' => '' ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$invalid_projection_response = $invalid_projection_handler->get_visible_tasks( $invalid_projection_request );
+$assert( is_wp_error( $invalid_projection_response ) && 400 === $invalid_projection_response->get_error_data()['status'] && 0 === $invalid_projection_service->calls, 'Empty projections must fail with 400 before repository work.' );
+$unknown_projection_request = new class( array( 'fields' => 'not_a_task_field' ) ) implements ArrayAccess {
+    private $params;
+    public function __construct( $params ) { $this->params = $params; }
+    public function get_params() { return $this->params; }
+    public function offsetExists( $offset ) { return isset( $this->params[ $offset ] ); }
+    public function offsetGet( $offset ) { return $this->params[ $offset ] ?? null; }
+    public function offsetSet( $offset, $value ) { $this->params[ $offset ] = $value; }
+    public function offsetUnset( $offset ) { unset( $this->params[ $offset ] ); }
+};
+$unknown_projection_response = $invalid_projection_handler->get_visible_tasks( $unknown_projection_request );
+$assert( is_wp_error( $unknown_projection_response ) && 400 === $unknown_projection_response->get_error_data()['status'] && 0 === $invalid_projection_service->calls, 'Unknown projections must fail with 400 before repository work.' );
+
+$repository_source = file_get_contents( dirname( __DIR__ ) . '/src/Infrastructure/Persistence/TaskRepository.php' );
+$assert( false !== strpos( $repository_source, "assignee_filter.role = 'assignee' OR assignee_filter.role IS NULL" ), 'Repository assignee filters must include assignee and legacy NULL roles.' );
 
 $entry_policy = new WorkEntryAccessPolicy( new class {
     public function findById( $entry_id ) { return 5 === $entry_id ? (object) array( 'id' => 5, 'user_id' => 7 ) : null; }

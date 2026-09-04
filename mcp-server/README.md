@@ -149,6 +149,8 @@ Every tool uses the same stable output envelope:
 - Success: `{ "ok": true, "data": ... }`
 - Failure or partial workflow: `{ "ok": false, "error": { "code": "...", "message": "...", "http_status": 422, "details": ... } }`
 
+Executed write tools return a compact confirmation by default. The receipt keeps operation identity, created/updated IDs, state, counts, per-item success or failure, and other action-critical values while omitting rich descriptions, comments, histories, avatars, and similar record detail. Set `response_mode: "full"` on a write when the complete REST result is actually needed. Dry-run previews and error/partial-workflow diagnostics remain detailed regardless of response mode, and `response_mode` is MCP-only metadata that is never sent to WordPress.
+
 Tool output schemas publish this contract to MCP clients. For compatibility, ordinary results also serialize the envelope into text. Text serialization is replaced by a small pointer above 64 KiB while the complete result remains available in `structuredContent`, preventing unusually large collections from being duplicated in model context.
 
 ## Optimized workflows
@@ -168,6 +170,8 @@ Use these first to reduce model/tool round trips:
 - `inbox_capture` / `inbox_list` — frictionless personal or delegated capture and triage before a task is classified onto a board.
 - `task_reopen` / `task_follow_up_create` — preserve completion history while distinguishing corrective rework from a genuinely new follow-up deliverable.
 - `batch_execute` — administrator-only mixed-action batch endpoint.
+
+Both `task_list` and `task_list_visible` accept `fields`, an array of allowlisted task property names. Use it whenever only a narrow record shape is needed—for example, `fields: ["name", "description"]`. The REST server performs the projection before the MCP response is serialized, while retaining the normal collection and pagination envelope. Both tools also accept `assignee_id` for an arbitrary assignee; use `assigned_to_me` instead for the authenticated user, not both.
 
 `project_plan` validates the complete dependency graph before creating anything and publishes progress for clients that request it. Its dry-run uses explicit `$project.id` and `$tasks[n].id` placeholders. During execution:
 

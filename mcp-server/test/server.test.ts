@@ -63,6 +63,16 @@ test('MCP server publishes annotated granular tools, workflows, resources, and p
     assert.ok(tool.outputSchema, `${tool.name} lacks outputSchema`);
   }
   assert.equal(tools.tools.find((tool) => tool.name === 'batch_execute')?.annotations?.idempotentHint, false);
+  const taskListProperties = tools.tools.find((tool) => tool.name === 'task_list')?.inputSchema.properties ?? {};
+  assert.ok('fields' in taskListProperties, 'task_list must advertise sparse-field selection.');
+  assert.ok('assignee_id' in taskListProperties, 'task_list must advertise arbitrary assignee filtering.');
+  assert.ok(!('response_mode' in taskListProperties), 'Read tools must not advertise mutation response modes.');
+  const taskCreateProperties = tools.tools.find((tool) => tool.name === 'task_create')?.inputSchema.properties ?? {};
+  assert.ok('name' in taskCreateProperties, 'Extending write schemas must preserve their original inputs.');
+  assert.ok('response_mode' in taskCreateProperties, 'Write tools must advertise response_mode.');
+  const taskCompleteProperties = tools.tools.find((tool) => tool.name === 'task_complete')?.inputSchema.properties ?? {};
+  assert.ok('task_id' in taskCompleteProperties, 'Core work-tool schemas must preserve their original inputs.');
+  assert.ok('response_mode' in taskCompleteProperties, 'Core work tools must advertise response_mode.');
 
   const preview = await mcpClient.callTool({
     name: 'task_create',
@@ -349,6 +359,84 @@ test('task_list_visible uses one boardless request and work_report forwards name
   assert.equal(calls.length, 3);
   assert.equal(calls[2]?.pathname, '/wp-json/pandatask/v1/users/me/work-report');
   assert.equal(calls[2]?.searchParams.get('period'), null, 'Omitting period must preserve the REST API last-30-days default.');
+});
+
+test('task list tools forward arbitrary assignee and sparse-field filters', async (t) => {
+  const calls: URL[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (input) => {
+    calls.push(new URL(String(input)));
+    return new Response(JSON.stringify({ tasks: [], pagination: { has_more: false, next_offset: null } }), { status: 200 });
+  });
+
+  await client.callTool({
+    name: 'task_list',
+    arguments: {
+      board_name: 'group_10',
+      search: 'projection',
+      assignee_id: 8,
+      fields: ['name', 'description'],
+    },
+  });
+  assert.equal(calls[0]?.pathname, '/wp-json/pandatask/v1/boards/group_10/tasks');
+  assert.equal(calls[0]?.searchParams.get('assignee_id'), '8');
+  assert.equal(calls[0]?.searchParams.get('fields'), 'name,description');
+
+  await client.callTool({
+    name: 'task_list_visible',
+    arguments: { assignee_id: 8, fields: ['id', 'name'], limit: 25 },
+  });
+  assert.equal(calls[1]?.pathname, '/wp-json/pandatask/v1/users/me/tasks');
+  assert.equal(calls[1]?.searchParams.get('assignee_id'), '8');
+  assert.equal(calls[1]?.searchParams.get('fields'), 'id,name');
+
+  const beforeConflict = calls.length;
+  const conflict = await client.callTool({
+    name: 'task_list',
+    arguments: { board_name: 'group_10', assigned_to_me: true, assignee_id: 8 },
+  });
+  assert.equal(conflict.isError, true);
+  assert.equal(calls.length, beforeConflict, 'Conflicting assignment filters must fail before REST access.');
+});
+
+test('executed MCP writes default to minimal responses with an explicit full override', async (t) => {
+  const requestBodies: Record<string, unknown>[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false }, async (_input, init) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({
+      message: 'Task added',
+      task: {
+        id: 77,
+        board_name: 'group_10',
+        name: 'Response shaping',
+        status: 'pending',
+        description: 'A deliberately verbose description.',
+        description_rendered: '<p>A deliberately verbose description.</p>',
+        comments: [{ id: 1, comment_text: 'Not needed in a mutation receipt.' }],
+      },
+    }), { status: 201 });
+  });
+
+  const minimal = await client.callTool({
+    name: 'task_create',
+    arguments: { board_name: 'group_10', name: 'Response shaping' },
+  });
+  const minimalData = (minimal.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.equal(minimalData.operation, 'task_create');
+  assert.deepEqual(minimalData.task, {
+    id: 77,
+    board_name: 'group_10',
+    name: 'Response shaping',
+    status: 'pending',
+  });
+  assert.equal((requestBodies[0] as Record<string, unknown>).response_mode, undefined, 'MCP-only response_mode must not leak into REST bodies.');
+
+  const full = await client.callTool({
+    name: 'task_create',
+    arguments: { board_name: 'group_10', name: 'Response shaping', response_mode: 'full' },
+  });
+  const fullData = (full.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.equal((fullData.task as Record<string, unknown>).description, 'A deliberately verbose description.');
+  assert.equal(requestBodies[1]?.response_mode, undefined, 'Full response selection must remain MCP-local.');
 });
 
 test('task_list_visible aggregates pages with broad defaults and accurate metadata', async (t) => {

@@ -26,7 +26,7 @@ final class TaskRepository {
         return $count > 0;
     }
 
-    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null ) {
+    public function findForBoard( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null, $assignee_id = null ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -50,6 +50,16 @@ final class TaskRepository {
         if ( ! empty( $user_id ) ) {
             $sql_where .= " AND EXISTS (SELECT 1 FROM {$assignments_table} a_user WHERE a_user.task_id = t.id AND a_user.user_id = %d)";
             $params[]   = $user_id;
+        }
+
+        if ( null !== $assignee_id ) {
+            $sql_where .= " AND EXISTS (
+                SELECT 1 FROM {$assignments_table} assignee_filter
+                WHERE assignee_filter.task_id = t.id
+                  AND assignee_filter.user_id = %d
+                  AND (assignee_filter.role = 'assignee' OR assignee_filter.role IS NULL)
+            )";
+            $params[] = (int) $assignee_id;
         }
 
         if ( ! $include_templates ) {
@@ -551,7 +561,7 @@ final class TaskRepository {
         return array_values( array_unique( array_filter( array_map( 'absint', $results ) ) ) );
     }
 
-    public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0 ) {
+    public function findForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0, $assignee_id = null ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -585,6 +595,18 @@ final class TaskRepository {
         // Inbox is a separate personal workflow surface. Items remain normal tasks,
         // but do not duplicate themselves in the ordinary actionable Tasks view.
         $sql .= ' AND t.inbox_state IS NULL';
+
+        if ( null !== $assignee_id ) {
+            $sql .= $wpdb->prepare(
+                " AND EXISTS (
+                    SELECT 1 FROM {$assignments_table} assignee_filter
+                    WHERE assignee_filter.task_id = t.id
+                      AND assignee_filter.user_id = %d
+                      AND (assignee_filter.role = 'assignee' OR assignee_filter.role IS NULL)
+                )",
+                (int) $assignee_id
+            );
+        }
 
         if ( ! $include_templates ) {
             $sql .= ' AND t.is_recurring = 0';
@@ -650,7 +672,7 @@ final class TaskRepository {
      * A null board list is an administrator query and intentionally has no access
      * predicate; an empty list still permits only direct participation.
      */
-    public function findVisibleForUser( $user_id, $readable_board_names, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = null, $project_filter = null, $include_templates = true, $task_type_filter = '', $assigned_to_me = false, $limit = 0, $offset = 0 ) {
+    public function findVisibleForUser( $user_id, $readable_board_names, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = null, $project_filter = null, $include_templates = true, $task_type_filter = '', $assigned_to_me = false, $limit = 0, $offset = 0, $assignee_id = null ) {
         global $wpdb;
 
         $prefix            = DatabaseContext::getDbPrefix();
@@ -702,6 +724,16 @@ final class TaskRepository {
                   AND (assigned_to_actor.role = 'assignee' OR assigned_to_actor.role IS NULL)
             )";
             $params[] = $user_id;
+        }
+
+        if ( null !== $assignee_id ) {
+            $sql_where .= " AND EXISTS (
+                SELECT 1 FROM {$assignments_table} assignee_filter
+                WHERE assignee_filter.task_id = t.id
+                  AND assignee_filter.user_id = %d
+                  AND (assignee_filter.role = 'assignee' OR assignee_filter.role IS NULL)
+            )";
+            $params[] = (int) $assignee_id;
         }
 
         if ( ! $include_templates ) {

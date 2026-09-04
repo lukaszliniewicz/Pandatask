@@ -29,6 +29,82 @@ export const dryRunField = z
   .default(false)
   .describe('When true, perform local schema and workflow preflight only, then return the exact planned requests without sending mutations.');
 
+export const responseModeField = z
+  .enum(['minimal', 'full'])
+  .optional()
+  .default('minimal')
+  .describe('Response detail for an executed mutation. MCP writes default to minimal; use full when the complete resulting record is needed. Dry-run previews remain detailed.');
+
+export const taskCollectionFieldNames = [
+  'id',
+  'board_name',
+  'board_display_name',
+  'name',
+  'description',
+  'description_rendered',
+  'status',
+  'priority',
+  'start_date',
+  'deadline',
+  'deadline_days_after_start',
+  'notify_deadline',
+  'notify_days_before',
+  'archived',
+  'parent_task_id',
+  'parent_task_name',
+  'parent_task_status',
+  'completed_at',
+  'created_at',
+  'updated_at',
+  'category_id',
+  'category_name',
+  'project_id',
+  'project_name',
+  'is_recurring',
+  'recurrence_frequency',
+  'recurrence_interval',
+  'recurrence_days',
+  'recurrence_ends_on',
+  'next_recurrence_date',
+  'parent_recurring_task_id',
+  'missed_deadline_notified',
+  'attachment_type',
+  'attachment_url',
+  'attachment_post_id',
+  'attachment_filename',
+  'attachment_protected',
+  'attachment_public_source_retained',
+  'task_type',
+  'bug_url',
+  'recurrence_anchor_day',
+  'deadline_reminder_sent_for',
+  'creator_id',
+  'estimated_effort_seconds',
+  'current_work_occurrence_id',
+  'follow_up_of_task_id',
+  'follow_up_of_task_name',
+  'follow_up_source_restricted',
+  'inbox_state',
+  'capture_source',
+  'capture_url',
+  'predecessors',
+  'predecessor_ids',
+  'is_blocked',
+  'assigned_users',
+  'assigned_user_ids',
+  'supervisor_users',
+  'supervisor_user_ids',
+] as const;
+
+const taskCollectionField = z.enum(taskCollectionFieldNames);
+const taskCollectionFields = z
+  .array(taskCollectionField)
+  .min(1)
+  .max(taskCollectionFieldNames.length)
+  .refine((values) => new Set(values).size === values.length, 'Task response fields must be unique.')
+  .optional()
+  .describe('Return only these allowlisted task fields. The result envelope and pagination metadata are always retained.');
+
 function validateDateOrder(
   value: {
     start_date?: string | undefined;
@@ -259,32 +335,52 @@ const taskListFilterFields = {
   project_id: z.union([positiveId, z.literal('none')]).optional().describe('Project ID, or none for tasks without a project.'),
   archived: z.boolean().optional().default(false).describe('Return archived rather than active tasks.'),
   assigned_to_me: z.boolean().optional().describe('Restrict to tasks assigned to the authenticated user.'),
+  assignee_id: positiveId.optional().describe('Restrict to tasks assigned to this user ID. Do not combine with assigned_to_me.'),
+  fields: taskCollectionFields,
   include_templates: z.boolean().optional().default(false).describe('Include recurring templates; false is recommended for actionable work.'),
   task_type: z.enum(['task', 'bug']).optional().describe('Restrict to tasks or bugs.'),
   limit: z.number().int().min(1).max(500).optional().default(100).describe('Maximum tasks returned in this page.'),
   offset: z.number().int().nonnegative().optional().default(0).describe('Zero-based task offset for pagination.'),
 };
 
-export const taskListInput = z.object({
-  board_name: boardName,
-  ...taskListFilterFields,
-  private_only: z.boolean().optional().describe('For user_ID boards, restrict the cross-board personal view to the private board itself.'),
-});
+function rejectConflictingAssigneeFilters(
+  value: { assigned_to_me?: boolean | undefined; assignee_id?: number | undefined },
+  context: z.RefinementCtx,
+): void {
+  if (value.assigned_to_me && value.assignee_id !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['assignee_id'],
+      message: 'Use assigned_to_me or assignee_id, not both.',
+    });
+  }
+}
 
-export const taskListVisibleInput = z.object(taskListFilterFields).extend({
-  status: z
-    .enum(['all', 'pending', 'in-progress', 'done', 'missed_deadline', 'pending_in-progress'])
-    .optional()
-    .default('all')
-    .describe('Task status filter. Defaults to all statuses for the complete visible-task view.'),
-  archived: z
-    .boolean()
-    .optional()
-    .describe('Archive filter. Omit for active and archived tasks, false for active only, or true for archived only.'),
-  include_templates: z.boolean().optional().default(true).describe('Include recurring templates; defaults to true for the complete visible-task view.'),
-  limit: z.number().int().min(1).max(500).optional().default(100).describe('REST page size; all pages are combined into one MCP result.'),
-  offset: z.number().int().nonnegative().optional().default(0).describe('Initial REST offset before the server follows subsequent pages.'),
-});
+export const taskListInput = z
+  .object({
+    board_name: boardName,
+    ...taskListFilterFields,
+    private_only: z.boolean().optional().describe('For user_ID boards, restrict the cross-board personal view to the private board itself.'),
+  })
+  .superRefine(rejectConflictingAssigneeFilters);
+
+export const taskListVisibleInput = z
+  .object(taskListFilterFields)
+  .extend({
+    status: z
+      .enum(['all', 'pending', 'in-progress', 'done', 'missed_deadline', 'pending_in-progress'])
+      .optional()
+      .default('all')
+      .describe('Task status filter. Defaults to all statuses for the complete visible-task view.'),
+    archived: z
+      .boolean()
+      .optional()
+      .describe('Archive filter. Omit for active and archived tasks, false for active only, or true for archived only.'),
+    include_templates: z.boolean().optional().default(true).describe('Include recurring templates; defaults to true for the complete visible-task view.'),
+    limit: z.number().int().min(1).max(500).optional().default(100).describe('REST page size; all pages are combined into one MCP result.'),
+    offset: z.number().int().nonnegative().optional().default(0).describe('Initial REST offset before the server follows subsequent pages.'),
+  })
+  .superRefine(rejectConflictingAssigneeFilters);
 
 export function taskListQuery(input: z.infer<typeof taskListInput>): Record<string, string | number> {
   return {
@@ -294,6 +390,8 @@ export function taskListQuery(input: z.infer<typeof taskListInput>): Record<stri
     ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
     ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),
     ...(input.assigned_to_me !== undefined ? { assigned_to_me: String(input.assigned_to_me) } : {}),
+    ...(input.assignee_id !== undefined ? { assignee_id: input.assignee_id } : {}),
+    ...(input.fields !== undefined ? { fields: input.fields.join(',') } : {}),
     ...(input.private_only !== undefined ? { private_only: String(input.private_only) } : {}),
     include_templates: String(input.include_templates),
     ...(input.task_type ? { task_type_filter: input.task_type } : {}),
@@ -310,6 +408,8 @@ export function taskListVisibleQuery(input: z.infer<typeof taskListVisibleInput>
     ...(input.project_id !== undefined ? { project_filter: input.project_id } : {}),
     ...(input.archived !== undefined ? { archived: input.archived ? 1 : 0 } : {}),
     ...(input.assigned_to_me !== undefined ? { assigned_to_me: String(input.assigned_to_me) } : {}),
+    ...(input.assignee_id !== undefined ? { assignee_id: input.assignee_id } : {}),
+    ...(input.fields !== undefined ? { fields: input.fields.join(',') } : {}),
     include_templates: String(input.include_templates),
     ...(input.task_type ? { task_type_filter: input.task_type } : {}),
     limit: input.limit,

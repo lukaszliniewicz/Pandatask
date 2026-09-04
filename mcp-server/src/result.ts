@@ -4,6 +4,113 @@ import { PandataskApiError } from './client.js';
 
 const MAX_TEXT_CONTENT_CHARS = 64 * 1024;
 
+export type ResponseMode = 'minimal' | 'full';
+
+export interface ToolResultOptions {
+  responseMode?: ResponseMode | undefined;
+  operation?: string;
+  input?: Record<string, unknown>;
+}
+
+const MINIMAL_RESULT_KEYS = new Set([
+  'message',
+  'id',
+  'task_id',
+  'project_id',
+  'entry_id',
+  'category_id',
+  'comment_id',
+  'owner_user_id',
+  'user_id',
+  'board_name',
+  'source_board',
+  'destination_board',
+  'key',
+  'name',
+  'title',
+  'label',
+  'role',
+  'status',
+  'state',
+  'task_type',
+  'archived',
+  'deleted',
+  'created',
+  'updated',
+  'complete',
+  'success',
+  'is_active',
+  'resumable',
+  'rolled_back',
+  'idempotent',
+  'replayed',
+  'index',
+  'duration_seconds',
+  'actual_seconds',
+  'seconds',
+  'work_date',
+  'capacity',
+  'occurrence_id',
+  'specific_seconds',
+  'declared_actual_seconds',
+  'residual_entry_id',
+  'resolved_by',
+  'sequence_number',
+  'occurrence_key',
+  'opened_at',
+  'skipped_at',
+  'cancelled_at',
+  'tombstoned_at',
+  'action',
+  'action_description',
+  'type',
+  'matched',
+  'truncated',
+  'requested',
+  'succeeded',
+  'failed',
+  'count',
+  'requested_tasks',
+  'created_tasks',
+  'error',
+  'code',
+  'http_status',
+]);
+
+const MINIMAL_STRUCTURED_KEYS = new Set([
+  'task',
+  'project',
+  'entry',
+  'category',
+  'comment',
+  'time',
+  'work_type',
+  'activity_type',
+  'occurrence',
+  'resolution',
+  'resource',
+  'results',
+  'task_results',
+  'rollback_results',
+  'failed_step',
+  'warnings',
+  'warning',
+  'next_action',
+  'delegates',
+]);
+
+const INPUT_IDENTITY_KEYS = [
+  'task_id',
+  'project_id',
+  'entry_id',
+  'category_id',
+  'comment_id',
+  'owner_user_id',
+  'board_name',
+  'destination_board',
+  'key',
+] as const;
+
 export const toolOutputSchema = z.object({
   ok: z.boolean().describe('True when the tool completed successfully; false for failures or partial workflows.'),
   data: z.unknown().optional().describe('Tool-specific result when ok is true.'),
@@ -70,10 +177,60 @@ function compatibleText(payload: Record<string, unknown>, largeResultSummary: st
   });
 }
 
-export function toolResult(value: unknown): CallToolResult {
-  const payload = { ok: true as const, data: value };
+function compactMutationValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(compactMutationValue);
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+
+  const compact: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (MINIMAL_RESULT_KEYS.has(key)) {
+      compact[key] = item;
+    } else if (MINIMAL_STRUCTURED_KEYS.has(key)) {
+      compact[key] = compactMutationValue(item);
+    }
+  }
+  return compact;
+}
+
+function minimalMutationResult(value: unknown, options: ToolResultOptions): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {
+      operation: options.operation ?? 'mutation',
+      message: 'Pandatask mutation completed.',
+      result: value,
+    };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.dry_run === true) return value;
+
+  const compact = compactMutationValue(value) as Record<string, unknown>;
+  const result: Record<string, unknown> = {
+    operation: options.operation ?? 'mutation',
+    ...compact,
+  };
+
+  for (const key of INPUT_IDENTITY_KEYS) {
+    if (result[key] === undefined && options.input?.[key] !== undefined) {
+      result[key] = options.input[key];
+    }
+  }
+
+  if (typeof result.message !== 'string' || !result.message.trim()) {
+    result.message = 'Pandatask mutation completed.';
+  }
+  return result;
+}
+
+export function toolResult(value: unknown, options: ToolResultOptions = {}): CallToolResult {
+  const responseValue = options.responseMode === 'minimal' ? minimalMutationResult(value, options) : value;
+  const payload = { ok: true as const, data: responseValue };
   return {
-    content: [{ type: 'text', text: compatibleText(payload, `${conciseSuccess(value)} Full data is available in structuredContent.`) }],
+    content: [{ type: 'text', text: compatibleText(payload, `${conciseSuccess(responseValue)} Full data is available in structuredContent.`) }],
     structuredContent: payload,
   };
 }
@@ -126,9 +283,9 @@ export function toolError(error: unknown): CallToolResult {
   };
 }
 
-export async function handled(operation: () => Promise<unknown>): Promise<CallToolResult> {
+export async function handled(operation: () => Promise<unknown>, options: ToolResultOptions = {}): Promise<CallToolResult> {
   try {
-    return toolResult(await operation());
+    return toolResult(await operation(), options);
   } catch (error) {
     return toolError(error);
   }

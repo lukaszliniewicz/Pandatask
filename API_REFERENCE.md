@@ -81,7 +81,7 @@ If you are an AI agent or building an automation script, follow these best pract
 -   **Response Example:**
     ```json
     {
-        "plugin_version": "1.0.29",
+        "plugin_version": "1.0.30",
         "today": "2026-07-24",
         "now": "2026-07-24T12:30:00+02:00",
         "timezone": "Europe/Warsaw",
@@ -244,6 +244,8 @@ Fields available when creating or updating tasks.
     -   `archived` (integer, optional): Set to `1` to return archived (soft-deleted) tasks instead of active ones. Default: `0`.
     -   `private_only` (string, optional): On a `user_{ID}` board, `"true"` restricts the cross-board personal view to tasks stored on that private board.
     -   `assigned_to_me` (string, optional): `"true"` to filter by tasks assigned to the current user.
+    -   `assignee_id` (integer, optional): Filter by an arbitrary user assigned with the assignee role. Supervisor-only assignments do not match. When `assigned_to_me=true`, this must either be omitted or equal the current user's ID.
+    -   `fields` (string or string array, optional): Return only the selected allowlisted fields on each task. A comma-separated string such as `id,name,description` is accepted. Filtering, sorting, and pagination happen before projection; the response envelope and pagination metadata are always retained. Unknown or empty selections return HTTP 400.
     -   `include_templates` (string, optional): `"true"` to include recurring template tasks. Front end always sends `"true"`.
     -   `task_type_filter` (string, optional): Filter by `task_type` value (e.g. `"bug"`).
     -   `limit` (integer, optional): Return at most 1-500 tasks. Omit it to preserve the unpaginated legacy front-end response.
@@ -283,6 +285,17 @@ Fields available when creating or updating tasks.
         }
     }
     ```
+
+    The projection allowlist is: `id`, `board_name`, `board_display_name`, `name`, `description`, `description_rendered`, `status`, `priority`, `start_date`, `deadline`, `deadline_days_after_start`, `notify_deadline`, `notify_days_before`, `archived`, `parent_task_id`, `parent_task_name`, `parent_task_status`, `completed_at`, `created_at`, `updated_at`, `category_id`, `category_name`, `project_id`, `project_name`, `is_recurring`, `recurrence_frequency`, `recurrence_interval`, `recurrence_days`, `recurrence_ends_on`, `next_recurrence_date`, `parent_recurring_task_id`, `missed_deadline_notified`, `attachment_type`, `attachment_url`, `attachment_post_id`, `attachment_filename`, `attachment_protected`, `attachment_public_source_retained`, `task_type`, `bug_url`, `recurrence_anchor_day`, `deadline_reminder_sent_for`, `creator_id`, `estimated_effort_seconds`, `current_work_occurrence_id`, `follow_up_of_task_id`, `follow_up_of_task_name`, `follow_up_source_restricted`, `inbox_state`, `capture_source`, `capture_url`, `predecessors`, `predecessor_ids`, `is_blocked`, `assigned_users`, `assigned_user_ids`, `supervisor_users`, and `supervisor_user_ids`.
+
+    `description_rendered` is computed only for an unprojected response or when explicitly requested. For example, `fields=name,description` returns exactly those two task properties without rendering or returning the rest of each record.
+
+### 1A. Get All Tasks Visible to the Current User
+
+-   **Endpoint:** `GET /users/me/tasks`
+-   **Description:** Retrieves tasks readable by the authenticated user across all boards in one paginated collection, including direct creator/assignment visibility where applicable.
+-   **Query Parameters:** Supports `search`, `status_filter`, `sort`, `project_filter`, `archived`, `assigned_to_me`, `assignee_id`, `fields`, `include_templates`, `task_type_filter`, `limit`, and `offset` with the same validation and projection semantics as the board task endpoint. Unlike the board endpoint, omitting `archived` includes both active and archived tasks, and omitting `include_templates` includes recurring templates.
+-   **Permissions:** Every result is restricted to tasks the authenticated user can read. `assignee_id` narrows that visible set; it does not grant access to another user's tasks.
 
 ### 2. Create a Task
 

@@ -132,6 +132,17 @@ final class RouteRegistrar {
                         'description' => __( 'Restrict to tasks assigned to the current user.', 'pandatask' ),
                         'type'        => 'boolean',
                     ),
+                    'assignee_id' => array(
+                        'description'       => __( 'Restrict to tasks assigned to this user as an assignee.', 'pandatask' ),
+                        'type'              => 'integer',
+                        'minimum'           => 1,
+                        'sanitize_callback' => 'absint',
+                    ),
+                    'fields' => array(
+                        'description' => __( 'Comma-separated task fields to return, or an array of field names.', 'pandatask' ),
+                        'type'        => array( 'string', 'array' ),
+                        'items'       => array( 'type' => 'string' ),
+                    ),
                     'include_templates' => array(
                         'description' => __( 'Include recurring task templates.', 'pandatask' ),
                         'type'        => 'boolean',
@@ -326,6 +337,17 @@ final class RouteRegistrar {
                             'description'       => __( 'Restrict to tasks assigned to the current user.', 'pandatask' ),
                             'type'              => 'boolean',
                             'sanitize_callback' => 'rest_sanitize_boolean',
+                        ),
+                        'assignee_id' => array(
+                            'description'       => __( 'Restrict to tasks assigned to this user as an assignee.', 'pandatask' ),
+                            'type'              => 'integer',
+                            'minimum'           => 1,
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'fields' => array(
+                            'description' => __( 'Comma-separated task fields to return, or an array of field names.', 'pandatask' ),
+                            'type'        => array( 'string', 'array' ),
+                            'items'       => array( 'type' => 'string' ),
                         ),
                         'private_only' => array(
                             'description'       => __( 'For user workspaces, restrict to the private board rather than the cross-board view.', 'pandatask' ),
