@@ -25,6 +25,7 @@ jobs:
           php-version: '8.2'
           coverage: none
       - run: npm ci
+      - run: composer install --no-interaction --prefer-dist
       - run: npm run typecheck
       - run: npm test
       - run: npm run lint
