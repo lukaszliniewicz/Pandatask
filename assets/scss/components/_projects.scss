@@ -1341,9 +1341,12 @@ body.pandat69-project-canvas-open {
 	z-index: var(--pandatask-gantt-viewport-z, 2147483646);
 	display: flex;
 	width: 100vw;
+	max-width: none;
 	height: 100vh;
 	height: 100dvh;
+	margin: 0 !important;
 	padding: 14px;
+	border: 0;
 	flex-direction: column;
 	background: #f4f7f9;
 

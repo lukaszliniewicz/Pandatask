@@ -264,7 +264,9 @@ const ProjectFlowView = ({ dependencies, onTaskAction, tasks }) => {
   const flow = (
     <section
       className={`pandat69-project-flow ${
-        isExpanded ? "is-viewport-expanded" : ""
+        isExpanded
+          ? "is-viewport-expanded pandat69-container pandat69-root"
+          : ""
       } ${hasRelationFocus ? "has-relation-focus" : ""}`}
       aria-labelledby="pandatask-project-flow-title"
     >

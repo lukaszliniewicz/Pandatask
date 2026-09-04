@@ -4,7 +4,7 @@ A WordPress plugin that renders task management boards via shortcode, with optio
 
 Projects open as dedicated workspaces with List, dependency Flow, and Timeline modes. Permission-safe included/related references add cross-project context without duplicating canonical tasks, while dependencies may span readable boards with global cycle protection.
 
-**Version:** 1.0.34
+**Version:** 1.0.35
 **License:** GPL v2 or later  
 **Requires:** WordPress 5.0+, PHP 7.4+  
 **Tested up to:** WordPress 7.0
