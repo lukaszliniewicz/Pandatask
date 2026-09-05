@@ -11,7 +11,9 @@ import {
   projectReferenceKey,
   projectReferenceRelationData,
   taskCollectionFieldNames,
+  taskCreateData,
   taskListInput,
+  taskUpdateData,
 } from '../src/schemas.js';
 
 test('calendar dates reject impossible month and day values', () => {
@@ -43,6 +45,27 @@ test('task creation and update schemas keep done behind task_complete', () => {
   assert.equal(batchAction.safeParse({
     action: 'update_task',
     data: { id: 1, status: 'done' },
+  }).success, false);
+});
+
+test('task description inputs cap raw content at 10,000 code units', () => {
+  const description = 'x'.repeat(10_000);
+  const tooLong = 'x'.repeat(10_001);
+  assert.equal(taskCreateData.safeParse({ name: 'At the limit', description }).success, true);
+  assert.equal(taskUpdateData.safeParse({ description }).success, true);
+  assert.equal(plannedTaskData.safeParse({ name: 'At the limit', description }).success, true);
+  assert.equal(batchAction.safeParse({
+    action: 'create_task',
+    board_name: 'project_alpha',
+    data: { name: 'At the limit', description },
+  }).success, true);
+  assert.equal(taskCreateData.safeParse({ name: 'Too long', description: tooLong }).success, false);
+  assert.equal(taskUpdateData.safeParse({ description: tooLong }).success, false);
+  assert.equal(plannedTaskData.safeParse({ name: 'Too long', description: tooLong }).success, false);
+  assert.equal(batchAction.safeParse({
+    action: 'create_task',
+    board_name: 'project_alpha',
+    data: { name: 'Too long', description: tooLong },
   }).success, false);
 });
 

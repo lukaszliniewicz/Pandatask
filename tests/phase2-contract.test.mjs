@@ -494,6 +494,7 @@ test('Annotated task views expose project grouping and progressive disclosure co
 test('Task descriptions use one rich HTML and Mermaid contract across edit and read surfaces', () => {
 	const generalFields = fs.readFileSync(path.join(repoRoot, 'src/components/task-form/TaskGeneralFields.jsx'), 'utf8');
 	const editor = fs.readFileSync(path.join(repoRoot, 'src/components/rich-text/RichTaskDescriptionEditor.jsx'), 'utf8');
+	const markdownContent = fs.readFileSync(path.join(repoRoot, 'src/rich-content/markdownContent.mjs'), 'utf8');
 	const taskItem = fs.readFileSync(path.join(repoRoot, 'src/components/TaskItem.jsx'), 'utf8');
 	const taskDetail = fs.readFileSync(path.join(repoRoot, 'src/components/task-detail/TaskDetailDescription.jsx'), 'utf8');
 	const requestHelper = fs.readFileSync(path.join(repoRoot, 'src/Http/Rest/V1/Support/RequestHelper.php'), 'utf8');
@@ -501,7 +502,9 @@ test('Task descriptions use one rich HTML and Mermaid contract across edit and r
 	const notifier = fs.readFileSync(path.join(repoRoot, 'src/Infrastructure/Notifications/BuddyPressNotifier.php'), 'utf8');
 
 	assert.match(generalFields, /RichTaskDescriptionEditor/);
-	assert.match(editor, /convertMermaidMarkdownFences/);
+	assert.match(editor, /handlePaste/);
+	assert.match(editor, /markdownToTaskHtml/);
+	assert.match(markdownContent, /convertMermaidMarkdownFences/);
 	assert.match(editor, /CodeBlock\.configure/);
 	assert.match(editor, /TableKit\.configure/);
 	assert.match(taskItem, /import\('\.\.\/rich-content\/renderMermaid'\)/);

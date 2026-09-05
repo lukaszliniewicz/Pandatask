@@ -3,6 +3,7 @@ import { Controller } from 'react-hook-form';
 import Icon from '../Icon';
 import TaskSelect from '../TaskSelect';
 import RichTaskDescriptionEditor from '../rich-text/RichTaskDescriptionEditor';
+import { validateTaskDescriptionLength } from '../../rich-content/markdownContent.mjs';
 
 const TaskGeneralFields = ({
     active,
@@ -83,17 +84,28 @@ const TaskGeneralFields = ({
             <Controller
                 control={control}
                 name="description"
+                rules={{
+                    validate: (value) => validateTaskDescriptionLength(value) || true,
+                }}
                 render={({ field: { onChange, value } }) => (
                     <RichTaskDescriptionEditor
                         id={`${fieldPrefix}-description`}
                         value={value}
                         onChange={onChange}
-                        aria-describedby={`${fieldPrefix}-description-help`}
+                        aria-invalid={Boolean(errors.description)}
+                        aria-describedby={errors.description
+                            ? `${fieldPrefix}-description-help ${fieldPrefix}-description-error`
+                            : `${fieldPrefix}-description-help`}
                     />
                 )}
             />
+            {errors.description && (
+                <span id={`${fieldPrefix}-description-error`} className="pandat69-error-text">
+                    {errors.description.message}
+                </span>
+            )}
             <p id={`${fieldPrefix}-description-help`} className="pandat69-field-hint">
-                Rich text is stored as sanitized HTML. Markdown import is one-way; Mermaid diagrams remain editable.
+                Paste Markdown directly, or use More → Import Markdown. Import is one-way; Mermaid diagrams remain editable.
             </p>
         </div>
 

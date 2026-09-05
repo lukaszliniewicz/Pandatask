@@ -565,6 +565,55 @@ test('executed MCP writes default to minimal responses with an explicit full ove
   assert.equal(requestBodies[1]?.response_mode, undefined, 'Full response selection must remain MCP-local.');
 });
 
+test('follow-up and inbox capture omit absent description fields and normalize supplied HTML', async (t) => {
+  let fetchCalls = 0;
+  const client = await connectedClient(t, config, async () => {
+    fetchCalls += 1;
+    return new Response('{}', { status: 200 });
+  });
+
+  const followUp = await client.callTool({
+    name: 'task_follow_up_create',
+    arguments: { task_id: 10 },
+  });
+  const followUpRequest = (((followUp.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute) as Record<string, unknown>;
+  assert.deepEqual(followUpRequest.body, {});
+
+  const inboxCapture = await client.callTool({
+    name: 'inbox_capture',
+    arguments: { name: 'Capture without description' },
+  });
+  const inboxRequest = (((inboxCapture.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute) as Record<string, unknown>;
+  assert.deepEqual(inboxRequest.body, { name: 'Capture without description', capture_source: 'mcp', priority: 5 });
+
+  const formattedFollowUp = await client.callTool({
+    name: 'task_follow_up_create',
+    arguments: { task_id: 10, description: '<p>Already HTML</p>' },
+  });
+  const formattedRequest = (((formattedFollowUp.structuredContent as Record<string, unknown>).data as Record<string, unknown>).would_execute) as Record<string, unknown>;
+  assert.deepEqual(formattedRequest.body, { description: '<p>Already HTML</p>' });
+
+  assert.equal(fetchCalls, 0, 'Dry-run previews must not send REST mutations.');
+});
+
+test('inline task-description schemas reject raw descriptions above 10,000 code units', async (t) => {
+  let fetchCalls = 0;
+  const client = await connectedClient(t, config, async () => {
+    fetchCalls += 1;
+    return new Response('{}', { status: 200 });
+  });
+  const description = 'x'.repeat(10_001);
+
+  for (const [name, arguments_] of [
+    ['task_follow_up_create', { task_id: 10, description }],
+    ['inbox_capture', { name: 'Too long', description }],
+  ] as const) {
+    const result = await client.callTool({ name, arguments: arguments_ });
+    assert.equal(result.isError, true, `${name} must reject descriptions above the raw limit.`);
+  }
+  assert.equal(fetchCalls, 0, 'Schema rejections must not send REST mutations.');
+});
+
 test('minimal idempotent replay receipts retain replay flags and omit rich task fields', async (t) => {
   const client = await connectedClient(t, { ...config, defaultDryRun: false }, async () => new Response(JSON.stringify({
     message: 'Task already created',

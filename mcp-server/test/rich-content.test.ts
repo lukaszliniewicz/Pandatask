@@ -7,6 +7,7 @@ import {
   normalizeBatchTaskDescriptions,
   normalizeTaskDescriptionBody,
   plainTextToHtml,
+  TASK_DESCRIPTION_MAX_LENGTH,
 } from '../src/rich-content.js';
 
 test('task schemas accept explicit description input formats', () => {
@@ -48,6 +49,20 @@ test('plain input is escaped and format metadata never reaches REST', () => {
   assert.throws(
     () => normalizeTaskDescriptionBody({ description_format: 'markdown' }),
     /requires description/,
+  );
+});
+
+test('description without a format is treated as HTML and the converted result is bounded', () => {
+  assert.deepEqual(
+    normalizeTaskDescriptionBody({ description: '<p>Already HTML</p>' }),
+    { description: '<p>Already HTML</p>' },
+  );
+
+  const markdown = '- x\n'.repeat(1_000);
+  assert.ok(markdown.length <= TASK_DESCRIPTION_MAX_LENGTH);
+  assert.throws(
+    () => normalizeTaskDescriptionBody({ description: markdown, description_format: 'markdown' }),
+    /10000 JavaScript string code units or fewer after conversion/,
   );
 });
 

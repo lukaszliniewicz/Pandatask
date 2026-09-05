@@ -6,15 +6,18 @@ import Link from '@tiptap/extension-link';
 import CodeBlock from '@tiptap/extension-code-block';
 import { TableKit } from '@tiptap/extension-table';
 import DOMPurify from 'dompurify';
-import { marked } from 'marked';
 import Modal from '../Modal';
 import MermaidNode from './MermaidNode';
 import MermaidEditorDialog from './MermaidEditorDialog';
 import {
-    convertMermaidMarkdownFences,
     looksLikeHtml,
     plainTextToHtml,
 } from '../../rich-content/mermaidContent.mjs';
+import {
+    looksLikeTaskMarkdown,
+    markdownToTaskHtml,
+    validateTaskDescriptionLength,
+} from '../../rich-content/markdownContent.mjs';
 
 const CODE_LANGUAGES = [
     ['', 'Plain text'],
@@ -36,12 +39,7 @@ const canonicalizeInitialValue = (value) => {
 };
 
 const markdownToSafeHtml = (markdown) => {
-    const parsed = marked.parse(convertMermaidMarkdownFences(String(markdown ?? '')), {
-        async: false,
-        gfm: true,
-        breaks: false,
-    });
-    return DOMPurify.sanitize(String(parsed), {
+    return DOMPurify.sanitize(markdownToTaskHtml(markdown), {
         USE_PROFILES: { html: true },
         ADD_ATTR: ['class'],
     });
@@ -60,12 +58,13 @@ const ToolbarButton = ({ active, children, label, onClick }) => (
     </button>
 );
 
-const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ariaDescribedBy }) => {
+const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ariaDescribedBy, 'aria-invalid': ariaInvalid }) => {
     const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
     const [markdownDraft, setMarkdownDraft] = useState('');
     const [markdownError, setMarkdownError] = useState('');
     const [mermaidDialogValue, setMermaidDialogValue] = useState(undefined);
     const fileInputRef = useRef(null);
+    const editorRef = useRef(null);
 
     const editor = useEditor({
         extensions: [
@@ -91,14 +90,35 @@ const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ar
         ],
         content: canonicalizeInitialValue(value),
         onUpdate: ({ editor: currentEditor }) => {
-            onChange(currentEditor.isEmpty ? '' : currentEditor.getHTML());
+            const nextValue = currentEditor.isEmpty ? '' : currentEditor.getHTML();
+            setMarkdownError(validateTaskDescriptionLength(nextValue) || '');
+            onChange(nextValue);
         },
         editorProps: {
+            handlePaste: (_view, event) => {
+                const pastedText = event.clipboardData?.getData('text/plain') || '';
+                const currentEditor = editorRef.current;
+                if (!currentEditor || !looksLikeTaskMarkdown(pastedText)) return false;
+
+                event.preventDefault();
+                try {
+                    const html = markdownToSafeHtml(pastedText);
+                    const lengthError = validateTaskDescriptionLength(html);
+                    if (lengthError) throw new Error(lengthError);
+                    currentEditor.chain().focus().insertContent(html).run();
+                    const finalHtml = currentEditor.isEmpty ? '' : currentEditor.getHTML();
+                    setMarkdownError(validateTaskDescriptionLength(finalHtml) || '');
+                } catch (error) {
+                    setMarkdownError(error instanceof Error ? error.message : 'Markdown could not be imported.');
+                }
+                return true;
+            },
             attributes: {
                 id,
                 class: 'pandat69-rich-editor-content',
                 'aria-label': 'Task description',
                 'aria-describedby': ariaDescribedBy || '',
+                'aria-invalid': ariaInvalid ? 'true' : 'false',
                 'aria-multiline': 'true',
             },
         },
@@ -106,11 +126,15 @@ const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ar
 
     useEffect(() => {
         if (!editor) return;
+        editorRef.current = editor;
         const next = canonicalizeInitialValue(value);
         const current = editor.isEmpty ? '' : editor.getHTML();
         if (!editor.isFocused && next !== current) {
             editor.commands.setContent(next, { emitUpdate: false });
         }
+        return () => {
+            if (editorRef.current === editor) editorRef.current = null;
+        };
     }, [editor, value]);
 
     if (!editor) return null;
@@ -118,8 +142,11 @@ const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ar
     const insertMarkdown = (markdown) => {
         try {
             const html = markdownToSafeHtml(markdown);
+            const lengthError = validateTaskDescriptionLength(html);
+            if (lengthError) throw new Error(lengthError);
             if (html) editor.chain().focus().insertContent(html).run();
-            setMarkdownError('');
+            const finalHtml = editor.isEmpty ? '' : editor.getHTML();
+            setMarkdownError(validateTaskDescriptionLength(finalHtml) || '');
             return true;
         } catch (error) {
             setMarkdownError(error instanceof Error ? error.message : 'Markdown could not be imported.');
@@ -170,7 +197,7 @@ const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ar
                             >
                                 Diagram
                             </ToolbarButton>
-                            <ToolbarButton label="Paste Markdown" onClick={() => setMarkdownDialogOpen(true)}>Paste Markdown</ToolbarButton>
+                            <ToolbarButton label="Import Markdown" onClick={() => setMarkdownDialogOpen(true)}>Import Markdown</ToolbarButton>
                             <ToolbarButton label="Upload Markdown file" onClick={() => fileInputRef.current?.click()}>Upload .md</ToolbarButton>
                         </div>
                     </details>
@@ -208,7 +235,7 @@ const RichTaskDescriptionEditor = ({ value, onChange, id, 'aria-describedby': ar
                 <EditorContent editor={editor} />
             </div>
 
-            <Modal isOpen={markdownDialogOpen} onClose={() => setMarkdownDialogOpen(false)} title="Paste Markdown">
+            <Modal isOpen={markdownDialogOpen} onClose={() => setMarkdownDialogOpen(false)} title="Import Markdown">
                 <label htmlFor={`${id}-markdown-input`}>Markdown</label>
                 <textarea
                     id={`${id}-markdown-input`}

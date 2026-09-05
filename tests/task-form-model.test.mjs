@@ -203,6 +203,7 @@ test( 'reason and validation helpers identify sensitive changes and tabs', () =>
 		false
 	);
 	assert.equal( validationErrorTab( { name: {} } ), 'general' );
+	assert.equal( validationErrorTab( { description: {} } ), 'general' );
 	assert.equal(
 		validationErrorTab( { deadline_days_after_start: {} } ),
 		'schedule'

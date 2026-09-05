@@ -7,6 +7,13 @@ import {
     serializeMermaidFigure,
     validateMermaidSource,
 } from '../src/rich-content/mermaidContent.mjs';
+import {
+    looksLikeTaskMarkdown,
+    markdownToTaskHtml,
+    TASK_DESCRIPTION_MAX_LENGTH,
+    validateTaskDescriptionLength,
+    validateTaskMarkdown,
+} from '../src/rich-content/markdownContent.mjs';
 
 test('plain task text becomes escaped canonical paragraph HTML', () => {
     assert.equal(
@@ -55,4 +62,35 @@ test('oversized Mermaid source is preserved for visible validation', () => {
         () => serializeMermaidFigure(normalized),
         /50,000 characters or fewer/
     );
+});
+
+test('Markdown detection distinguishes document syntax from ordinary hash text', () => {
+    assert.equal(looksLikeTaskMarkdown('# Heading\n\nA **bold** paragraph.'), true);
+    assert.equal(looksLikeTaskMarkdown('See issue #123 for the ordinary prose.'), false);
+    assert.equal(looksLikeTaskMarkdown('| Name | State |\n| --- | --- |\n| Paste | Fixed |'), true);
+    assert.equal(looksLikeTaskMarkdown('[Pandatask](https://example.test)'), true);
+    assert.equal(looksLikeTaskMarkdown('![Diagram][architecture]'), true);
+});
+
+test('Markdown conversion handles mixed block and inline syntax without raw markers', () => {
+    const html = markdownToTaskHtml('# Heading\n\nA **bold** paragraph.\n\n- One\n- Two');
+
+    assert.match(html, /<h1>Heading<\/h1>/);
+    assert.match(html, /A <strong>bold<\/strong> paragraph/);
+    assert.match(html, /<ul>/);
+    assert.doesNotMatch(html, /# Heading|\*\*bold\*\*/);
+});
+
+test('unsupported Markdown structures produce actionable validation errors', () => {
+    assert.match(validateTaskMarkdown('- [ ] Not silently downgraded'), /Task-list checkboxes/);
+    assert.match(validateTaskMarkdown('![Diagram](https://example.test/image.png)'), /Markdown images/);
+    assert.throws(
+        () => markdownToTaskHtml('![Diagram](https://example.test/image.png)'),
+        /attachment or paste a link/
+    );
+});
+
+test('task-description length validation matches the REST contract', () => {
+    assert.equal(validateTaskDescriptionLength('x'.repeat(TASK_DESCRIPTION_MAX_LENGTH)), null);
+    assert.match(validateTaskDescriptionLength('x'.repeat(TASK_DESCRIPTION_MAX_LENGTH + 1)), /10,000/);
 });

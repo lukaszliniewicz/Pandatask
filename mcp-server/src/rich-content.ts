@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 import type { JsonRecord } from './client.js';
 
+export const TASK_DESCRIPTION_MAX_LENGTH = 10_000;
 const MERMAID_MAX_SOURCE_LENGTH = 50_000;
 
 function escapeHtml(value: unknown): string {
@@ -82,6 +83,12 @@ export function normalizeTaskDescriptionBody(body: JsonRecord): JsonRecord {
       break;
     default:
       throw new Error('description_format must be html, markdown, or plain.');
+  }
+
+  if (String(normalized.description).length > TASK_DESCRIPTION_MAX_LENGTH) {
+    throw new Error(
+      `Task description HTML must be ${TASK_DESCRIPTION_MAX_LENGTH} JavaScript string code units or fewer after conversion; shorten the description and try again.`,
+    );
   }
 
   return normalized;

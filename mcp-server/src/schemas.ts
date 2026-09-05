@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TASK_DESCRIPTION_MAX_LENGTH } from './rich-content.js';
 
 export const boardName = z
   .string()
@@ -204,7 +205,7 @@ function validateRecurrenceRule(value: RecurrenceInput, context: z.RefinementCtx
 
 export const taskMutableFields = {
   name: z.string().min(1).max(255).optional().describe('Short task title.'),
-  description: z.string().optional().describe('Detailed task description. Stored/read content is canonical sanitized HTML.'),
+  description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH).optional().describe('Detailed task description. Stored/read content is canonical sanitized HTML.'),
   description_format: z
     .enum(['html', 'markdown', 'plain'])
     .optional()

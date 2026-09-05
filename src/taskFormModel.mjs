@@ -167,7 +167,7 @@ export const requiresTaskChangeReason = ( task, data ) =>
 	);
 
 export const validationErrorTab = ( errors ) => {
-	if ( errors.name || errors.task_type ) {
+	if ( errors.name || errors.task_type || errors.description ) {
 		return 'general';
 	}
 	if ( errors.deadline_days_after_start ) {

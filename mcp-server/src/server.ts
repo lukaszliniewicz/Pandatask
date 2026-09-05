@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { PandataskApiError, PandataskClient, type JsonRecord, type MutationPreview, type RequestOptions } from './client.js';
 import { publicConfig } from './config.js';
 import { handled, PandataskWorkflowError, toolOutputSchema } from './result.js';
-import { normalizeBatchTaskDescriptions, normalizeTaskDescriptionBody } from './rich-content.js';
+import { normalizeBatchTaskDescriptions, normalizeTaskDescriptionBody, TASK_DESCRIPTION_MAX_LENGTH } from './rich-content.js';
 import {
   batchAction,
   boardName,
@@ -39,7 +39,7 @@ import { collection, deadlineReview, numberIds, summarizeTasks, workload } from 
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.5';
+const VERSION = '1.3.6';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -1000,8 +1000,8 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     z.object({
       task_id: positiveId.describe('Source task ID.'),
       name: z.string().min(1).max(255).optional(),
-      description: z.string().optional(),
-      description_format: z.enum(['html', 'markdown', 'plain']).optional().default('html'),
+      description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH).optional(),
+      description_format: z.enum(['html', 'markdown', 'plain']).optional(),
       board_name: boardName.optional().describe('Destination board; defaults to the source board.'),
       priority: z.number().int().min(1).max(10).optional(),
       project_id: z.number().int().nonnegative().optional(),
@@ -1056,8 +1056,8 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     z.object({
       owner_user_id: positiveId.optional(),
       name: z.string().min(1).max(255),
-      description: z.string().optional(),
-      description_format: z.enum(['html', 'markdown', 'plain']).optional().default('html'),
+      description: z.string().max(TASK_DESCRIPTION_MAX_LENGTH).optional(),
+      description_format: z.enum(['html', 'markdown', 'plain']).optional(),
       source_url: z.string().url().optional(),
       source_title: z.string().max(255).optional(),
       capture_source: z.string().regex(/^[a-z0-9_-]{1,32}$/).optional().default('mcp'),

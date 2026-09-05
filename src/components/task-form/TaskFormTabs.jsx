@@ -10,7 +10,7 @@ const TaskFormTabs = ({ activeTab, errors, fieldPrefix, onChange }) => (
     <div className="pandat69-form-tabs" role="tablist" aria-label="Task form sections">
         {TABS.map((tab) => {
             const hasError = (
-                tab.id === 'general' && Boolean(errors.name || errors.task_type)
+                tab.id === 'general' && Boolean(errors.name || errors.task_type || errors.description)
             ) || (
                 tab.id === 'schedule' && Boolean(errors.deadline_days_after_start)
             );
