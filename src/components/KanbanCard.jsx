@@ -3,6 +3,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { parseDate } from '../utils';
 import Icon from './Icon';
+import ChecklistCount from './ChecklistCount';
 
 const KanbanCard = ({ task, onAction }) => {
     const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -80,6 +81,7 @@ const KanbanCard = ({ task, onAction }) => {
             </div>
 
             <div className="pandat69-kanban-card-meta">
+                <ChecklistCount task={task} />
                 <span title="Priority">
                     <Icon name="star" size={15} /> {task.priority}
                 </span>

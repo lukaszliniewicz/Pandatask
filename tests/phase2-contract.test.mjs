@@ -239,7 +239,7 @@ test('Subtask projects are authoritative, cascaded, and repaired on upgrade', ()
 	assert.match(mutations, /updateProjectForTasks/);
 	assert.match(mutations, /Inherited from the parent task project/);
 	assert.match(mutations, /pandatask_task_has_children/);
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.21'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.23'/);
 	assert.match(lifecycle, /board_events/);
 	assert.match(lifecycle, /repairProjectInheritance/);
 	assert.match(lifecycle, /child\.project_id <=> parent\.project_id/);

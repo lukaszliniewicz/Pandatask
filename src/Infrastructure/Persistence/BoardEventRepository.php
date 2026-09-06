@@ -100,8 +100,7 @@ final class BoardEventRepository {
                     SUM(CASE WHEN status <> 'done' AND deadline IS NOT NULL AND deadline < %s THEN 1 ELSE 0 END) AS overdue_count
                  FROM {$table}
                  WHERE board_name = %s
-                   AND archived = 0
-                   AND is_recurring = 0",
+                   AND archived = 0",
                 $today,
                 $today,
                 $board_name

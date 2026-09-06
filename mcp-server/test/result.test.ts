@@ -67,6 +67,57 @@ test('minimal task mutation receipts preserve an authoritative frontend URL', ()
   });
 });
 
+test('minimal checklist mutation receipts retain revision metadata for reconciliation', () => {
+  const result = toolResult(
+    {
+      checklist: [{ id: 'one', text: 'A rich checklist item', checked: false }],
+      checklist_version: 6,
+      checklist_total: 1,
+      checklist_checked: 0,
+      can_edit_checklist: true,
+    },
+    { responseMode: 'minimal', operation: 'task_checklist_update', input: { task_id: 42 } },
+  );
+
+  assert.deepEqual(result.structuredContent?.data, {
+    operation: 'task_checklist_update',
+    message: 'Pandatask mutation completed.',
+    checklist_version: 6,
+    checklist_total: 1,
+    checklist_checked: 0,
+    can_edit_checklist: true,
+    task_id: 42,
+  });
+});
+
+test('minimal task receipts retain concrete recurrence linkage fields', () => {
+  const result = toolResult(
+    {
+      task: {
+        id: 42,
+        name: 'Occurrence',
+        recurrence_series_id: 9,
+        recurrence_sequence: 3,
+        recurrence_scheduled_start: '2026-09-06',
+        description: 'Omit rich fields from the minimal receipt.',
+      },
+    },
+    { responseMode: 'minimal', operation: 'task_update' },
+  );
+
+  assert.deepEqual(result.structuredContent?.data, {
+    operation: 'task_update',
+    message: 'Pandatask mutation completed.',
+    task: {
+      id: 42,
+      name: 'Occurrence',
+      recurrence_series_id: 9,
+      recurrence_sequence: 3,
+      recurrence_scheduled_start: '2026-09-06',
+    },
+  });
+});
+
 test('full mutation and dry-run responses remain unprojected', () => {
   const fullValue = { message: 'Task added', task: { id: 7, description: 'Keep me.' } };
   assert.deepEqual(toolResult(fullValue, { responseMode: 'full', operation: 'task_create' }).structuredContent, {

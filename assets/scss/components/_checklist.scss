@@ -1,0 +1,212 @@
+@use "../base/variables" as *;
+
+.pandat69-checklist-count {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	color: $secondary-color;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.pandat69-checklist-add {
+	margin-bottom: 24px;
+}
+
+.pandat69-checklist {
+	margin-bottom: 24px;
+	padding: 18px 20px;
+	border: 1px solid $border-color;
+	border-radius: 6px;
+	background: $white;
+
+	.pandat69-checklist-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 12px;
+
+		h3 {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			margin: 0;
+			font-size: 16px;
+		}
+	}
+
+	.pandat69-checklist-items {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 12px;
+
+		li {
+			padding: 6px 0;
+			border-bottom: 1px solid $light-border-color;
+		}
+	}
+
+	.pandat69-checklist-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+
+		input[type="checkbox"] {
+			flex: 0 0 18px;
+			width: 18px;
+			height: 18px;
+			margin: 0;
+			accent-color: $primary-color;
+		}
+	}
+
+	.pandat69-checklist-text {
+		flex: 1;
+		min-width: 0;
+		padding: 5px 0;
+		border: 0;
+		background: transparent;
+		color: $primary-color;
+		font: inherit;
+		font-size: 14px;
+		line-height: 1.5;
+		text-align: left;
+		overflow-wrap: anywhere;
+	}
+
+	button.pandat69-checklist-text {
+		cursor: pointer;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+
+	.is-checked .pandat69-checklist-text {
+		color: $secondary-color;
+		text-decoration: line-through;
+	}
+
+	.pandat69-checklist-actions {
+		display: flex;
+		flex: 0 0 auto;
+		gap: 2px;
+
+		button {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 30px;
+			min-height: 32px;
+			padding: 5px;
+			border: 0;
+			border-radius: 4px;
+			background: transparent;
+			color: $secondary-color;
+			cursor: pointer;
+
+			&:hover:not(:disabled) {
+				background: $light-bg;
+				color: $primary-color;
+			}
+
+			&:disabled {
+				opacity: 0.35;
+				cursor: default;
+			}
+		}
+	}
+
+	.pandat69-checklist-entry {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 10px;
+
+		input {
+			flex: 1 1 160px;
+			min-width: 0;
+			width: auto;
+			padding: 8px 10px;
+			border: 1px solid $border-color;
+			border-radius: 4px;
+			font: inherit;
+			font-size: 14px;
+		}
+	}
+
+	.pandat69-checklist-error {
+		margin: 12px 0 0;
+		color: $danger-color;
+		font-size: 13px;
+	}
+
+	button:focus-visible,
+	input:focus-visible {
+		outline: 2px solid $primary-color;
+		outline-offset: 2px;
+	}
+}
+
+.pandat69-checklist-down {
+	transform: rotate(180deg);
+}
+
+@media (max-width: 480px) {
+
+	.pandat69-checklist {
+		padding: 14px 12px;
+
+		.pandat69-checklist-actions button {
+			min-width: 32px;
+			min-height: 40px;
+		}
+	}
+}
+
+.pandat69-recurrence-card {
+	margin: 16px 0;
+	padding: 16px;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+
+	h3 {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 0;
+	}
+
+	details {
+		margin-top: 12px;
+	}
+
+	summary {
+		cursor: pointer;
+	}
+}
+
+.pandat69-recurrence-history {
+	padding-left: 20px;
+
+	li {
+		margin: 10px 0;
+	}
+
+	span {
+		display: block;
+		font-size: 0.875em;
+	}
+}
+
+.pandat69-recurrence-scope label {
+	display: block;
+	margin: 8px 0;
+}
+
+.pandat69-checklist-future {
+	margin-top: 12px;
+}

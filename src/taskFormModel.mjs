@@ -69,6 +69,7 @@ export const createTaskFormDefaults = ( {
 		notify_days_before: task?.notify_days_before || 3,
 		parent_task_id:
 			task?.parent_task_id || defaultValues.parent_task_id || '',
+		recurrence_scope: 'this',
 		is_recurring: Number( task?.is_recurring ) === 1,
 		recurrence_frequency: task?.recurrence_frequency || 'weekly',
 		recurrence_interval: task?.recurrence_interval || 1,
@@ -153,6 +154,25 @@ export const buildTaskPayload = (
 	}
 	if ( changeComment ) {
 		payload.change_comment = changeComment;
+	}
+
+	if ( task?.recurrence_series_id ) {
+		payload.recurrence_scope = data.recurrence_scope || 'this';
+		if ( payload.recurrence_scope === 'this' ) {
+			for ( const field of [
+				'is_recurring',
+				'recurrence_frequency',
+				'recurrence_interval',
+				'recurrence_days',
+				'recurrence_ends_on',
+				'recurrence_month_week',
+				'recurrence_anchor_day',
+			] ) {
+				delete payload[ field ];
+			}
+		}
+	} else {
+		delete payload.recurrence_scope;
 	}
 
 	return payload;

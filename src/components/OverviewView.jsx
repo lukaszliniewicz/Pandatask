@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import TimelineCalendar from './TimelineCalendar';
 import MonthCalendar from './MonthCalendar';
-import { getMonday, formatDisplayDate, generateFutureOccurrences } from '../utils';
+import { getMonday, formatDisplayDate } from '../utils';
 import { useTasks } from '../hooks/useTasks';
 import Icon from './Icon';
 
@@ -46,28 +46,9 @@ const OverviewView = ({ onTaskAction }) => {
         setCurrentDate(newDate);
     };
 
-    const getVisibleTasks = () => {
-        if (!tasks) return [];
-        
-        const realTasks = tasks.filter(t => t.is_recurring != 1);
-        const templates = tasks.filter(t => t.is_recurring == 1);
-        
-        let start, end;
-        if (period === 'week') {
-            start = currentWeekStart;
-            end = currentWeekEnd;
-        } else {
-            start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-            end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        }
-
-        const virtual = generateFutureOccurrences(templates, start, end);
-        return [...realTasks, ...virtual];
-    };
-
     if (isLoading) return <div className="pandat69-loading">Loading overview...</div>;
 
-    const visibleTasks = getVisibleTasks();
+    const visibleTasks = tasks || [];
 
     return (
         <div className="pandat69-tab-overview">

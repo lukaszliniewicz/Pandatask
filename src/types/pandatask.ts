@@ -11,6 +11,11 @@ export interface PandataskTask {
 	board_name: string;
 	name: string;
 	description?: string;
+	checklist?: { id: string; text: string; checked: boolean }[];
+	checklist_version?: number;
+	checklist_total?: number;
+	checklist_checked?: number;
+	can_edit_checklist?: boolean;
 	status: 'pending' | 'in-progress' | 'done';
 	priority: number;
 	start_date?: string | null;

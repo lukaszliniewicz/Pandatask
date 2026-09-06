@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import MonthCalendar from './MonthCalendar';
-import { generateFutureOccurrences } from '../utils';
 import Icon from './Icon';
 
 const CalendarView = ({ tasks, onTaskAction }) => {
@@ -20,22 +19,6 @@ const CalendarView = ({ tasks, onTaskAction }) => {
         setCurrentDate(newDate);
     };
 
-    // Merge actual tasks with virtual recurring instances
-    const allTasks = useMemo(() => {
-        if (!tasks) return [];
-        
-        const realTasks = tasks.filter(t => t.is_recurring != 1);
-        const templates = tasks.filter(t => t.is_recurring == 1);
-
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const viewStart = new Date(year, month, 1);
-        const viewEnd = new Date(year, month + 1, 0);
-
-        const virtual = generateFutureOccurrences(templates, viewStart, viewEnd);
-        return [...realTasks, ...virtual];
-    }, [tasks, currentDate]);
-
     return (
         <div className="pandat69-view-container pandat69-calendar-view active">
             <div className="pandat69-date-selector">
@@ -45,7 +28,7 @@ const CalendarView = ({ tasks, onTaskAction }) => {
             </div>
             <div className="pandat69-month-task-container-tasks">
                 <MonthCalendar 
-                    tasks={allTasks} 
+                    tasks={tasks || []}
                     currentDate={currentDate} 
                     onTaskClick={(task) => onTaskAction('view', task)} 
                 />

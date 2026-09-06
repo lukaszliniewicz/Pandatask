@@ -145,15 +145,32 @@ set -Eeuo pipefail
 test $RemotePluginDirQ = $ExpectedProductionDirQ
 had_previous=0
 deployed=0
+maintenance_owned=0
+database_ready=0
+old_db_version=""
+series_existed=0
 rollback() {
     status=`$?
     trap - ERR
     set +e
     if [ "`$deployed" -eq 1 ] && [ -d $RemotePluginDirQ ]; then
-        rm -rf $RemotePluginDirQ
+        rm -rf $RemotePluginDirQ || { echo 'Code rollback failed; maintenance remains enabled.' >&2; exit 1; }
     fi
     if [ "`$had_previous" -eq 1 ] && [ -d $RemotePreviousDirQ ]; then
-        mv $RemotePreviousDirQ $RemotePluginDirQ
+        mv $RemotePreviousDirQ $RemotePluginDirQ || { echo 'Code rollback failed; maintenance remains enabled.' >&2; exit 1; }
+    fi
+    if [ "`$deployed" -eq 1 ] && [ "`$database_ready" -eq 1 ]; then
+        if ! gzip -dc $RemoteDatabaseBackupPathQ | sudo -u iarf -- wp db import - --skip-plugins --skip-themes --path=$RemoteWordPressDirQ; then
+            echo 'Database rollback failed. Maintenance remains enabled; restore the retained database backup before reopening the site.' >&2
+            exit 1
+        fi
+        if [ "`$series_existed" -eq 0 ]; then
+            sudo -u iarf -- wp db query "DROP TABLE IF EXISTS `${db_prefix}pandat69_task_recurrence_series" --skip-plugins --skip-themes --path=$RemoteWordPressDirQ || exit 1
+        fi
+        sudo -u iarf -- wp option update pandat69_db_version "`$old_db_version" --skip-plugins --skip-themes --path=$RemoteWordPressDirQ || exit 1
+    fi
+    if [ "`$maintenance_owned" -eq 1 ]; then
+        sudo -u iarf -- wp maintenance-mode deactivate --skip-plugins --skip-themes --path=$RemoteWordPressDirQ
     fi
     rm -rf $RemoteStagingDirQ
     rm -f $RemotePackagePathQ
@@ -176,9 +193,19 @@ if [ -f $RemoteStagingDirQ/composer.json ] && command -v composer >/dev/null 2>&
     cd $RemoteStagingDirQ
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 fi
+if sudo -u iarf -- wp maintenance-mode is-active --skip-plugins --skip-themes --path=$RemoteWordPressDirQ >/dev/null 2>&1; then
+    echo 'Production is already under maintenance; refusing to take ownership of that maintenance window.' >&2
+    exit 1
+fi
+sudo -u iarf -- wp maintenance-mode activate --skip-plugins --skip-themes --path=$RemoteWordPressDirQ
+maintenance_owned=1
+old_db_version=`$(sudo -u iarf -- wp option get pandat69_db_version --skip-plugins --skip-themes --path=$RemoteWordPressDirQ)
 db_prefix=`$(sudo -u iarf -- wp db prefix --path=$RemoteWordPressDirQ)
 existing_tables=`$(sudo -u iarf -- wp db query 'SHOW TABLES;' --skip-column-names --path=$RemoteWordPressDirQ)
-db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_project_task_references `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions `${db_prefix}pandat69_work_log_group_shares"
+db_candidates="`${db_prefix}pandat69_tasks `${db_prefix}pandat69_projects `${db_prefix}pandat69_project_assignments `${db_prefix}pandat69_project_task_references `${db_prefix}pandat69_categories `${db_prefix}pandat69_assignments `${db_prefix}pandat69_comments `${db_prefix}pandat69_task_history `${db_prefix}pandat69_task_relationships `${db_prefix}pandat69_task_change_buffers `${db_prefix}pandat69_board_events `${db_prefix}pandat69_task_work_occurrences `${db_prefix}pandat69_work_entries `${db_prefix}pandat69_work_allocations `${db_prefix}pandat69_task_time_resolutions `${db_prefix}pandat69_work_audit_log `${db_prefix}pandat69_work_suggestion_decisions `${db_prefix}pandat69_work_log_group_shares `${db_prefix}pandat69_inbox_delegates `${db_prefix}pandat69_task_recurrence_series"
+if printf '%s\n' "`$existing_tables" | grep -Fxq "`${db_prefix}pandat69_task_recurrence_series"; then
+    series_existed=1
+fi
 db_tables=""
 for table in `$db_candidates; do
     if printf '%s\n' "`$existing_tables" | grep -Fxq "`$table"; then
@@ -194,6 +221,7 @@ sudo -u iarf -- wp db export $RemoteDatabaseBackupSqlQ --tables="`$db_tables" --
 gzip -f $RemoteDatabaseBackupSqlQ
 test -s $RemoteDatabaseBackupPathQ
 chmod 600 $RemoteDatabaseBackupPathQ
+database_ready=1
 if [ -d $RemotePluginDirQ ]; then
     tar -czf $RemoteBackupPathQ -C $RemotePluginDirQ .
     mv $RemotePluginDirQ $RemotePreviousDirQ
@@ -220,6 +248,8 @@ sudo -u iarf -- wp eval-file $RemotePluginDirQ/tests/server-smoke.php --path=$Re
 if ! sudo -u iarf -- wp cache flush --path=$RemoteWordPressDirQ >/dev/null; then
     echo 'Warning: WordPress object cache could not be flushed; deployment files and plugin activation were verified.' >&2
 fi
+sudo -u iarf -- wp maintenance-mode deactivate --skip-plugins --skip-themes --path=$RemoteWordPressDirQ
+maintenance_owned=0
 trap - ERR
 if ! rm -rf $RemotePreviousDirQ; then
     echo 'Warning: the temporary previous-release directory could not be removed.' >&2

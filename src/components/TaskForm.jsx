@@ -19,11 +19,16 @@ import TaskFormTabs from './task-form/TaskFormTabs';
 import TaskGeneralFields from './task-form/TaskGeneralFields';
 import TaskPeopleFields from './task-form/TaskPeopleFields';
 import TaskScheduleFields from './task-form/TaskScheduleFields';
+import { useTaskRecurrence } from '../hooks/useTaskRecurrence';
 
 const EMPTY_DEFAULT_VALUES = {};
 
 const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValues = EMPTY_DEFAULT_VALUES }) => {
     const isEdit = Boolean(task);
+    const recurrence = useTaskRecurrence(task);
+    const seriesVersion = useRef(null);
+    const [saveError, setSaveError] = useState('');
+
     const { boardName, currentUser } = useConfig();
     const isUserBoard = boardName?.startsWith('user_');
     const fieldPrefix = useId().replace(/[^a-z0-9_-]/gi, '');
@@ -49,12 +54,20 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
         formState: { errors, isSubmitting }
     } = useForm({ defaultValues: initialValues });
 
+    useEffect(() => {
+        if (seriesVersion.current === null && recurrence.data) {
+            seriesVersion.current = recurrence.data.series.version;
+            if (!recurrence.data.series.active) setValue('is_recurring', false);
+        }
+    }, [recurrence.data, setValue]);
+
     const taskType = watch('task_type');
     const scheduleMode = watch('schedule_mode');
     const targetBoard = watch('target_board') || task?.board_name || boardName;
     const previousTargetBoardRef = useRef(targetBoard);
     const notifyDeadline = watch('notify_deadline');
     const isRecurring = watch('is_recurring');
+    const recurrenceScope = watch('recurrence_scope');
     const recurrenceFrequency = watch('recurrence_frequency');
     const recurrenceInterval = watch('recurrence_interval');
     const parentTaskId = watch('parent_task_id');
@@ -85,6 +98,11 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
             changeComment
         });
 
+        if (payload.recurrence_scope === 'future') {
+            if (seriesVersion.current === null) { setSaveError('Wait for the series to load before changing future occurrences.'); return; }
+            payload.expected_series_version = seriesVersion.current;
+        }
+        setSaveError('');
         const shouldComplete = data.status === 'done' && (!isEdit || task.status !== 'done');
         if (shouldComplete) {
             payload.status = isEdit ? task.status : 'pending';
@@ -102,8 +120,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                 await setStatus(savedTask, 'done', { changeComment });
             }
         } catch (error) {
-            console.error('Failed to save task:', error);
-            alert('Failed to save task. Please try again.');
+            setSaveError(error.status === 409 ? 'The task or series changed elsewhere. Your draft is still here. Close and reopen the editor to review the latest occurrence before saving.' : error.message || 'Failed to save task. Please try again.');
         }
     };
 
@@ -146,6 +163,15 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
     return (
         <>
             <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="pandat69-form">
+                {task?.recurrence_series_id && <fieldset className="pandat69-form-field pandat69-fieldset pandat69-recurrence-scope">
+                    <legend>Apply changes to</legend>
+                    <label><input type="radio" value="this" {...register('recurrence_scope')} /> This occurrence</label>
+                    {recurrence.data?.series.can_edit && Number(recurrence.data.series.current_task_id) === Number(task.id) && <label><input type="radio" value="future" {...register('recurrence_scope')} /> This and future occurrences</label>}
+                    <p className="pandat69-field-hint">{recurrenceScope === 'future' ? 'These details become the defaults for new occurrences. Earlier tasks keep their own details.' : 'Future occurrences keep their existing defaults.'}</p>
+                    {recurrence.isLoading && <p role="status">Loading future editing options…</p>}
+                    {recurrence.isError && <p role="alert">Future editing options could not be loaded. <button type="button" className="pandat69-link-button" onClick={() => recurrence.refetch()}>Try again</button></p>}
+                </fieldset>}
+                {saveError && <p className="pandat69-error-text" role="alert">{saveError}</p>}
                 <TaskFormTabs activeTab={activeTab} errors={errors} fieldPrefix={fieldPrefix} onChange={setActiveTab} />
                 <TaskGeneralFields
                     active={activeTab === 'general'}
@@ -183,6 +209,7 @@ const TaskForm = ({ task = null, onClose, defaultTaskType = 'task', defaultValue
                     projectId={projectId}
                     recurrenceFrequency={recurrenceFrequency}
                     recurrenceInterval={recurrenceInterval}
+                    recurrenceScope={recurrenceScope}
                     register={register}
                     scheduleMode={scheduleMode}
                     targetBoard={targetBoard}

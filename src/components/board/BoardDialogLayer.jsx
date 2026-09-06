@@ -138,6 +138,7 @@ const BoardDialogLayer = ({ controller }) => {
                 isOpen={controller.dialog?.kind === 'recurring-delete'}
                 onClose={controller.closeDialogs}
                 onConfirm={controller.confirmRecurringDelete}
+                isPending={controller.isDeleting}
             />
         </>
     );

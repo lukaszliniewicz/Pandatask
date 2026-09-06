@@ -91,6 +91,246 @@ test('MCP server publishes annotated granular tools, workflows, resources, and p
   assert.ok(prompts.prompts.some((prompt) => prompt.name === 'launch-project'));
 });
 
+test('task checklist tools use dedicated REST paths and complete replacement payloads', async (t) => {
+  const calls: { method: string; path: string; body: Record<string, unknown> | undefined; idempotencyKey: string | null }[] = [];
+  const response = {
+    checklist: [{ id: 'prepare', text: 'Prepare agenda', checked: true }],
+    checklist_version: 4,
+    checklist_total: 1,
+    checklist_checked: 1,
+    can_edit_checklist: true,
+  };
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async (input, init) => {
+    const url = new URL(String(input));
+    calls.push({
+      method: init?.method ?? 'GET',
+      path: url.pathname,
+      body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) as Record<string, unknown>,
+      idempotencyKey: new Headers(init?.headers).get('Idempotency-Key'),
+    });
+    return new Response(JSON.stringify(response), { status: 200 });
+  });
+
+  const get = await client.callTool({ name: 'task_checklist_get', arguments: { task_id: 42 } });
+  assert.equal(get.isError, undefined);
+  assert.deepEqual((get.structuredContent as Record<string, unknown>).data, response);
+
+  const update = await client.callTool({
+    name: 'task_checklist_update',
+    arguments: {
+      task_id: 42,
+      expected_version: 3,
+      items: [{ id: 'prepare', text: 'Prepare agenda', checked: true }, { text: 'Send notes', checked: false }],
+      response_mode: 'full',
+      idempotency_key: 'checklist-42-v3',
+    },
+  });
+  assert.equal(update.isError, undefined);
+  assert.deepEqual((update.structuredContent as Record<string, unknown>).data, response);
+  assert.deepEqual(calls, [
+    { method: 'GET', path: '/wp-json/pandatask/v1/tasks/42/checklist', body: undefined, idempotencyKey: null },
+    {
+      method: 'POST',
+      path: '/wp-json/pandatask/v1/tasks/42/checklist',
+      body: {
+        expected_version: 3,
+        items: [{ id: 'prepare', text: 'Prepare agenda', checked: true }, { text: 'Send notes', checked: false }],
+      },
+      idempotencyKey: 'checklist-42-v3',
+    },
+  ]);
+});
+
+test('task checklist updates use the existing dry-run mutation preview', async (t) => {
+  let fetchCalls = 0;
+  const client = await connectedClient(t, { ...config, toolProfile: 'core' }, async () => {
+    fetchCalls += 1;
+    return new Response('{}', { status: 200 });
+  });
+
+  const preview = await client.callTool({
+    name: 'task_checklist_update',
+    arguments: {
+      task_id: 42,
+      expected_version: 0,
+      items: [{ text: 'First step', checked: false }],
+      idempotency_key: 'checklist-preview-42',
+    },
+  });
+  assert.equal(preview.isError, undefined);
+  assert.equal(fetchCalls, 0);
+  const data = (preview.structuredContent as Record<string, unknown>).data as Record<string, unknown>;
+  assert.deepEqual(data.would_execute, {
+    method: 'POST',
+    url: 'https://example.com/wp-json/pandatask/v1/tasks/42/checklist',
+    body: { expected_version: 0, items: [{ text: 'First step', checked: false }] },
+    idempotency_key: 'checklist-preview-42',
+  });
+});
+
+test('task checklist minimal updates retain the new revision metadata and task identity', async (t) => {
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async () => new Response(JSON.stringify({
+    checklist: [{ id: 'one', text: 'One', checked: false }],
+    checklist_version: 5,
+    checklist_total: 1,
+    checklist_checked: 0,
+    can_edit_checklist: true,
+  }), { status: 200 }));
+
+  const update = await client.callTool({
+    name: 'task_checklist_update',
+    arguments: {
+      task_id: 42,
+      expected_version: 4,
+      items: [{ id: 'one', text: 'One', checked: false }],
+    },
+  });
+  assert.equal(update.isError, undefined);
+  assert.deepEqual((update.structuredContent as Record<string, unknown>).data, {
+    operation: 'task_checklist_update',
+    message: 'Pandatask mutation completed.',
+    task_id: 42,
+    checklist_version: 5,
+    checklist_total: 1,
+    checklist_checked: 0,
+    can_edit_checklist: true,
+  });
+});
+
+test('task checklist stale versions surface one actionable 409 without an automatic retry', async (t) => {
+  let calls = 0;
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      code: 'pandatask_checklist_version_conflict',
+      message: 'Checklist changed since it was read.',
+    }), { status: 409 });
+  });
+
+  const conflict = await client.callTool({
+    name: 'task_checklist_update',
+    arguments: { task_id: 42, expected_version: 3, items: [] },
+  });
+  assert.equal(conflict.isError, true);
+  assert.equal(calls, 1);
+  assert.deepEqual((conflict.structuredContent as Record<string, unknown>).error, {
+    code: 'pandatask_checklist_version_conflict',
+    message: 'Checklist changed since it was read.',
+    http_status: 409,
+    details: { code: 'pandatask_checklist_version_conflict', message: 'Checklist changed since it was read.' },
+  });
+});
+
+test('task recurrence history maps the bounded read request without client-side filtering', async (t) => {
+  const calls: URL[] = [];
+  const response = {
+    series: {
+      id: 9,
+      version: 4,
+      active: true,
+      current_task_id: 42,
+      next_start_date: '2026-09-13',
+      can_edit: true,
+      template: { name: 'Weekly review' },
+    },
+    occurrences: [{ id: 42, recurrence_sequence: 3, recurrence_scheduled_start: '2026-09-06' }],
+    has_more: true,
+    next_before_sequence: 3,
+  };
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async (input) => {
+    const url = new URL(String(input));
+    calls.push(url);
+    return new Response(JSON.stringify(response), { status: 200 });
+  });
+
+  const first = await client.callTool({ name: 'task_recurrence_get', arguments: { task_id: 42 } });
+  assert.equal(first.isError, undefined);
+  assert.deepEqual((first.structuredContent as Record<string, unknown>).data, response);
+  const second = await client.callTool({ name: 'task_recurrence_get', arguments: { task_id: 42, limit: 10, before_sequence: 3 } });
+  assert.equal(second.isError, undefined);
+  assert.deepEqual(calls.map((url) => ({ path: url.pathname, limit: url.searchParams.get('limit'), before: url.searchParams.get('before_sequence') })), [
+    { path: '/wp-json/pandatask/v1/tasks/42/recurrence', limit: '50', before: null },
+    { path: '/wp-json/pandatask/v1/tasks/42/recurrence', limit: '10', before: '3' },
+  ]);
+});
+
+test('task update recurrence scope is serialized only when supplied and future validates its series version', async (t) => {
+  const bodies: Record<string, unknown>[] = [];
+  let calls = 0;
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async (_input, init) => {
+    calls += 1;
+    bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ message: 'updated' }), { status: 200 });
+  });
+
+  const current = await client.callTool({ name: 'task_update', arguments: { task_id: 42, name: 'Current' } });
+  assert.equal(current.isError, undefined);
+  const explicitThis = await client.callTool({ name: 'task_update', arguments: { task_id: 42, name: 'Current', recurrence_scope: 'this' } });
+  assert.equal(explicitThis.isError, undefined);
+  const future = await client.callTool({ name: 'task_update', arguments: { task_id: 42, name: 'Future', recurrence_scope: 'future', expected_series_version: 4 } });
+  assert.equal(future.isError, undefined);
+  const missingVersion = await client.callTool({ name: 'task_update', arguments: { task_id: 42, name: 'Invalid future', recurrence_scope: 'future' } });
+  assert.equal(missingVersion.isError, true);
+  assert.equal(calls, 3);
+  assert.deepEqual(bodies, [
+    { name: 'Current' },
+    { name: 'Current', recurrence_scope: 'this' },
+    { name: 'Future', recurrence_scope: 'future', expected_series_version: 4 },
+  ]);
+});
+
+test('stale recurring series versions surface one actionable 409 without an automatic retry', async (t) => {
+  let calls = 0;
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      code: 'pandatask_recurrence_conflict',
+      message: 'The series changed. Open its latest occurrence before editing future tasks.',
+      series_version: 5,
+      current_task_id: 43,
+    }), { status: 409 });
+  });
+
+  const conflict = await client.callTool({
+    name: 'task_update',
+    arguments: { task_id: 42, name: 'Future edit', recurrence_scope: 'future', expected_series_version: 4 },
+  });
+  assert.equal(conflict.isError, true);
+  assert.equal(calls, 1);
+  assert.deepEqual((conflict.structuredContent as Record<string, unknown>).error, {
+    code: 'pandatask_recurrence_conflict',
+    message: 'The series changed. Open its latest occurrence before editing future tasks.',
+    http_status: 409,
+    details: {
+      code: 'pandatask_recurrence_conflict',
+      message: 'The series changed. Open its latest occurrence before editing future tasks.',
+      series_version: 5,
+      current_task_id: 43,
+    },
+  });
+});
+
+test('future checklist recurrence scope sends both optimistic versions', async (t) => {
+  const bodies: Record<string, unknown>[] = [];
+  const client = await connectedClient(t, { ...config, defaultDryRun: false, toolProfile: 'core' }, async (_input, init) => {
+    bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ checklist_version: 8, checklist_total: 0, checklist_checked: 0, can_edit_checklist: true }), { status: 200 });
+  });
+
+  const result = await client.callTool({
+    name: 'task_checklist_update',
+    arguments: {
+      task_id: 42,
+      expected_version: 7,
+      items: [],
+      recurrence_scope: 'future',
+      expected_series_version: 4,
+    },
+  });
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(bodies, [{ expected_version: 7, items: [], recurrence_scope: 'future', expected_series_version: 4 }]);
+});
+
 test('work_log supports split allocations without double-counting the entry duration', async (t) => {
   const client = await connectedClient(t, config, async () => new Response('{}', { status: 200 }));
 
@@ -710,7 +950,7 @@ test('task_list_visible aggregates pages with broad defaults and accurate metada
   assert.equal(calls[0]?.pathname, '/wp-json/pandatask/v1/users/me/tasks');
   assert.equal(calls[0]?.searchParams.get('status_filter'), 'all', 'Default visible task listing must request every status explicitly.');
   assert.equal(calls[0]?.searchParams.get('archived'), null, 'Omitting the archive filter must include active and archived tasks.');
-  assert.equal(calls[0]?.searchParams.get('include_templates'), 'true', 'Default visible task listing must include templates.');
+  assert.equal(calls[0]?.searchParams.get('include_templates'), 'true', 'Default visible task listing must include concrete recurring rows.');
   assert.equal(calls[0]?.searchParams.get('private_only'), null);
   assert.equal(calls[0]?.searchParams.get('sort'), 'created_at_desc', 'Default task ordering must show newly added tasks first.');
   assert.equal(calls[1]?.searchParams.get('offset'), '2');
@@ -828,7 +1068,7 @@ test('tool profiles keep core focused and administrator tools opt-in', async (t)
   assert.ok(coreNames.has('work_type_update'));
   assert.ok(coreNames.has('work_type_archive'));
   assert.ok(coreNames.has('work_report'));
-  assert.equal(coreNames.size, 52);
+  assert.equal(coreNames.size, 55);
   assert.equal(coreNames.has('task_delete'), false);
   assert.equal(coreNames.has('batch_execute'), false);
 

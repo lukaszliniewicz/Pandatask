@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { taskCreateData, taskUpdateData } from '../src/schemas.js';
+import { taskChecklistUpdateData, taskCreateData, taskRecurrenceGetData, taskUpdateData } from '../src/schemas.js';
 
 test('recurrence schemas preserve explicit intervals and ISO Sunday', () => {
   const weekly = taskCreateData.parse({
@@ -53,4 +53,47 @@ test('recurrence schemas reject unsupported field combinations with actionable e
     () => taskUpdateData.parse({ recurrence_frequency: 'bi-weekly', recurrence_interval: 4 }),
     /legacy alias/,
   );
+});
+
+test('recurrence edit scopes advertise this as the default and require a series version for future edits', () => {
+  const current = taskUpdateData.parse({ name: 'Current occurrence' });
+  assert.equal(current.recurrence_scope, undefined);
+  assert.equal(taskUpdateData.shape.recurrence_scope.meta()?.default, 'this');
+  assert.equal('recurrence_scope' in taskCreateData.parse({ name: 'New recurring task' }), false);
+
+  assert.throws(
+    () => taskUpdateData.parse({ name: 'Future occurrences', recurrence_scope: 'future' }),
+    /expected_series_version is required/,
+  );
+  const future = taskUpdateData.parse({ name: 'Future occurrences', recurrence_scope: 'future', expected_series_version: 8 });
+  assert.equal(future.recurrence_scope, 'future');
+  assert.equal(future.expected_series_version, 8);
+  assert.equal(taskUpdateData.safeParse({ name: 'Invalid series version', expected_series_version: -1 }).success, false);
+
+  assert.throws(
+    () => taskChecklistUpdateData.parse({ task_id: 7, expected_version: 2, items: [], recurrence_scope: 'future' }),
+    /expected_series_version is required/,
+  );
+  const checklistFuture = taskChecklistUpdateData.parse({
+    task_id: 7,
+    expected_version: 2,
+    items: [],
+    recurrence_scope: 'future',
+    expected_series_version: 8,
+  });
+  assert.equal(checklistFuture.recurrence_scope, 'future');
+  assert.equal(checklistFuture.expected_series_version, 8);
+  assert.equal(taskChecklistUpdateData.safeParse({ task_id: 7, items: [] }).success, false);
+});
+
+test('recurrence history schema bounds occurrence pagination and defaults the page size', () => {
+  assert.deepEqual(taskRecurrenceGetData.parse({ task_id: 7 }), { task_id: 7, limit: 50 });
+  assert.deepEqual(taskRecurrenceGetData.parse({ task_id: 7, limit: 100, before_sequence: 12 }), {
+    task_id: 7,
+    limit: 100,
+    before_sequence: 12,
+  });
+  assert.equal(taskRecurrenceGetData.safeParse({ task_id: 7, limit: 0 }).success, false);
+  assert.equal(taskRecurrenceGetData.safeParse({ task_id: 7, limit: 101 }).success, false);
+  assert.equal(taskRecurrenceGetData.safeParse({ task_id: 7, before_sequence: 0 }).success, false);
 });

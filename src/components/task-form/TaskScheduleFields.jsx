@@ -19,6 +19,7 @@ const TaskScheduleFields = ({
     projectId,
     recurrenceFrequency,
     recurrenceInterval,
+    recurrenceScope,
     register,
     scheduleMode,
     targetBoard,
@@ -117,7 +118,7 @@ const TaskScheduleFields = ({
             </div>
         )}
 
-        <fieldset className="pandat69-form-field pandat69-fieldset pandat69-recurrence-fieldset">
+        {(!task?.recurrence_series_id || recurrenceScope === 'future') && <fieldset className="pandat69-form-field pandat69-fieldset pandat69-recurrence-fieldset">
             <legend className="pandat69-visually-hidden">Recurrence</legend>
             <label className="pandat69-checkbox-label">
                 <input type="checkbox" {...register('is_recurring')} />
@@ -195,7 +196,7 @@ const TaskScheduleFields = ({
                     </div>
                 </div>
             )}
-        </fieldset>
+        </fieldset>}
     </section>
 );
 

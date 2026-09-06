@@ -284,7 +284,7 @@ $oversized_import = $service->importReferences(
 $assert( is_wp_error( $oversized_import ) && 'rest_import_too_large' === $oversized_import->get_error_code(), 'REST imports must reject more than 500 references before processing.' );
 
 $schema = file_get_contents( dirname( __DIR__ ) . '/src/Infrastructure/Setup/DatabaseLifecycle.php' );
-$assert( false !== strpos( $schema, "private const DB_VERSION = '1.0.21'" ), 'Database version should be 1.0.21.' );
+$assert( false !== strpos( $schema, "private const DB_VERSION = '1.0.23'" ), 'Database version should be 1.0.23.' );
 $assert( false !== strpos( $schema, 'project_task_references' ), 'Project reference table should be part of the lifecycle.' );
 $routes = file_get_contents( dirname( __DIR__ ) . '/src/Http/Rest/V1/ProjectReferenceRouteRegistrar.php' );
 $assert( false !== strpos( $routes, '/projects/(?P<id>\\d+)/workspace' ), 'Workspace route should be registered.' );

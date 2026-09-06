@@ -42,6 +42,9 @@ test('fresh stdio core profile advertises the required tools and response contra
     'project_reference_remove',
     'project_reference_export',
     'project_reference_import',
+    'task_recurrence_get',
+    'task_checklist_get',
+    'task_checklist_update',
   ]) {
     assert.ok(names.has(required), `Core profile is missing ${required}.`);
   }
@@ -62,6 +65,9 @@ test('fresh stdio core profile advertises the required tools and response contra
   const fieldsSchema = taskListProperties.fields as { items?: { enum?: readonly unknown[] } } | undefined;
   assert.ok(fieldsSchema?.items?.enum?.includes('frontend_url'), 'task_list fields must include frontend_url.');
   assert.ok(fieldsSchema?.items?.enum?.includes('recurrence_month_week'), 'task_list fields must include recurrence_month_week.');
+  for (const field of ['recurrence_series_id', 'recurrence_sequence', 'recurrence_scheduled_start']) {
+    assert.ok(fieldsSchema?.items?.enum?.includes(field), `task_list fields must include ${field}.`);
+  }
 
   const taskCreate = listed.tools.find((tool) => tool.name === 'task_create');
   assert.ok(taskCreate, 'Core profile must advertise task_create.');
@@ -72,6 +78,24 @@ test('fresh stdio core profile advertises the required tools and response contra
   assert.ok(recurrenceFrequency?.enum?.includes('monthly_weekday'), 'task_create must advertise monthly_weekday recurrence.');
   assert.deepEqual(recurrenceMonthWeek?.enum, ['first', 'second', 'third', 'fourth', 'last']);
   assert.match(recurrenceDays?.description ?? '', /Sunday is 7, never 0/);
+  assert.ok(!('recurrence_scope' in taskCreateProperties), 'task_create must not advertise a recurrence edit scope.');
+
+  const taskUpdate = listed.tools.find((tool) => tool.name === 'task_update');
+  assert.ok(taskUpdate, 'Core profile must advertise task_update.');
+  const taskUpdateProperties = (taskUpdate.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  const recurrenceScope = taskUpdateProperties.recurrence_scope as { enum?: readonly unknown[]; default?: unknown } | undefined;
+  assert.deepEqual(recurrenceScope?.enum, ['this', 'future']);
+  assert.equal(recurrenceScope?.default, 'this');
+  assert.ok('expected_series_version' in taskUpdateProperties);
+
+  const recurrenceGet = listed.tools.find((tool) => tool.name === 'task_recurrence_get');
+  assert.ok(recurrenceGet);
+  assert.equal(recurrenceGet.annotations?.readOnlyHint, true);
+  const recurrenceGetProperties = (recurrenceGet.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  assert.ok('task_id' in recurrenceGetProperties);
+  assert.ok('limit' in recurrenceGetProperties);
+  assert.ok('before_sequence' in recurrenceGetProperties);
+  assert.ok(!('response_mode' in recurrenceGetProperties));
 
   for (const name of ['project_workspace_get', 'project_reference_list', 'project_reference_export']) {
     const tool = listed.tools.find((item) => item.name === name);
@@ -96,4 +120,26 @@ test('fresh stdio core profile advertises the required tools and response contra
   const relationType = addProperties.relation_type as { enum?: readonly unknown[] } | undefined;
   assert.deepEqual(relationType?.enum, ['included', 'related', 'dependency']);
   assert.match(String((relationType as { description?: string } | undefined)?.description), /dependency requires/);
+
+  const checklistGet = listed.tools.find((tool) => tool.name === 'task_checklist_get');
+  assert.ok(checklistGet);
+  assert.equal(checklistGet.annotations?.readOnlyHint, true);
+  const checklistGetProperties = (checklistGet.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  assert.ok('task_id' in checklistGetProperties);
+  assert.ok(!('response_mode' in checklistGetProperties));
+
+  const checklistUpdate = listed.tools.find((tool) => tool.name === 'task_checklist_update');
+  assert.ok(checklistUpdate);
+  assert.equal(checklistUpdate.annotations?.readOnlyHint, false);
+  const checklistUpdateProperties = (checklistUpdate.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  assert.ok('task_id' in checklistUpdateProperties);
+  assert.ok('expected_version' in checklistUpdateProperties);
+  assert.ok('items' in checklistUpdateProperties);
+  assert.ok('response_mode' in checklistUpdateProperties);
+  assert.ok('dry_run' in checklistUpdateProperties);
+  assert.ok('idempotency_key' in checklistUpdateProperties);
+  const checklistRecurrenceScope = checklistUpdateProperties.recurrence_scope as { enum?: readonly unknown[]; default?: unknown } | undefined;
+  assert.deepEqual(checklistRecurrenceScope?.enum, ['this', 'future']);
+  assert.equal(checklistRecurrenceScope?.default, 'this');
+  assert.ok('expected_series_version' in checklistUpdateProperties);
 });

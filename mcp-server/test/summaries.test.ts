@@ -31,14 +31,58 @@ test('workload and deadline review preserve useful task references', () => {
   assert.deepEqual((review.tasks as Record<string, unknown>[]).map((task) => task.id), [1, 2, 3]);
 });
 
-test('recurrence-enabled rows are templates excluded from actionable summaries', () => {
+test('recurrence-enabled rows are concrete actionable occurrences in summaries', () => {
   const summary = summarizeTasks(
-    [...tasks, { id: 5, name: 'Recurring template', status: 'pending', priority: 10, deadline: '2026-07-18', is_recurring: true }],
+    [...tasks, {
+      id: 5,
+      name: 'Recurring occurrence',
+      status: 'pending',
+      priority: 10,
+      deadline: '2026-07-18',
+      is_recurring: true,
+      recurrence_series_id: 9,
+      recurrence_sequence: 3,
+      recurrence_scheduled_start: '2026-07-18',
+    }],
     '2026-07-19',
   );
-  assert.equal(summary.total, 4);
+  assert.equal(summary.total, 5);
   assert.equal(summary.total_records, 5);
   assert.equal(summary.recurring_tasks, 1);
-  assert.equal(summary.recurring_templates, 1);
-  assert.equal(summary.overdue, 1);
+  assert.equal('recurring_templates' in summary, false);
+  assert.deepEqual((summary.attention as Record<string, unknown>).overdue, [
+    {
+      id: 1,
+      name: 'Late',
+      status: 'in-progress',
+      priority: 9,
+      deadline: '2026-07-18',
+      project_id: null,
+      project_name: null,
+      assigned_user_ids: [2],
+      supervisor_user_ids: [],
+      is_blocked: false,
+      is_recurring: false,
+      recurrence_series_id: null,
+      recurrence_sequence: null,
+      recurrence_scheduled_start: null,
+    },
+    {
+      id: 5,
+      name: 'Recurring occurrence',
+      status: 'pending',
+      priority: 10,
+      deadline: '2026-07-18',
+      project_id: null,
+      project_name: null,
+      assigned_user_ids: [],
+      supervisor_user_ids: [],
+      is_blocked: false,
+      is_recurring: true,
+      recurrence_series_id: 9,
+      recurrence_sequence: 3,
+      recurrence_scheduled_start: '2026-07-18',
+    },
+  ]);
+  assert.equal(summary.overdue, 2);
 });

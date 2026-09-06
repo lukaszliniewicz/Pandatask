@@ -18,14 +18,6 @@ const INITIAL_FILTERS = {
 	archived: false,
 };
 
-const normalizeTaskId = ( taskId ) => {
-	if ( typeof taskId !== 'string' || ! taskId.startsWith( 'virtual-' ) ) {
-		return taskId;
-	}
-	const id = Number.parseInt( taskId.split( '-' )[ 1 ], 10 );
-	return Number.isInteger( id ) ? id : taskId;
-};
-
 export const useBoardController = () => {
 	const { boardName, text, features } = useConfig();
 	const isUserBoard = boardName?.startsWith( 'user_' );
@@ -93,7 +85,7 @@ export const useBoardController = () => {
 	};
 
 	const handleTaskAction = async ( action, task ) => {
-		const taskId = normalizeTaskId( task.id );
+		const taskId = task.id;
 
 		if ( action === 'view' ) {
 			navigation.openTask( taskId );
@@ -123,7 +115,10 @@ export const useBoardController = () => {
 			return;
 		}
 		if ( action === 'delete' ) {
-			if ( Number( task.is_recurring ) === 1 ) {
+			if (
+				task.recurrence_series_id ||
+				Number( task.is_recurring ) === 1
+			) {
 				setDialog( { kind: 'recurring-delete', task } );
 				return;
 			}
@@ -194,6 +189,7 @@ export const useBoardController = () => {
 		allSubtasksExpanded,
 		closeDialogs,
 		confirmRecurringDelete,
+		isDeleting: deleteTask.isPending,
 		containerRef,
 		dialog,
 		filters: { ...filters, project: navigation.selectedProjectId },

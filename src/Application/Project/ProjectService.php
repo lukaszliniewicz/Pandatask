@@ -2,6 +2,8 @@
 
 namespace Pandatask\Application\Project;
 
+use Pandatask\Domain\Task\TaskChecklist;
+
 use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Task\TaskCacheInvalidator;
@@ -165,8 +167,16 @@ final class ProjectService {
             if ( is_object( $task ) ) {
                 $task = clone $task;
                 $task->frontend_url = TaskBoardUrlResolver::resolve( $board_name, (int) ( $task->id ?? 0 ) );
+                $checklist = ! empty( $task->checklist_json ) ? TaskChecklist::fields( $task ) : array();
+                $task->checklist_total = $checklist['checklist_total'] ?? 0;
+                $task->checklist_checked = $checklist['checklist_checked'] ?? 0;
+                unset( $task->checklist_json );
             } elseif ( is_array( $task ) ) {
                 $task['frontend_url'] = TaskBoardUrlResolver::resolve( $board_name, (int) ( $task['id'] ?? 0 ) );
+                $checklist = ! empty( $task['checklist_json'] ) ? TaskChecklist::fields( (object) $task ) : array();
+                $task['checklist_total'] = $checklist['checklist_total'] ?? 0;
+                $task['checklist_checked'] = $checklist['checklist_checked'] ?? 0;
+                unset( $task['checklist_json'] );
             }
 
             $decorated[] = $task;

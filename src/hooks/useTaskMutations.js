@@ -78,6 +78,9 @@ export const useTaskMutations = () => {
 		},
 		onSettled: ( updatedTask, __, { id, data } ) => {
 			queryClient.invalidateQueries( {
+				queryKey: [ 'task-recurrence' ],
+			} );
+			queryClient.invalidateQueries( {
 				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			queryClient.invalidateQueries( {
@@ -125,6 +128,9 @@ export const useTaskMutations = () => {
 		},
 		onSettled: ( _, __, { id } ) => {
 			queryClient.invalidateQueries( {
+				queryKey: [ 'task-recurrence' ],
+			} );
+			queryClient.invalidateQueries( {
 				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
@@ -151,6 +157,9 @@ export const useTaskMutations = () => {
 		},
 		onSettled: ( _, __, { id } ) => {
 			queryClient.invalidateQueries( {
+				queryKey: [ 'task-recurrence' ],
+			} );
+			queryClient.invalidateQueries( {
 				queryKey: queryKeys.tasks.board( boardName ),
 			} );
 			queryClient.invalidateQueries( { queryKey: queryKeys.task( id ) } );
@@ -176,8 +185,8 @@ export const useTaskMutations = () => {
 			await apiClient.delete( `tasks/${ id }`, config );
 		},
 		onMutate: async ( { id, scope } ) => {
-			// Only optimistically delete if it's a full delete or delete all instances
-			if ( scope && scope !== 'all' ) {
+			// Series actions refresh their retained task records.
+			if ( scope ) {
 				return { previousTasks: null };
 			}
 
@@ -208,6 +217,9 @@ export const useTaskMutations = () => {
 			}
 		},
 		onSettled: ( _, __, { id } ) => {
+			queryClient.invalidateQueries( {
+				queryKey: [ 'task-recurrence' ],
+			} );
 			queryClient.invalidateQueries( {
 				queryKey: queryKeys.tasks.board( boardName ),
 			} );

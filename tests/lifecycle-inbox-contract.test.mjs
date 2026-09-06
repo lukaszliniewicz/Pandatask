@@ -59,7 +59,7 @@ test('reopen, follow-up task, and post-completion work remain distinct lifecycle
   assert.match(mutation, /pandatask_reopen_required/);
   assert.match(mutation, /pandatask_completion_required/);
   assert.match(mutation, /'reopen' === \$lifecycle_operation/);
-  assert.match(mutation, /nextSequence/);
+  assert.match(mutation, /getRecurrenceService\(\)->advance/);
   assert.match(lifecycle, /follow_up_created/);
   assert.match(lifecycle, /follow_up_of_task_id/);
   const taskService = read('src/Application/Task/TaskService.php');
@@ -91,7 +91,7 @@ test('itemised completion refuses to exceed the still-unlogged actual time', () 
 
 test('database schema persists Inbox delegation, follow-up lineage, and work allocation context', () => {
   const lifecycle = read('src/Infrastructure/Setup/DatabaseLifecycle.php');
-	assert.match(lifecycle, /DB_VERSION = '1\.0\.21'/);
+	assert.match(lifecycle, /DB_VERSION = '1\.0\.23'/);
   assert.match(lifecycle, /follow_up_of_task_id/);
   assert.match(lifecycle, /inbox_delegates/);
   assert.match(lifecycle, /allocation_context VARCHAR\(32\) NOT NULL DEFAULT 'occurrence'/);

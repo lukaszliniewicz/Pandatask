@@ -115,6 +115,9 @@ final class RequestHelper {
             'notify_deadline',
             'notify_days_before',
             'is_recurring',
+            'recurrence_series_id',
+            'recurrence_sequence',
+            'recurrence_scheduled_start',
             'recurrence_frequency',
             'recurrence_interval',
             'recurrence_days',
@@ -127,6 +130,10 @@ final class RequestHelper {
             'deadline_reminder_sent_for',
             'attachment_protected',
             'attachment_public_source_retained',
+            'checklist',
+            'checklist_version',
+            'checklist_total',
+            'checklist_checked',
         );
     }
 

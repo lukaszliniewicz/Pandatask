@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTaskStatusTransition } from '../context/CompletionContext';
 import { parseDate } from '../utils';
 import Icon from './Icon';
+import ChecklistCount from './ChecklistCount';
 
 const TaskItem = ({ task, onAction }) => {
     const { setStatus, isPending } = useTaskStatusTransition();
@@ -101,6 +102,7 @@ const TaskItem = ({ task, onAction }) => {
                 </div>
 
                 <div className="pandat69-task-item-meta">
+                    <ChecklistCount task={task} />
                     <span style={{ position: 'relative' }} ref={dropdownRef}>
                         <button
                             type="button"

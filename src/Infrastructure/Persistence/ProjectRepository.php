@@ -132,6 +132,8 @@ final class ProjectRepository {
                                 t.start_date,
                                 t.deadline,
                                 t.priority,
+                                t.checklist_json,
+                                t.checklist_version,
                                 t.parent_task_id
                             FROM {$tasks_table} t
                             WHERE t.project_id IN ({$project_ids_sql})

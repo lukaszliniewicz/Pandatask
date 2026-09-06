@@ -144,7 +144,7 @@ final class RouteRegistrar {
                         'items'       => array( 'type' => 'string' ),
                     ),
                     'include_templates' => array(
-                        'description' => __( 'Include recurring task templates.', 'pandatask' ),
+                        'description' => __( 'Include concrete recurring occurrences (default true).', 'pandatask' ),
                         'type'        => 'boolean',
                     ),
                     'task_type_filter' => array(
@@ -355,7 +355,7 @@ final class RouteRegistrar {
                             'sanitize_callback' => 'rest_sanitize_boolean',
                         ),
                         'include_templates' => array(
-                            'description'       => __( 'Include recurring templates.', 'pandatask' ),
+                            'description'       => __( 'Include concrete recurring occurrences (default true).', 'pandatask' ),
                             'type'              => 'boolean',
                             'sanitize_callback' => 'rest_sanitize_boolean',
                         ),
@@ -411,10 +411,57 @@ final class RouteRegistrar {
                     'permission_callback' => array( $this->permission_checker, 'check_task_delete_permission' ),
                     'args'                => array(
                         'delete_scope' => array(
-                            'description'       => __( 'For recurring tasks, advance only this occurrence or delete the full series.', 'pandatask' ),
+                            'description'       => __( 'Skip an occurrence, stop future occurrences, or do both; preserve task history.', 'pandatask' ),
                             'type'              => 'string',
-                            'enum'              => array( 'single', 'all' ),
+                            'enum'              => array( 'single', 'this', 'following', 'future', 'all', 'series' ),
                             'sanitize_callback' => 'sanitize_key',
+                        ),
+                    ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/tasks/(?P<id>\d+)/recurrence',
+            array(
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => array( $this->task_route_handler, 'get_task_recurrence' ),
+                'permission_callback' => array( $this->permission_checker, 'check_task_read_permission' ),
+                'args' => array(
+                    'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 50 ),
+                    'before_sequence' => array( 'type' => 'integer', 'minimum' => 1 ),
+                ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/tasks/(?P<id>\d+)/checklist',
+            array(
+                array(
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => array( $this->task_route_handler, 'get_task_checklist' ),
+                    'permission_callback' => array( $this->permission_checker, 'check_task_read_permission' ),
+                ),
+                array(
+                    'methods'             => WP_REST_Server::EDITABLE,
+                    'callback'            => array( $this->task_route_handler, 'update_task_checklist' ),
+                    'permission_callback' => array( $this->permission_checker, 'check_task_update_permission' ),
+                    'args'                => array(
+                        'items' => array(
+                            'description' => __( 'Ordered checklist items.', 'pandatask' ),
+                            'type'        => 'array',
+                            'required'    => true,
+                            'items'       => array( 'type' => 'object' ),
+                        ),
+                        'recurrence_scope' => array( 'type' => 'string', 'enum' => array( 'this', 'future' ) ),
+                        'expected_series_version' => array( 'type' => 'integer', 'minimum' => 0 ),
+                        'expected_version' => array(
+                            'description' => __( 'Checklist version read before editing.', 'pandatask' ),
+                            'type'        => 'integer',
+                            'required'    => true,
+                            'minimum'     => 0,
                         ),
                     ),
                 ),

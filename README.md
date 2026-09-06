@@ -115,6 +115,72 @@ From the task list or detail modal:
 - **Quick actions (compact view)** – Kebab menu with Edit, View, Add Subtask, Google Calendar export, Archive, Delete.
 - **Google Calendar export** – Opens a `google.com/calendar/render` URL with the task name and deadline.
 
+### Checklists
+
+Open a task's details and choose **Add checklist** to track small steps within
+the task. Type an item and press Enter to keep adding steps. Check or uncheck an
+item directly, select its text to edit it, use the arrow buttons to reorder it,
+or delete it. Each task supports one optional checklist with up to 100 items of
+500 characters each. Task rows, cards, and project task lists show a compact
+checked-item count when a checklist exists.
+
+Checklist completion is independent from task completion and work accounting.
+Checking every item leaves the task's status unchanged. Log time against the
+task; use a subtask when a step needs its own assignee, schedule, or time totals.
+People who can read a task can see its checklist, while changes require task
+update permission.
+
+Checklist saves use a revision number to reject conflicting edits. If someone
+else changes the checklist, the latest state is loaded and the unsaved text is
+kept for review. Each recurring occurrence has a separate task record and
+checklist revision. Completing or skipping it preserves that checklist; the
+next task starts with the saved future steps unchecked. Reopening a completed
+occurrence keeps its checklist state. Use **Use these steps for future
+occurrences** to update the saved steps explicitly.
+
+The REST API exposes `GET` and `POST`/`PATCH` at
+`tasks/{id}/checklist`. MCP offers `task_checklist_get` and
+`task_checklist_update` in the core profile; see
+[MCP checklist usage](mcp-server/CHECKLISTS.md) for the complete replacement
+payload and conflict-handling contract.
+
+---
+
+## Recurring occurrences
+
+Each occurrence has its own task ID, dates, status, checklist, comments, and work
+history. A series stores the repeat schedule and defaults. Completing the latest
+occurrence creates the next task immediately. The daily scheduler also creates
+occurrences whose scheduled start has arrived, keeping unfinished earlier tasks
+visible. If creation fails, completion remains saved and the scheduler retries.
+The calendar displays real occurrences; the task's **Repeating task** card shows
+the next scheduled date and links to earlier and latest occurrences.
+
+Edits default to **This occurrence**. On the latest task, choose **This and future
+occurrences** to save its details as defaults for new tasks. Repeat-schedule
+changes require that scope. Checklist edits stay local until explicitly saved
+for future occurrences. Series changes require the version returned by
+`GET tasks/{id}/recurrence`; stale edits return HTTP 409.
+
+**Skip this occurrence** archives it and creates a successor if it is the latest
+member. **Stop repeating** retains existing tasks and prevents new ones.
+**Skip and stop repeating** combines those actions. Archiving an individual
+occurrence does not stop an active series. All three actions preserve work
+history. Assignments, dependencies, task metadata, and protected attachments are
+copied into new occurrences; comments, work logs, and subtask rows are not copied.
+
+The migration attaches existing recurring tasks to series without changing their
+IDs or work history. It does not reconstruct older full task records that the
+previous model did not retain, or invent missed historical occurrences. Existing
+work occurrence snapshots remain available on the original task.
+
+See [MCP recurrence usage](mcp-server/RECURRENCE.md) for API examples.
+
+Run `bash scripts/test-recurrence-integration.sh` for real WordPress/MySQL checks
+of completion, concurrent successor creation, and migration from schema 1.0.21.
+The script lists any required Docker image pulls, uses synthetic data in isolated
+containers, and removes its containers and volumes on exit.
+
 ---
 
 ## Task Dependencies

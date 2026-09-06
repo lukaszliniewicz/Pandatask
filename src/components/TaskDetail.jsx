@@ -9,6 +9,8 @@ import TaskHistory from './task-detail/TaskHistory';
 import TaskTimeCard from './work/TaskTimeCard';
 import { useConfig } from '../context/ConfigContext';
 import TaskMoveDialog from './TaskMoveDialog';
+import TaskChecklist from './task-detail/TaskChecklist';
+import TaskRecurrenceCard from './task-detail/TaskRecurrenceCard';
 
 const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHeader = false }) => {
     const { features } = useConfig();
@@ -46,9 +48,11 @@ const TaskDetail = ({ taskId, onEdit, onAddSubtask, onNavigate, contextInModalHe
                 contextInModalHeader={contextInModalHeader}
             />
             <TaskDetailMetadata task={task} />
+            <TaskRecurrenceCard key={`series-${task.id}`} task={task} onNavigate={handleNavigate} />
             <TaskDetailSubtasks task={task} onAddSubtask={onAddSubtask} onNavigate={handleNavigate} />
             {features?.workLog !== false && <TaskTimeCard task={task} onNavigate={handleNavigate} />}
             <TaskDetailDescription task={task} />
+            <TaskChecklist key={task.id} task={task} />
             <TaskComments task={task} />
             <TaskHistory taskId={task.id} />
             <TaskMoveDialog

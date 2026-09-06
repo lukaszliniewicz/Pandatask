@@ -21,6 +21,12 @@ namespace {
     if ( ! function_exists( 'sanitize_key' ) ) {
         function sanitize_key( $key ) { return strtolower( preg_replace( '/[^a-z0-9_-]/', '', (string) $key ) ); }
     }
+    if ( ! function_exists( 'sanitize_text_field' ) ) {
+        function sanitize_text_field( $value ) { return trim( strip_tags( (string) $value ) ); }
+    }
+    if ( ! function_exists( 'is_wp_error' ) ) {
+        function is_wp_error( $value ) { return $value instanceof \WP_Error; }
+    }
     if ( ! function_exists( 'get_transient' ) ) {
         function get_transient( $key ) { return $GLOBALS['pandatask_url_transients'][ $key ] ?? false; }
     }
@@ -101,6 +107,9 @@ namespace {
     }
 
     final class TaskBoardUrlTestPolicy {
+        public function canUpdateTask( $task_id, $viewer_id ) {
+            return true;
+        }
         public function canManageBoard( $board_name, $viewer_id ) {
             return true;
         }
@@ -148,6 +157,7 @@ namespace {
     require_once dirname( __DIR__ ) . '/src/Infrastructure/Notifications/TaskBoardUrlResolver.php';
     require_once dirname( __DIR__ ) . '/src/Infrastructure/Persistence/DatabaseContext.php';
     require_once dirname( __DIR__ ) . '/src/Infrastructure/Media/ProtectedAttachmentService.php';
+    require_once dirname( __DIR__ ) . '/src/Domain/Task/TaskChecklist.php';
     require_once dirname( __DIR__ ) . '/src/Application/Task/TaskService.php';
     require_once dirname( __DIR__ ) . '/src/Application/Project/ProjectService.php';
     require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
@@ -182,6 +192,8 @@ namespace {
         'name'            => 'Cached task',
         'description'     => '',
         'attachment_type' => '',
+        'checklist_json'  => '[{"id":"links","text":"Check links","checked":true},{"id":"send","text":"Send newsletter","checked":false}]',
+        'checklist_version' => 3,
     );
     $task_repository = new TaskBoardUrlTestTaskRepository();
     $task_repository->task = $canonical_task;
@@ -191,14 +203,20 @@ namespace {
         new TaskBoardUrlTestBoardService(),
         new TaskBoardUrlTestCommentService(),
         new \stdClass(),
-        new \stdClass()
+        new \stdClass(),
+        new TaskBoardUrlTestPolicy()
     );
     $decorated_task = $task_service->getTask( 7 );
     $assert( 'https://example.test/board/?open_task=7' === $decorated_task->frontend_url, 'Task detail decoration must expose the authoritative task URL.' );
     $assert( ! property_exists( $canonical_task, 'frontend_url' ), 'Task URL decoration must not mutate the canonical task object.' );
+    $assert( 2 === count( $decorated_task->checklist ) && 'links' === $decorated_task->checklist[0]['id'], 'Task reads must decode stored checklist items before removing raw storage fields.' );
+    $assert( 3 === $decorated_task->checklist_version && 2 === $decorated_task->checklist_total && 1 === $decorated_task->checklist_checked, 'Task detail reads must retain the saved checklist revision and counts.' );
+    $assert( true === $decorated_task->can_edit_checklist && ! property_exists( $decorated_task, 'checklist_json' ), 'Task detail exposes checklist permission without leaking raw storage fields.' );
+    $assert( property_exists( $canonical_task, 'checklist_json' ), 'Checklist decoration must not erase the canonical or cached storage value.' );
     $decorated_tasks = $task_service->getTasks( 'standard' );
     $assert( 'https://example.test/board/?open_task=7' === $decorated_tasks[0]->frontend_url, 'Task list decoration must expose the authoritative task URL.' );
     $assert( ! property_exists( $canonical_task, 'frontend_url' ), 'Task list URL decoration must not mutate the cached task object.' );
+    $assert( $decorated_task->checklist === $decorated_tasks[0]->checklist && ! property_exists( $decorated_tasks[0], 'checklist_json' ), 'Task collections must expose the same saved checklist items as task details.' );
 
     $canonical_task->board_name = 'group_42';
     $moved_task = $task_service->getTask( 7 );
@@ -206,6 +224,8 @@ namespace {
     $canonical_task->board_name = 'standard';
 
     $canonical_project_task = (object) array( 'id' => 7, 'name' => 'Project task', 'status' => 'pending' );
+    $canonical_project_task->checklist_json = $canonical_task->checklist_json;
+    $canonical_project_task->checklist_version = 3;
     $canonical_project = (object) array(
         'id'         => 12,
         'board_name' => 'standard',
@@ -225,6 +245,8 @@ namespace {
     $assert( 'https://example.test/board/?pandatask_project=12' === $decorated_projects[0]->frontend_url, 'Project list decoration must expose the authoritative project URL.' );
     $assert( 'https://example.test/board/?open_task=7' === $decorated_projects[0]->tasks[0]->frontend_url, 'Embedded project task summaries must expose task URLs.' );
     $assert( ! property_exists( $canonical_project, 'frontend_url' ) && ! property_exists( $canonical_project_task, 'frontend_url' ), 'Project list decoration must not mutate cached project or nested task objects.' );
+    $assert( 2 === $decorated_projects[0]->tasks[0]->checklist_total && 1 === $decorated_projects[0]->tasks[0]->checklist_checked, 'Embedded project task rows must include correct checklist counts.' );
+    $assert( ! property_exists( $decorated_projects[0]->tasks[0], 'checklist_json' ) && property_exists( $canonical_project_task, 'checklist_json' ), 'Project checklist decoration must remove raw storage only from response clones.' );
 
     $GLOBALS['pandatask_url_transients']['pandat69_project_12'] = $canonical_project;
     $decorated_project = $project_service->getProject( 12 );

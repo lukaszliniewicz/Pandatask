@@ -9,10 +9,10 @@ use Pandatask\Infrastructure\Persistence\DatabaseContext;
 
 final class DatabaseLifecycle {
 
-    private const DB_VERSION = '1.0.21';
+    private const DB_VERSION = '1.0.23';
 
     public static function activate() {
-        if ( self::createTables() && self::repairData() && self::verifySchema() ) {
+        if ( self::createTables() && self::repairData() && self::verifySchema() && ( new \Pandatask\Application\Task\TaskRecurrenceService() )->migrateLegacyTasks() ) {
             update_option( 'pandat69_db_version', self::DB_VERSION );
         }
     }
@@ -41,6 +41,7 @@ final class DatabaseLifecycle {
         $table_work_log_group_shares = $prefix . 'work_log_group_shares';
         $table_inbox_delegates       = $prefix . 'inbox_delegates';
         $table_project_task_references = $prefix . 'project_task_references';
+        $table_recurrence_series     = $prefix . 'task_recurrence_series';
 
         $upgrade_file = wp_normalize_path( ABSPATH . 'wp-admin/includes/upgrade.php' );
         if ( ! is_file( $upgrade_file ) ) {
@@ -56,6 +57,8 @@ final class DatabaseLifecycle {
             estimated_effort_seconds INT UNSIGNED NULL,
             current_work_occurrence_id BIGINT(20) UNSIGNED NULL,
             description LONGTEXT NULL,
+            checklist_json LONGTEXT NULL,
+            checklist_version BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
             task_type VARCHAR(20) NOT NULL DEFAULT 'task',
             bug_url VARCHAR(2048) NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -75,6 +78,9 @@ final class DatabaseLifecycle {
             capture_url VARCHAR(2048) NULL,
             completed_at DATETIME NULL,
             is_recurring TINYINT(1) NOT NULL DEFAULT 0,
+            recurrence_series_id BIGINT(20) UNSIGNED NULL,
+            recurrence_sequence INT UNSIGNED NULL,
+            recurrence_scheduled_start DATE NULL,
             recurrence_frequency VARCHAR(20) NULL,
             recurrence_interval INT UNSIGNED NULL,
             recurrence_days VARCHAR(30) NULL,
@@ -116,9 +122,28 @@ final class DatabaseLifecycle {
             KEY deadline_reminder_queue (notify_deadline, archived, deadline, status),
             KEY missed_deadline_queue (missed_deadline_notified, archived, deadline, status),
             KEY recurring_rollover (is_recurring, deadline, recurrence_ends_on, status),
-            KEY project_active_tasks (project_id, archived, status, deadline)
+            KEY project_active_tasks (project_id, archived, status, deadline),
+            UNIQUE KEY recurrence_series_sequence (recurrence_series_id, recurrence_sequence),
+            KEY recurrence_series_id (recurrence_series_id)
         ) $charset_collate;";
         dbDelta( $sql_tasks );
+
+        $sql_recurrence_series = "CREATE TABLE $table_recurrence_series (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            board_name VARCHAR(191) NOT NULL,
+            template_json LONGTEXT NOT NULL,
+            current_task_id BIGINT(20) UNSIGNED NULL,
+            next_start_date DATE NULL,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            version BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY current_task_id (current_task_id),
+            KEY due (active, next_start_date, id),
+            KEY board_name (board_name)
+        ) $charset_collate;";
+        dbDelta( $sql_recurrence_series );
 
         $sql_projects = "CREATE TABLE $table_projects (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -188,8 +213,8 @@ final class DatabaseLifecycle {
             task_id BIGINT(20) UNSIGNED NOT NULL,
             user_id BIGINT(20) UNSIGNED NOT NULL,
             field_changed VARCHAR(50) NOT NULL,
-            old_value TEXT,
-            new_value TEXT,
+            old_value LONGTEXT,
+            new_value LONGTEXT,
             change_comment TEXT,
             changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
@@ -443,7 +468,7 @@ final class DatabaseLifecycle {
             return;
         }
 
-        if ( self::createTables() && self::repairData() && self::verifySchema() ) {
+        if ( self::createTables() && self::repairData() && self::verifySchema() && ( new \Pandatask\Application\Task\TaskRecurrenceService() )->migrateLegacyTasks() ) {
             update_option( 'pandat69_db_version', self::DB_VERSION );
         }
     }
@@ -472,6 +497,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_log_group_shares',
             $prefix . 'inbox_delegates',
             $prefix . 'project_task_references',
+            $prefix . 'task_recurrence_series',
         );
 
         foreach ( $required_tables as $table ) {
@@ -483,8 +509,16 @@ final class DatabaseLifecycle {
         $tasks_table = $prefix . 'tasks';
         $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 
-        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_month_week', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id', 'follow_up_of_task_id', 'inbox_state', 'capture_source', 'capture_url' ) as $column ) {
+        foreach ( array( 'deadline_reminder_sent_for', 'recurrence_month_week', 'recurrence_anchor_day', 'creator_id', 'estimated_effort_seconds', 'current_work_occurrence_id', 'follow_up_of_task_id', 'inbox_state', 'capture_source', 'capture_url', 'checklist_json', 'checklist_version', 'recurrence_series_id', 'recurrence_sequence', 'recurrence_scheduled_start' ) as $column ) {
             if ( ! in_array( $column, $task_columns, true ) ) {
+                return false;
+            }
+        }
+
+        $series_table = $prefix . 'task_recurrence_series';
+        $series_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$series_table}" ), 'Field' );
+        foreach ( array( 'id', 'board_name', 'template_json', 'current_task_id', 'next_start_date', 'active', 'version', 'created_at', 'updated_at' ) as $column ) {
+            if ( ! in_array( $column, $series_columns, true ) ) {
                 return false;
             }
         }
@@ -502,6 +536,16 @@ final class DatabaseLifecycle {
             }
         }
 
+        $history_column_types = array();
+        foreach ( $wpdb->get_results( "SHOW COLUMNS FROM {$prefix}task_history" ) as $column ) {
+            $history_column_types[ (string) $column->Field ] = strtolower( (string) $column->Type );
+        }
+        foreach ( array( 'old_value', 'new_value' ) as $column ) {
+            if ( ! isset( $history_column_types[ $column ] ) || 'longtext' !== $history_column_types[ $column ] ) {
+                return false;
+            }
+        }
+
         $required_indexes = array(
             $tasks_table => array(
                 'board_list_deadline',
@@ -513,6 +557,8 @@ final class DatabaseLifecycle {
                 'follow_up_of_task_id',
                 'inbox_state',
                 'board_inbox_created',
+                'recurrence_series_sequence',
+                'recurrence_series_id',
             ),
             $prefix . 'comments' => array( 'task_created_id' ),
             $prefix . 'task_history' => array( 'task_changed' ),
@@ -527,6 +573,7 @@ final class DatabaseLifecycle {
             $prefix . 'work_log_group_shares' => array( 'user_group', 'group_user', 'user_id', 'group_id' ),
             $prefix . 'inbox_delegates' => array( 'owner_user', 'user_owner', 'owner_role' ),
             $prefix . 'project_task_references' => array( 'project_task', 'task_id', 'relation_type' ),
+            $prefix . 'task_recurrence_series' => array( 'current_task_id', 'due', 'board_name' ),
         );
 
         foreach ( $required_indexes as $table => $index_names ) {

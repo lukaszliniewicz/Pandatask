@@ -1,5 +1,6 @@
 import React from 'react';
 import Icon from '../Icon';
+import ChecklistCount from '../ChecklistCount';
 
 const ProjectTaskNode = ( {
 	depth = 0,
@@ -48,6 +49,7 @@ const ProjectTaskNode = ( {
 				>
 					{ task.name }
 				</button>
+				<ChecklistCount task={ task } />
 				{ task.deadline && (
 					<span className="pandat69-project-task-deadline">
 						<Icon name="calendar" size={ 13 } />

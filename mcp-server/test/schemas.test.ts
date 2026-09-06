@@ -10,6 +10,7 @@ import {
   projectReferenceImportData,
   projectReferenceKey,
   projectReferenceRelationData,
+  taskChecklistUpdateData,
   taskCollectionFieldNames,
   taskCreateData,
   taskListInput,
@@ -71,7 +72,58 @@ test('task description inputs cap raw content at 10,000 code units', () => {
 
 test('task collection schemas advertise the authoritative frontend URL field', () => {
   assert.equal(taskCollectionFieldNames.includes('frontend_url'), true);
+  for (const field of ['recurrence_series_id', 'recurrence_sequence', 'recurrence_scheduled_start'] as const) {
+    assert.equal(taskCollectionFieldNames.includes(field), true);
+  }
   assert.equal(taskListInput.safeParse({ board_name: 'group_10', fields: ['frontend_url'] }).success, true);
+  assert.equal(taskListInput.parse({ board_name: 'group_10' }).include_templates, true);
+});
+
+test('checklist update schema enforces bounded ordered items and optimistic versioning', () => {
+  const parsed = taskChecklistUpdateData.parse({
+    task_id: 42,
+    expected_version: 3,
+    items: [
+      { id: 'prepare', text: '  Prepare agenda  ', checked: true },
+      { text: 'Send notes', checked: false },
+    ],
+  });
+  assert.deepEqual(parsed.items, [
+    { id: 'prepare', text: 'Prepare agenda', checked: true },
+    { text: 'Send notes', checked: false },
+  ]);
+  assert.equal(taskChecklistUpdateData.safeParse({ task_id: 42, expected_version: 0, items: [] }).success, true);
+  for (const character of ['a', 'ą', '😀']) {
+    for (const length of [500, 501]) {
+      assert.equal(taskChecklistUpdateData.safeParse({
+        task_id: 42,
+        expected_version: 0,
+        items: [{ id: 'unicode', text: character.repeat(length), checked: false }],
+      }).success, length === 500);
+    }
+  }
+  assert.equal(taskChecklistUpdateData.safeParse({ task_id: 42, expected_version: -1, items: [] }).success, false);
+  assert.equal(taskChecklistUpdateData.safeParse({
+    task_id: 42,
+    expected_version: 0,
+    items: [{ id: 'same', text: 'One', checked: false }, { id: 'same', text: 'Two', checked: false }],
+  }).success, false);
+  assert.equal(taskChecklistUpdateData.safeParse({
+    task_id: 42,
+    expected_version: 0,
+    items: [{ id: 'bad id', text: 'One', checked: false }],
+  }).success, false);
+  assert.equal(taskChecklistUpdateData.safeParse({
+    task_id: 42,
+    expected_version: 0,
+    items: [{ text: 'One', checked: false, extra: true }],
+  }).success, false);
+  assert.equal(taskChecklistUpdateData.safeParse({ task_id: 42, expected_version: 0, items: [{ text: '   ', checked: false }] }).success, false);
+  assert.equal(taskChecklistUpdateData.safeParse({
+    task_id: 42,
+    expected_version: 0,
+    items: Array.from({ length: 101 }, (_, index) => ({ text: `Item ${index}`, checked: false })),
+  }).success, false);
 });
 
 test('project reference schemas enforce association and dependency discriminants', () => {

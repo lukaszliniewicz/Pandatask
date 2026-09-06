@@ -33,7 +33,7 @@ function enabled(value: unknown): boolean {
 }
 
 function actionableTasks(tasks: UnknownRecord[]): UnknownRecord[] {
-  return tasks.filter((task) => !enabled(task.is_recurring));
+  return tasks;
 }
 
 function dateValue(value: unknown): string | null {
@@ -52,6 +52,10 @@ function compactTask(task: UnknownRecord): UnknownRecord {
     assigned_user_ids: numberIds(task.assigned_user_ids),
     supervisor_user_ids: numberIds(task.supervisor_user_ids),
     is_blocked: enabled(task.is_blocked),
+    is_recurring: enabled(task.is_recurring),
+    recurrence_series_id: task.recurrence_series_id ?? null,
+    recurrence_sequence: task.recurrence_sequence ?? null,
+    recurrence_scheduled_start: task.recurrence_scheduled_start ?? null,
   };
 }
 
@@ -67,7 +71,7 @@ export function todayIso(now: Date = new Date()): string {
 
 export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRecord {
   const actionable = actionableTasks(tasks);
-  const recurringTemplates = tasks.filter((task) => enabled(task.is_recurring)).length;
+  const recurringTasks = tasks.filter((task) => enabled(task.is_recurring)).length;
   const open = actionable.filter((task) => task.status !== 'done');
   const overdue = open.filter((task) => {
     const deadline = dateValue(task.deadline);
@@ -97,8 +101,7 @@ export function summarizeTasks(tasks: UnknownRecord[], today: string): UnknownRe
     high_priority_open: highPriority.length,
     unassigned_open: unassigned.length,
     blocked_open: blocked.length,
-    recurring_tasks: recurringTemplates,
-    recurring_templates: recurringTemplates,
+    recurring_tasks: recurringTasks,
     attention: {
       overdue: overdue.slice(0, 25).map(compactTask),
       due_today: dueToday.slice(0, 25).map(compactTask),

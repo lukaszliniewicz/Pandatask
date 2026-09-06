@@ -7,7 +7,6 @@ use DateTime;
 use Exception;
 use Throwable;
 use Pandatask\Application\Security\TaskAccessPolicy;
-use Pandatask\Domain\Task\RecurrenceCalculator;
 use Pandatask\Infrastructure\Notifications\BuddyPressNotifier;
 use Pandatask\Infrastructure\Notifications\EmailNotifier;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
@@ -31,8 +30,6 @@ final class TaskMutationService {
 
     private $history_buffer_service;
 
-    private $recurrence_calculator;
-
     private $cache_invalidator;
 
     private $occurrence_repository;
@@ -43,18 +40,23 @@ final class TaskMutationService {
 
     private $task_access_policy;
 
-    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null, $feature_settings = null, $task_access_policy = null ) {
+    private $recurrence_service;
+
+    private $recurrence_calculator;
+
+    public function __construct( $repository = null, $task_repository = null, $history_service = null, $invariant_service = null, $history_buffer_service = null, $recurrence_calculator = null, $cache_invalidator = null, $occurrence_repository = null, $task_time_service = null, $feature_settings = null, $task_access_policy = null, $recurrence_service = null ) {
         $this->repository      = $repository ?: new TaskCommandRepository();
         $this->task_repository = $task_repository ?: new TaskRepository();
         $this->history_service = $history_service ?: new HistoryService();
         $this->invariant_service = $invariant_service ?: new TaskInvariantService( $this->task_repository );
         $this->history_buffer_service = $history_buffer_service ?: new TaskHistoryBufferService( null, $this->history_service, $this->task_repository );
-        $this->recurrence_calculator = $recurrence_calculator ?: new RecurrenceCalculator();
         $this->cache_invalidator = $cache_invalidator ?: new TaskCacheInvalidator( $this->task_repository );
         $this->occurrence_repository = $occurrence_repository ?: new WorkOccurrenceLifecycleService();
         $this->task_time_service = $task_time_service ?: new TaskTimeService();
         $this->feature_settings = $feature_settings ?: new FeatureSettings();
         $this->task_access_policy = $task_access_policy;
+        $this->recurrence_service = $recurrence_service;
+        $this->recurrence_calculator = $recurrence_calculator;
     }
 
     /**
@@ -249,6 +251,10 @@ final class TaskMutationService {
                 throw new Exception( 'Failed to preserve unresolved time for a completed task.' );
             }
 
+            if ( $is_recurring ) {
+                $this->getRecurrenceService()->attachTask( $task_id, $actor_id );
+            }
+
             if ( ! $this->history_service->addEntry( $task_id, $actor_id, 'task_created', '', $task_data['name'] ) ) {
                 throw new Exception( 'Failed to create task history.' );
             }
@@ -290,6 +296,17 @@ final class TaskMutationService {
     public function updateTask( $task_id, $data, $change_comment = '', $actor_id = null, $completion = null, $lifecycle_operation = '' ) {
         $task_id   = (int) $task_id;
         $actor_id  = is_null( $actor_id ) ? get_current_user_id() : (int) $actor_id;
+        $recurrence_scope = $data['recurrence_scope'] ?? 'this';
+        $expected_series_version = $data['expected_series_version'] ?? null;
+        if ( ! in_array( $recurrence_scope, array( 'this', 'future' ), true ) ) {
+            return new WP_Error( 'rest_invalid_param', __( 'recurrence_scope must be this or future.', 'pandatask' ), array( 'status' => 422 ) );
+        }
+        unset( $data['recurrence_scope'], $data['expected_series_version'] );
+        if ( in_array( $lifecycle_operation, array( 'rollover', 'skip' ), true ) ) {
+            return new WP_Error( 'pandatask_occurrence_identity_required', __( 'Recurring occurrences must advance through the series, preserving their task records.', 'pandatask' ), array( 'status' => 409 ) );
+        }
+        $recurrence_fields = array( 'is_recurring', 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on', 'recurrence_month_week', 'recurrence_anchor_day' );
+        $recurrence_schedule_changed = (bool) array_intersect( array_keys( $data ), array_merge( $recurrence_fields, array( 'start_date', 'deadline', 'deadline_days_after_start' ) ) );
         $dependency_graph_lock_required = array_key_exists( 'predecessors', $data );
         $predecessors_explicit = $dependency_graph_lock_required;
         $dependency_lock_acquired = false;
@@ -310,6 +327,15 @@ final class TaskMutationService {
 
         if ( ! $current_task ) {
             return false;
+        }
+
+        if ( ! empty( $current_task->recurrence_series_id ) && 'this' === $recurrence_scope ) {
+            foreach ( $recurrence_fields as $field ) {
+                if ( array_key_exists( $field, $data ) && (string) $data[ $field ] !== (string) ( $current_task->$field ?? null ) ) {
+                    return new WP_Error( 'pandatask_recurrence_scope_required', __( 'Choose this and future occurrences to change the repeat schedule.', 'pandatask' ), array( 'status' => 422 ) );
+                }
+                unset( $data[ $field ] );
+            }
         }
 
         if ( 'complete' === $lifecycle_operation && 'done' === $current_task->status ) {
@@ -345,7 +371,12 @@ final class TaskMutationService {
             }
         }
 
-        $data = $this->invariant_service->applyAndValidate( $data, $current_task );
+        $invariant_context = $current_task;
+        if ( ! empty( $current_task->recurrence_series_id ) && 'this' === $recurrence_scope ) {
+            $invariant_context = clone $current_task;
+            $invariant_context->is_recurring = 0;
+        }
+        $data = $this->invariant_service->applyAndValidate( $data, $invariant_context );
 
         if ( is_wp_error( $data ) ) {
             return $data;
@@ -538,7 +569,7 @@ final class TaskMutationService {
             }
         }
 
-        if ( array_key_exists( 'is_recurring', $data ) && empty( $data['is_recurring'] ) ) {
+        if ( empty( $current_task->recurrence_series_id ) && array_key_exists( 'is_recurring', $data ) && empty( $data['is_recurring'] ) ) {
             foreach ( array( 'recurrence_frequency', 'recurrence_interval', 'recurrence_days', 'recurrence_ends_on', 'recurrence_month_week', 'recurrence_anchor_day' ) as $field ) {
                 if ( ! array_key_exists( $field, $update_data ) ) {
                     $format[] = '%s';
@@ -581,12 +612,12 @@ final class TaskMutationService {
             ? $data['start_date']
             : $current_task->start_date;
 
-        if ( $final_is_recurring && 'monthly' === $final_frequency && $final_start_date ) {
+        if ( ( $final_is_recurring || ! empty( $current_task->recurrence_series_id ) ) && 'monthly' === $final_frequency && $final_start_date ) {
             if ( array_key_exists( 'recurrence_anchor_day', $data ) ) {
                 $update_data['recurrence_anchor_day'] = max( 1, min( 31, (int) $data['recurrence_anchor_day'] ) );
             } elseif (
-                array_key_exists( 'start_date', $data )
-                || array_key_exists( 'recurrence_frequency', $data )
+                ( array_key_exists( 'start_date', $data ) && $data['start_date'] !== $current_task->start_date )
+                || ( array_key_exists( 'recurrence_frequency', $data ) && $data['recurrence_frequency'] !== $current_task->recurrence_frequency )
                 || empty( $current_task->recurrence_anchor_day )
             ) {
                 $update_data['recurrence_anchor_day'] = (int) substr( $final_start_date, 8, 2 );
@@ -595,7 +626,7 @@ final class TaskMutationService {
             $update_data['recurrence_anchor_day'] = null;
         }
 
-        if ( ! $final_is_recurring || 'monthly_weekday' !== $final_frequency ) {
+        if ( ( ! $final_is_recurring && empty( $current_task->recurrence_series_id ) ) || 'monthly_weekday' !== $final_frequency ) {
             if ( ! empty( $current_task->recurrence_month_week ) || array_key_exists( 'recurrence_month_week', $update_data ) ) {
                 if ( ! array_key_exists( 'recurrence_month_week', $update_data ) ) {
                     $format[] = '%s';
@@ -651,6 +682,15 @@ final class TaskMutationService {
         $attachment_sync = null;
 
         try {
+            $series_for_update = null;
+            if ( ! empty( $current_task->recurrence_series_id ) ) {
+                $series_for_update = $this->getRecurrenceService()->lockForUpdate( $task_id, $recurrence_scope, $expected_series_version, $actor_id );
+                if ( is_wp_error( $series_for_update ) ) {
+                    DatabaseContext::rollback();
+                    return $series_for_update;
+                }
+            }
+
             if ( 'complete' === $lifecycle_operation ) {
                 // Serialize completion accounting on the task row. A concurrent
                 // request waits here, then observes the committed done status.
@@ -800,26 +840,6 @@ final class TaskMutationService {
             }
         }
 
-        if ( in_array( $lifecycle_operation, array( 'rollover', 'skip' ), true ) && $current_occurrence ) {
-            $old_state = 'skip' === $lifecycle_operation ? 'skipped' : 'completed';
-            if ( ! $this->occurrence_repository->setState( $current_occurrence->id, $old_state, $actor_id ) ) {
-                throw new Exception( 'The previous work occurrence could not be closed.' );
-            }
-            $next_task = clone $current_task;
-            foreach ( $update_data as $field => $value ) {
-                $next_task->$field = $value;
-            }
-            $next_occurrence_id = $this->occurrence_repository->createForTask(
-                $next_task,
-                $this->occurrence_repository->nextSequence( $task_id ),
-                'open',
-                $actor_id
-            );
-            if ( ! $next_occurrence_id || ! $this->occurrence_repository->setCurrentOccurrence( $task_id, $next_occurrence_id ) ) {
-                throw new Exception( 'The next work occurrence could not be created.' );
-            }
-        }
-
         if ( $project_is_changing && ! empty( $descendant_ids ) ) {
             if ( ! $this->repository->updateProjectForTasks( $descendant_ids, $next_project_id ) ) {
                 throw new Exception( 'The descendant project update failed.' );
@@ -880,6 +900,12 @@ final class TaskMutationService {
                     throw new Exception( 'A system task change could not be recorded.' );
                 }
             }
+        }
+
+        if ( $series_for_update && 'future' === $recurrence_scope ) {
+            $this->getRecurrenceService()->syncTemplate( $task_id, $series_for_update, $actor_id, $recurrence_schedule_changed, $data['is_recurring'] ?? null );
+        } elseif ( ! $series_for_update && ! empty( $data['is_recurring'] ) ) {
+            $this->getRecurrenceService()->attachTask( $task_id, $actor_id );
         }
 
         if ( ! DatabaseContext::commit() ) {
@@ -945,6 +971,12 @@ final class TaskMutationService {
             $change_comment
         );
 
+        if ( $is_completing && ! empty( $updated_task->recurrence_series_id ) ) {
+            // Completion is already durable. Failed successor creation is safe
+            // to retry from cron and never requires completing the task twice.
+            $this->getRecurrenceService()->advance( $task_id, $actor_id );
+        }
+
         return true;
         } finally {
             if ( $dependency_lock_acquired ) {
@@ -995,67 +1027,17 @@ final class TaskMutationService {
 
         $delete_scope = null === $delete_scope ? null : sanitize_key( $delete_scope );
 
-        if ( ! in_array( $delete_scope, array( null, 'single', 'this', 'all', 'series', 'future' ), true ) ) {
+        if ( ! in_array( $delete_scope, array( null, 'single', 'this', 'following', 'all', 'series', 'future' ), true ) ) {
             return new WP_Error( 'pandatask_invalid_delete_scope', __( 'Invalid recurring-task deletion scope.', 'pandatask' ), array( 'status' => 422 ) );
         }
 
-        if ( $task_to_delete->is_recurring && in_array( $delete_scope, array( 'single', 'this' ), true ) ) {
-            $next_date_str = $this->recurrence_calculator->next(
-                $task_to_delete->start_date,
-                $task_to_delete->recurrence_frequency,
-                $task_to_delete->recurrence_interval,
-                $task_to_delete->recurrence_days,
-                (int) ( $task_to_delete->recurrence_anchor_day ?? 0 ),
-                $task_to_delete->recurrence_month_week ?? null
-            );
-
-            if ( $next_date_str && ( ! $task_to_delete->recurrence_ends_on || $next_date_str <= $task_to_delete->recurrence_ends_on ) ) {
-                $next_start_date  = new DateTime( $next_date_str );
-                $new_deadline_date = clone $next_start_date;
-
-                if ( ! empty( $task_to_delete->deadline_days_after_start ) && is_numeric( $task_to_delete->deadline_days_after_start ) ) {
-                    $new_deadline_date->add( new DateInterval( 'P' . absint( $task_to_delete->deadline_days_after_start ) . 'D' ) );
-                } else {
-                    $old_start    = new DateTime( $task_to_delete->start_date );
-                    $old_deadline = new DateTime( $task_to_delete->deadline );
-                    $duration     = $old_start->diff( $old_deadline );
-                    $new_deadline_date->add( $duration );
-                }
-
-                $update_data = array(
-                    'start_date'   => $next_start_date->format( 'Y-m-d' ),
-                    'deadline'     => $new_deadline_date->format( 'Y-m-d' ),
-                    'status'       => 'pending',
-                    'completed_at' => null,
-                    'deadline_reminder_sent_for' => null,
-                    'missed_deadline_notified' => 0,
-                    'recurrence_anchor_day' => (int) ( $task_to_delete->recurrence_anchor_day ?? 0 ),
-                    'recurrence_month_week' => $task_to_delete->recurrence_month_week ?? null,
-                );
-
-                $result = $this->updateTask(
-                    $task_id,
-                    $update_data,
-                    sprintf(
-                        /* translators: %s: skipped recurring occurrence date. */
-                        __( 'Skipped recurring occurrence scheduled for %s.', 'pandatask' ),
-                        $task_to_delete->start_date
-                    ),
-                    get_current_user_id(),
-                    null,
-                    'skip'
-                );
-
-                if ( true !== $result ) {
-                    if ( is_wp_error( $result ) ) {
-                        return $result;
-                    }
-
-                    return new WP_Error( 'pandatask_update_failed', __( 'The recurring task could not be advanced.', 'pandatask' ), array( 'status' => 500 ) );
-                }
-
-                return true;
-            }
+        if ( ! empty( $task_to_delete->recurrence_series_id ) ) {
+            DatabaseContext::releaseDependencyGraphLock();
+            $dependency_lock_acquired = false;
+            $skip = ! in_array( $delete_scope, array( 'following', 'future' ), true );
+            $stop = in_array( $delete_scope, array( 'following', 'future', 'all', 'series' ), true );
+            $result = $this->getRecurrenceService()->advance( $task_id, get_current_user_id(), true, $skip, $stop );
+            return is_wp_error( $result ) ? $result : true;
         }
 
         if ( ! DatabaseContext::beginTransaction() ) {
@@ -1175,89 +1157,20 @@ final class TaskMutationService {
     }
 
     public function rollOverCompletedRecurringTasks() {
-        $today             = wp_date( 'Y-m-d' );
-        $tasks_to_roll_over = $this->repository->findRecurringTasksToRollOver( $today );
-        $stats = array(
-            'scanned'  => count( $tasks_to_roll_over ),
-            'advanced' => 0,
-            'disabled' => 0,
-            'failed'   => 0,
-        );
+        return $this->getRecurrenceService()->runDue();
+    }
 
-        foreach ( $tasks_to_roll_over as $task ) {
-            $next_occurrence = $this->recurrence_calculator->next(
-                $task->start_date,
-                $task->recurrence_frequency,
-                $task->recurrence_interval,
-                $task->recurrence_days,
-                (int) ( $task->recurrence_anchor_day ?? 0 ),
-                $task->recurrence_month_week ?? null
-            );
-            $current_start_date = $next_occurrence
-                ? $this->recurrence_calculator->onOrAfter(
-                $next_occurrence,
-                $today,
-                $task->recurrence_frequency,
-                $task->recurrence_interval,
-                $task->recurrence_days,
-                (int) ( $task->recurrence_anchor_day ?? 0 ),
-                $task->recurrence_month_week ?? null
-                )
-                : null;
-
-            if ( ! $current_start_date ) {
-                $result = $this->updateTask( $task->id, array( 'is_recurring' => 0 ), '', 0 );
-                $stats[ true === $result ? 'disabled' : 'failed' ]++;
-                continue;
-            }
-
-            if ( $task->recurrence_ends_on && $current_start_date > $task->recurrence_ends_on ) {
-                $result = $this->updateTask( $task->id, array( 'is_recurring' => 0 ), '', 0 );
-                $stats[ true === $result ? 'disabled' : 'failed' ]++;
-                continue;
-            }
-
-            $next_start_date  = new DateTime( $current_start_date );
-            $new_deadline_date = clone $next_start_date;
-
-            if ( ! empty( $task->deadline_days_after_start ) && is_numeric( $task->deadline_days_after_start ) ) {
-                $new_deadline_date->add( new DateInterval( 'P' . absint( $task->deadline_days_after_start ) . 'D' ) );
-            } else {
-                $old_start    = new DateTime( $task->start_date );
-                $old_deadline = new DateTime( $task->deadline );
-                $duration     = $old_start->diff( $old_deadline );
-                $new_deadline_date->add( $duration );
-            }
-
-            $update_data = array(
-                'start_date'   => $next_start_date->format( 'Y-m-d' ),
-                'deadline'     => $new_deadline_date->format( 'Y-m-d' ),
-                'status'       => 'pending',
-                'completed_at' => null,
-                'recurrence_anchor_day' => (int) ( $task->recurrence_anchor_day ?? 0 ),
-                'recurrence_month_week' => $task->recurrence_month_week ?? null,
-            );
-
-            $result = $this->updateTask( $task->id, $update_data, '', 0, null, 'rollover' );
-
-            if ( true !== $result ) {
-                $stats['failed']++;
-                continue;
-            }
-
-            $stats['advanced']++;
+    private function getRecurrenceService() {
+        if ( ! $this->recurrence_service ) {
+            $this->recurrence_service = new TaskRecurrenceService( null, null, null, null, null, null, null, null, $this->recurrence_calculator );
         }
-
-        return $stats;
+        return $this->recurrence_service;
     }
 
     public function updateTaskAssignments( $task_id, $assigned_user_ids = array(), $supervisor_user_ids = array() ) {
-        $assignee_changes   = $this->updateTaskRoleAssignments( $task_id, $assigned_user_ids, 'assignee' );
-        $supervisor_changes = $this->updateTaskRoleAssignments( $task_id, $supervisor_user_ids, 'supervisor' );
-
         return array(
-            'assignee'   => $assignee_changes,
-            'supervisor' => $supervisor_changes,
+            'assignee' => $this->updateTaskRoleAssignments( $task_id, $assigned_user_ids, 'assignee' ),
+            'supervisor' => $this->updateTaskRoleAssignments( $task_id, $supervisor_user_ids, 'supervisor' ),
         );
     }
 

@@ -187,7 +187,7 @@ if ( $result['hierarchy_invalid_links'] > 0 ) {
 }
 
 $index_requirements = array(
-    'tasks'        => array( 'board_list_deadline', 'board_created', 'board_completed', 'scheduled_start', 'deadline_reminder_queue', 'missed_deadline_queue', 'recurring_rollover', 'project_active_tasks' ),
+    'tasks'        => array( 'board_list_deadline', 'board_created', 'board_completed', 'scheduled_start', 'deadline_reminder_queue', 'missed_deadline_queue', 'recurring_rollover', 'project_active_tasks', 'recurrence_series_sequence', 'recurrence_series_id' ),
     'assignments'  => array( 'user_task_role' ),
     'comments'     => array( 'task_created_id' ),
     'task_history' => array( 'task_field', 'task_changed' ),
@@ -248,6 +248,11 @@ if ( ! empty( $missing_assets ) ) {
 $task_columns = wp_list_pluck( $wpdb->get_results( "SHOW COLUMNS FROM {$tasks_table}" ), 'Field' );
 $result['schema_columns'] = array(
     'deadline_reminder_sent_for' => in_array( 'deadline_reminder_sent_for', $task_columns, true ),
+    'checklist_json' => in_array( 'checklist_json', $task_columns, true ),
+    'checklist_version' => in_array( 'checklist_version', $task_columns, true ),
+    'recurrence_series_id' => in_array( 'recurrence_series_id', $task_columns, true ),
+    'recurrence_sequence' => in_array( 'recurrence_sequence', $task_columns, true ),
+    'recurrence_scheduled_start' => in_array( 'recurrence_scheduled_start', $task_columns, true ),
     'recurrence_month_week'     => in_array( 'recurrence_month_week', $task_columns, true ),
     'recurrence_anchor_day'      => in_array( 'recurrence_anchor_day', $task_columns, true ),
     'creator_id'                 => in_array( 'creator_id', $task_columns, true ),
@@ -259,8 +264,16 @@ if ( in_array( false, $result['schema_columns'], true ) ) {
     $failures[] = 'A required task schema column is missing.';
 }
 
-if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.21', '<' ) ) {
-    $failures[] = 'Expected a loaded plugin with database schema 1.0.21 or newer.';
+$result['recurrence_migration'] = array(
+    'schema_valid' => \Pandatask\Infrastructure\Setup\DatabaseLifecycle::verifySchema(),
+    'legacy_unlinked' => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tasks_table} WHERE is_recurring = 1 AND recurrence_series_id IS NULL" ),
+);
+if ( ! $result['recurrence_migration']['schema_valid'] || $result['recurrence_migration']['legacy_unlinked'] > 0 ) {
+    $failures[] = 'Recurring task schema or legacy series migration is incomplete.';
+}
+
+if ( empty( $result['plugin_version'] ) || version_compare( (string) $result['db_version'], '1.0.23', '<' ) ) {
+    $failures[] = 'Expected a loaded plugin with database schema 1.0.23 or newer.';
 }
 
 WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

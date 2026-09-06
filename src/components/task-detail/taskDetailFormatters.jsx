@@ -56,6 +56,54 @@ export const renderCommentText = (text) => {
 export const renderHistoryItem = (entry) => {
     const user = <strong>{entry.user_name || 'System'}</strong>;
 
+    const recurrenceEvents = {
+        recurrence_series_created: 'started a recurring series.',
+        recurrence_defaults_updated: 'updated this occurrence and the defaults for future occurrences.',
+        recurrence_checklist_updated: 'updated the checklist steps for future occurrences.',
+        recurrence_skipped: 'skipped this occurrence and archived it, preserving its work history.',
+        recurrence_stopped: 'stopped future occurrences.',
+        recurrence_successor_created: 'created the next occurrence as a separate task.',
+        recurrence_occurrence_created: 'created this occurrence from its recurring series.',
+    };
+    if (recurrenceEvents[entry.field_changed]) return <span>{user} {recurrenceEvents[entry.field_changed]}</span>;
+
+    if (entry.field_changed === 'checklist_updated' || entry.field_changed === 'checklist_reset') {
+        const isReset = entry.field_changed === 'checklist_reset';
+        const readItems = value => {
+            try {
+                const items = JSON.parse(value || '[]');
+                return Array.isArray(items) ? items.filter(item => item && typeof item.text === 'string') : [];
+            } catch {
+                return [];
+            }
+        };
+        const previous = readItems(entry.old_value);
+        const next = readItems(entry.new_value);
+        const renderItems = items => items.length ? (
+            <ul className="pandat69-checklist-history-items">
+                {items.map((item, index) => (
+                    <li key={item.id || index}>
+                        <span aria-label={item.checked ? 'Checked' : 'Unchecked'}>{item.checked ? '☑' : '☐'}</span>{' '}
+                        {item.text}
+                    </li>
+                ))}
+            </ul>
+        ) : <p>No items.</p>;
+
+        return (
+            <div>
+                <div>{user} {isReset ? 'reset the checklist for the next occurrence.' : 'updated the checklist.'}</div>
+                <details>
+                    <summary>{isReset ? 'Previous occurrence checklist' : 'View checklist changes'}</summary>
+                    {!isReset && <strong>Before</strong>}
+                    {renderItems(previous)}
+                    {!isReset && <><strong>After</strong>{renderItems(next)}</>}
+                </details>
+                {entry.change_comment && <div className="history-comment">{entry.change_comment}</div>}
+            </div>
+        );
+    }
+
     if (entry.field_changed === 'task_updated_multiple') {
         let changes = {};
         try {

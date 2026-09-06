@@ -1,12 +1,12 @@
 {
   "name": "pandatask",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "description": "Adds a shortcode [task_board board_name=\"unique_board_id\"] to display a task management board.",
   "main": "build/main.js",
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
-    "test": "npm run test:phase2 && npm run test:board-navigation && npm run test:gantt && npm run test:project-tasks && npm run test:project-workspace && npm run test:project-workspace-ui && npm run test:task-list && npm run test:task-form && npm run test:rich-content && npm run test:lifecycle-inbox && npm run test:work-log && npm run test:work-suggestions && npm run test:board-activity && npm run test:security && npm run test:backend-domain",
+    "test": "npm run test:phase2 && npm run test:board-navigation && npm run test:gantt && npm run test:project-tasks && npm run test:project-workspace && npm run test:project-workspace-ui && npm run test:task-list && npm run test:task-form && npm run test:rich-content && npm run test:lifecycle-inbox && npm run test:work-log && npm run test:work-suggestions && npm run test:board-activity && npm run test:security && npm run test:backend-domain && npm run test:checklist && npm run test:recurrence",
     "test:board-navigation": "node --test tests/board-navigation-model.test.mjs",
     "test:board-activity": "node --test tests/board-activity-projection-contract.test.mjs && php tests/board-activity-projector-behavior.php",
     "test:phase2": "node --test tests/phase2-contract.test.mjs",
@@ -33,7 +33,11 @@
     "check:build-size": "node scripts/check-build-size.mjs",
     "check": "npm run typecheck && npm run lint && npm run check:a11y && npm test && npm run build && npm run check:build-size && npm run audit:production",
     "zip": "npm run build && shx rm -rf release && shx mkdir -p release/pandatask/assets && shx cp pandatask.php README.txt release/pandatask/ && shx cp -r templates build src release/pandatask/ && shx cp -r assets/css assets/js release/pandatask/assets/ && cd release && bestzip ../pandatask.zip pandatask/ && cd .. && shx rm -rf release",
-    "test:lifecycle-inbox": "node --test tests/lifecycle-inbox-contract.test.mjs"
+    "test:lifecycle-inbox": "node --test tests/lifecycle-inbox-contract.test.mjs",
+    "test:checklist": "php tests/task-checklist.php",
+    "test:checklist-ui": "node tests/task-checklist-ui.mjs",
+    "test:recurrence": "php tests/task-recurrence-repository.php && php tests/task-recurrence-service.php",
+    "test:recurrence-ui": "node tests/task-recurrence-ui.mjs"
   },
   "author": "Lukasz Liniewicz",
   "license": "GPL-2.0-or-later",

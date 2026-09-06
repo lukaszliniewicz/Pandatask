@@ -518,6 +518,36 @@ namespace {
 
     final class LifecycleTestRecurrenceCalculator {}
 
+    final class LifecycleTestRecurrenceService {
+        public $attach_calls = array();
+        public $advance_calls = array();
+        public $lock_calls = array();
+
+        public function attachTask( $task_id, $actor_id ) {
+            $this->attach_calls[] = array( (int) $task_id, (int) $actor_id );
+            return 77;
+        }
+
+        public function lockForUpdate( $task_id, $scope, $expected_version, $actor_id ) {
+            $this->lock_calls[] = array( (int) $task_id, $scope, $expected_version, (int) $actor_id );
+            return (object) array( 'id' => 77, 'version' => 0, 'current_task_id' => (int) $task_id );
+        }
+
+        public function syncTemplate( $task_id, $series, $actor_id, $schedule_changed = false ) {
+            unset( $task_id, $series, $actor_id, $schedule_changed );
+        }
+
+        public function advance( $task_id, $actor_id = 0 ) {
+            $this->advance_calls[] = array( (int) $task_id, (int) $actor_id );
+            $GLOBALS['pandatask_lifecycle_events'][] = 'recurrence_advance';
+            return null;
+        }
+
+        public function runDue() {
+            return array( 'scanned' => 0, 'advanced' => 0, 'disabled' => 0, 'failed' => 0 );
+        }
+    }
+
     $failures = array();
     $assert = static function ( $condition, $message ) use ( &$failures ) {
         if ( ! $condition ) {
@@ -525,7 +555,7 @@ namespace {
         }
     };
 
-    $make_service = static function ( $task_repository, $repository, $occurrence_repository, $time_service, $feature_settings, $history_service = null, $cache_invalidator = null ) {
+    $make_service = static function ( $task_repository, $repository, $occurrence_repository, $time_service, $feature_settings, $history_service = null, $cache_invalidator = null, $recurrence_service = null ) {
         return new TaskMutationService(
             $repository,
             $task_repository,
@@ -536,7 +566,9 @@ namespace {
             $cache_invalidator ?: new LifecycleTestCacheInvalidator(),
             $occurrence_repository,
             $time_service,
-            $feature_settings
+            $feature_settings,
+            null,
+            $recurrence_service
         );
     };
 
@@ -573,12 +605,16 @@ namespace {
     );
 
     $recurrence_repository = new LifecycleTestRepository();
+    $recurrence_double = new LifecycleTestRecurrenceService();
     $recurrence_service = $make_service(
         new LifecycleTestTaskRepository(),
         $recurrence_repository,
         new LifecycleTestOccurrenceRepository(),
         new LifecycleTestTimeService(),
-        new LifecycleTestFeatureSettings( true )
+        new LifecycleTestFeatureSettings( true ),
+        null,
+        null,
+        $recurrence_double
     );
     $recurrence_created = $recurrence_service->createTask(
         array(
@@ -600,6 +636,34 @@ namespace {
     $assert( 'monthly_weekday' === $recurrence_repository->inserted['recurrence_frequency'], 'Task creation must persist the monthly weekday frequency.' );
     $assert( '7' === $recurrence_repository->inserted['recurrence_days'], 'Task creation must persist ISO Sunday as 7.' );
     $assert( 'last' === $recurrence_repository->inserted['recurrence_month_week'], 'Task creation must persist the monthly weekday ordinal.' );
+    $assert( array( array( 42, 7 ) ) === $recurrence_double->attach_calls, 'Recurring task creation should attach the created task to a series inside the transaction.' );
+
+    $complete_task_repository = new LifecycleTestTaskRepository( 'pending' );
+    $complete_task_repository->task->recurrence_series_id = 77;
+    $complete_occurrence = new LifecycleTestOccurrenceRepository();
+    $complete_recurrence = new LifecycleTestRecurrenceService();
+    $GLOBALS['pandatask_lifecycle_events'] = array();
+    $complete_service = $make_service(
+        $complete_task_repository,
+        new LifecycleTestRepository(),
+        $complete_occurrence,
+        new LifecycleTestTimeService(),
+        new LifecycleTestFeatureSettings( false ),
+        null,
+        null,
+        $complete_recurrence
+    );
+    $completed_recurring = $complete_service->completeTask( 42, array(), '', 7 );
+    $assert( true === $completed_recurring, 'Completing an ordinary recurring task should commit the task mutation.' );
+    $assert( array( array( 42, 7 ) ) === $complete_recurrence->advance_calls, 'A committed recurring completion should advance through the recurrence service.' );
+    $assert( array_search( 'commit', $GLOBALS['pandatask_lifecycle_events'], true ) < array_search( 'recurrence_advance', $GLOBALS['pandatask_lifecycle_events'], true ), 'A recurring successor should be requested only after completion commits.' );
+    $assert( 'completed' === $complete_occurrence->occurrence->state && 99 === $complete_occurrence->current_occurrence_id, 'Completing a recurring task should keep its own completed work occurrence selected.' );
+
+    $complete_task_repository->task->status = 'done';
+    $reopened_recurring = $complete_service->updateTask( 42, array( 'status' => 'in-progress' ), 'Corrected completion', 7, null, 'reopen' );
+    $assert( true === $reopened_recurring, 'Reopening the completed recurring task should succeed.' );
+    $assert( 'open' === $complete_occurrence->occurrence->state && 99 === $complete_occurrence->current_occurrence_id, 'Reopening should reuse the old work occurrence.' );
+    $assert( 1 === count( $complete_recurrence->advance_calls ), 'Reopening an old recurring task should not advance the series again.' );
 
     $delegated_repository = new LifecycleTestRepository();
     $delegated_occurrence = new LifecycleTestOccurrenceRepository();
@@ -760,6 +824,34 @@ namespace {
     $assert( 99 === $reopen_occurrence->current_occurrence_id, 'An explicit reopen should keep the existing occurrence selected as current.' );
     $assert( ! in_array( 'create:open', $reopen_occurrence->events, true ), 'An explicit reopen must not create a new work occurrence.' );
     $assert( array( array( 99, 7 ) ) === $reopen_time->reopens, 'An explicit reopen should revise time for the reopened occurrence.' );
+
+    // Legacy lifecycle operation names are rejected so they cannot rewrite an
+    // existing task row in place. RecurrenceService owns successor identity.
+    foreach ( array( 'rollover', 'skip' ) as $operation ) {
+        $task_repository = new LifecycleTestTaskRepository( 'rollover' === $operation ? 'done' : 'pending' );
+        $repository = new LifecycleTestRepository();
+        $occurrence = new LifecycleTestOccurrenceRepository( 'completed' );
+        $service = new TaskMutationService(
+            $repository, $task_repository, new LifecycleTestHistoryService(),
+            new LifecycleTestInvariantService(), new LifecycleTestHistoryBufferService(),
+            new LifecycleTestRecurrenceCalculator(), new LifecycleTestCacheInvalidator(),
+            $occurrence, new LifecycleTestTimeService(), new LifecycleTestFeatureSettings( false ),
+            null, new LifecycleTestRecurrenceService()
+        );
+        $GLOBALS['pandatask_lifecycle_events'] = array();
+        $result = $service->updateTask(
+            42,
+            array( 'start_date' => '2026-09-08', 'deadline' => '2026-09-09', 'status' => 'pending' ),
+            '',
+            0,
+            null,
+            $operation
+        );
+        $assert( is_wp_error( $result ) && 'pandatask_occurrence_identity_required' === $result->get_error_code(), $operation . ' should require recurrence successor identity.' );
+        $assert( 409 === (int) ( $result->get_error_data()['status'] ?? 0 ), $operation . ' should return HTTP 409.' );
+        $assert( empty( $repository->updated ), $operation . ' should not write task fields.' );
+        $assert( empty( $occurrence->events ), $operation . ' should not mutate work occurrences.' );
+    }
 
     require_once dirname( __DIR__ ) . '/src/Infrastructure/Persistence/TaskRepository.php';
     require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';

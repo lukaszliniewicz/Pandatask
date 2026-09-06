@@ -5,6 +5,7 @@ import StatusBadge from './StatusBadge';
 import { useTaskMutations } from '../hooks/useTaskMutations';
 import { parseDate } from '../utils';
 import Icon from './Icon';
+import ChecklistCount from './ChecklistCount';
 
 const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand, onAction }) => {
     const { updateTask } = useTaskMutations();
@@ -106,6 +107,7 @@ const CompactTaskItem = ({ task, depth, hasChildren, isExpanded, onToggleExpand,
             </div>
 
             <div className="pandat69-compact-meta">
+                <ChecklistCount task={task} />
                 {task.deadline && (
                     <span title="Deadline" className={parseDate(task.deadline) < new Date() && task.status !== 'done' ? 'pandat69-meta-overdue' : ''}>
                         <Icon name="calendar" size={15} /> {task.deadline}

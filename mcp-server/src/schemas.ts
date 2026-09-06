@@ -44,6 +44,11 @@ export const taskCollectionFieldNames = [
   'name',
   'description',
   'description_rendered',
+  'checklist',
+  'checklist_version',
+  'checklist_total',
+  'checklist_checked',
+  'can_edit_checklist',
   'status',
   'priority',
   'start_date',
@@ -63,6 +68,9 @@ export const taskCollectionFieldNames = [
   'project_id',
   'project_name',
   'is_recurring',
+  'recurrence_series_id',
+  'recurrence_sequence',
+  'recurrence_scheduled_start',
   'recurrence_frequency',
   'recurrence_interval',
   'recurrence_days',
@@ -262,12 +270,77 @@ export const taskCreateData = z
   .superRefine((value, context) => validateRecurrenceRule(value, context, true))
   .superRefine(validateOpenTaskStatus);
 
-export const taskUpdateData = z
+const taskUpdateBaseData = z
   .object(taskMutableFields)
   .refine((value) => Object.values(value).some((item) => item !== undefined), 'Provide at least one task field to update.')
   .superRefine(validateDateOrder)
   .superRefine((value, context) => validateRecurrenceRule(value, context))
   .superRefine(validateOpenTaskStatus);
+
+export const taskBulkUpdateData = taskUpdateBaseData;
+
+export const taskUpdateData = taskUpdateBaseData.safeExtend({
+  recurrence_scope: z
+    .enum(['this', 'future'])
+    .optional()
+    .meta({ default: 'this' })
+    .describe('Recurring edit scope. Defaults to this occurrence; future applies this and future occurrences and is allowed only on the latest member.'),
+  expected_series_version: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe('Optimistic recurring-series revision. Required when recurrence_scope is future.'),
+})
+  .superRefine((value, context) => {
+    if (value.recurrence_scope === 'future' && value.expected_series_version === undefined) {
+      context.addIssue({ code: 'custom', path: ['expected_series_version'], message: 'expected_series_version is required when recurrence_scope is future.' });
+    }
+  });
+
+const checklistItemId = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, 'Checklist item IDs may contain only letters, numbers, underscores, or hyphens and must be 1-64 characters long.')
+  .optional()
+  .describe('Stable checklist item ID. Omit for a new item; the server assigns its UUID.');
+
+export const checklistItem = z
+  .object({
+    id: checklistItemId,
+    text: z.string().trim().min(1).refine((value) => Array.from(value).length <= 500, 'Checklist item text must contain at most 500 Unicode characters.').describe('Checklist item text, trimmed to 1-500 Unicode characters.'),
+    checked: z.boolean().describe('Whether this checklist item is complete.'),
+  })
+  .strict();
+
+export const taskChecklistUpdateData = z
+  .object({
+    task_id: positiveId,
+    expected_version: z.number().int().nonnegative().describe('Checklist revision read from task_get or task_checklist_get. A stale revision is rejected with HTTP 409.'),
+    items: z.array(checklistItem).max(100).describe('Complete ordered checklist replacement. Omitted IDs are assigned by the server; missing existing IDs are deleted; an empty list clears the checklist.'),
+    recurrence_scope: z
+      .enum(['this', 'future'])
+      .optional()
+      .meta({ default: 'this' })
+      .describe('Recurring checklist edit scope. Defaults to this occurrence; future applies this and future occurrences and is allowed only on the latest member.'),
+    expected_series_version: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe('Optimistic recurring-series revision. Required when recurrence_scope is future.'),
+    dry_run: dryRunField,
+    idempotency_key: idempotencyKey,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const ids = value.items.flatMap((item) => item.id === undefined ? [] : [item.id]);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: 'custom', path: ['items'], message: 'Checklist item IDs must be unique.' });
+    }
+    if (value.recurrence_scope === 'future' && value.expected_series_version === undefined) {
+      context.addIssue({ code: 'custom', path: ['expected_series_version'], message: 'expected_series_version is required when recurrence_scope is future.' });
+    }
+  });
 
 const { project_id: _projectId, predecessors: _predecessors, ...plannedTaskMutableFields } = taskMutableFields;
 export const plannedTaskData = z
@@ -447,7 +520,7 @@ export const batchAction = z.discriminatedUnion('action', [
     action: z.literal('delete_task'),
     data: z.object({
       id: positiveId.describe('Task ID to delete.'),
-      delete_scope: z.enum(['this', 'following', 'all']).optional().describe('Recurring-task deletion scope.'),
+      delete_scope: z.enum(['this', 'following', 'all']).optional().describe('Recurring-task scope: this skips only the selected occurrence, following stops future generation after it, and all skips it and stops future generation while preserving history.'),
     }),
   }),
   z.object({
@@ -521,7 +594,7 @@ const taskListFilterFields = {
   assigned_to_me: z.boolean().optional().describe('Restrict to tasks assigned to the authenticated user.'),
   assignee_id: positiveId.optional().describe('Restrict to tasks assigned to this user ID. Do not combine with assigned_to_me.'),
   fields: taskCollectionFields,
-  include_templates: z.boolean().optional().default(false).describe('Include recurring templates; false is recommended for actionable work.'),
+  include_templates: z.boolean().optional().default(true).describe('Legacy REST parameter: include concrete recurring task rows; defaults to true. Set false to exclude recurring members.'),
   task_type: z.enum(['task', 'bug']).optional().describe('Restrict to tasks or bugs.'),
   limit: z.number().int().min(1).max(500).optional().default(100).describe('Maximum tasks returned in this page.'),
   offset: z.number().int().nonnegative().optional().default(0).describe('Zero-based task offset for pagination.'),
@@ -560,7 +633,7 @@ export const taskListVisibleInput = z
       .boolean()
       .optional()
       .describe('Archive filter. Omit for active and archived tasks, false for active only, or true for archived only.'),
-    include_templates: z.boolean().optional().default(true).describe('Include recurring templates; defaults to true for the complete visible-task view.'),
+    include_templates: z.boolean().optional().default(true).describe('Legacy REST parameter: include concrete recurring task rows; defaults to true. Set false to exclude recurring members.'),
     limit: z.number().int().min(1).max(500).optional().default(100).describe('REST page size; all pages are combined into one MCP result.'),
     offset: z.number().int().nonnegative().optional().default(0).describe('Initial REST offset before the server follows subsequent pages.'),
   })
@@ -598,5 +671,18 @@ export function taskListVisibleQuery(input: z.infer<typeof taskListVisibleInput>
     ...(input.task_type ? { task_type_filter: input.task_type } : {}),
     limit: input.limit,
     offset: input.offset,
+  };
+}
+
+export const taskRecurrenceGetData = z.object({
+  task_id: positiveId,
+  limit: z.number().int().min(1).max(100).optional().default(50).describe('Maximum occurrence summaries returned.'),
+  before_sequence: z.number().int().positive().optional().describe('Return occurrences before this positive recurrence sequence number.'),
+});
+
+export function taskRecurrenceGetQuery(input: z.infer<typeof taskRecurrenceGetData>): Record<string, string | number> {
+  return {
+    limit: input.limit,
+    ...(input.before_sequence !== undefined ? { before_sequence: input.before_sequence } : {}),
   };
 }

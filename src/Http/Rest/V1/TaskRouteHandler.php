@@ -8,7 +8,9 @@ use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\PublicBugSubmissionPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
 use Pandatask\Application\Task\HistoryService;
+use Pandatask\Application\Task\TaskChecklistService;
 use Pandatask\Application\Task\TaskService;
+use Pandatask\Application\Task\TaskRecurrenceService;
 use Pandatask\Http\Rest\V1\Support\RequestHelper;
 use Pandatask\Http\Rest\V1\Support\TaskInputNormalizer;
 use WP_Error;
@@ -30,7 +32,9 @@ final class TaskRouteHandler {
 
     private $board_activity_service;
 
-    public function __construct( $task_service = null, $history_service = null, $board_access_policy = null, $public_bug_submission_policy = null, $task_access_policy = null, $input_normalizer = null, $board_activity_service = null ) {
+    private $task_checklist_service;
+
+    public function __construct( $task_service = null, $history_service = null, $board_access_policy = null, $public_bug_submission_policy = null, $task_access_policy = null, $input_normalizer = null, $board_activity_service = null, $task_checklist_service = null ) {
         $this->task_service    = $task_service ?: new TaskService();
         $this->history_service = $history_service ?: new HistoryService();
         $this->board_access_policy = $board_access_policy ?: new BoardAccessPolicy();
@@ -38,6 +42,7 @@ final class TaskRouteHandler {
         $this->task_access_policy = $task_access_policy ?: new TaskAccessPolicy( $this->task_service, $this->board_access_policy );
         $this->input_normalizer = $input_normalizer ?: new TaskInputNormalizer();
         $this->board_activity_service = $board_activity_service ?: new BoardActivityService();
+        $this->task_checklist_service = $task_checklist_service;
     }
 
     public function get_board_activity( $request ) {
@@ -105,7 +110,7 @@ final class TaskRouteHandler {
         $project_filter    = $params['project_filter'] ?? null;
         $archived          = isset( $params['archived'] ) ? (int) $params['archived'] : 0;
         $private_only      = isset( $params['private_only'] ) && rest_sanitize_boolean( $params['private_only'] );
-        $include_templates = isset( $params['include_templates'] ) && rest_sanitize_boolean( $params['include_templates'] );
+        $include_templates = ! isset( $params['include_templates'] ) || rest_sanitize_boolean( $params['include_templates'] );
         $task_type_filter  = $params['task_type_filter'] ?? '';
         $limit             = isset( $params['limit'] ) ? max( 1, min( 500, (int) $params['limit'] ) ) : 500;
         $offset            = max( 0, (int) ( $params['offset'] ?? 0 ) );
@@ -316,6 +321,50 @@ final class TaskRouteHandler {
         $task = RequestHelper::renderTask( $this->task_service->getTask( (int) $request['id'] ) );
 
         return new WP_REST_Response( array( 'task' => $task ), 200 );
+    }
+
+    public function get_task_recurrence( $request ) {
+        $service = new TaskRecurrenceService( null, null, null, null, null, $this->task_access_policy );
+        $result = $service->getSeries( (int) $request['id'], get_current_user_id(), $request['limit'] ?? 50, $request['before_sequence'] ?? null );
+        return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
+    }
+
+    public function get_task_checklist( $request ) {
+        $checklist = $this->getChecklistService()->getChecklist( (int) $request['id'], get_current_user_id() );
+
+        if ( is_wp_error( $checklist ) ) {
+            return $checklist;
+        }
+
+        return new WP_REST_Response( $checklist, 200 );
+    }
+
+    public function update_task_checklist( $request ) {
+        $params = RequestHelper::bodyParams( $request );
+        $items = array_key_exists( 'items', $params ) ? $params['items'] : null;
+        $expected_version = array_key_exists( 'expected_version', $params ) ? $params['expected_version'] : null;
+
+        $checklist = $this->getChecklistService()->updateChecklist(
+            (int) $request['id'],
+            $items,
+            $expected_version,
+            get_current_user_id(),
+            $params['recurrence_scope'] ?? 'this',
+            $params['expected_series_version'] ?? null
+        );
+
+        if ( is_wp_error( $checklist ) ) {
+            return $checklist;
+        }
+
+        return new WP_REST_Response( $checklist, 200 );
+    }
+
+    private function getChecklistService() {
+        if ( ! $this->task_checklist_service ) {
+            $this->task_checklist_service = new TaskChecklistService( null, $this->task_service, $this->history_service, $this->task_access_policy );
+        }
+        return $this->task_checklist_service;
     }
 
     public function update_task( $request ) {

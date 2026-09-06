@@ -6,6 +6,7 @@ use Pandatask\Application\Board\BoardService;
 use Pandatask\Application\Comment\CommentService;
 use Pandatask\Application\Security\BoardAccessPolicy;
 use Pandatask\Application\Security\TaskAccessPolicy;
+use Pandatask\Domain\Task\TaskChecklist;
 use Pandatask\Infrastructure\Persistence\DatabaseContext;
 use Pandatask\Infrastructure\Media\ProtectedAttachmentService;
 use Pandatask\Infrastructure\Notifications\TaskBoardUrlResolver;
@@ -84,7 +85,7 @@ final class TaskService {
         return $this->mutation_service->deleteTask( (int) $task_id, $delete_scope );
     }
 
-    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = false, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null, $assignee_id = null ) {
+    public function getTasks( $board_name, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $date_filter = '', $start_date = '', $end_date = '', $archived = 0, $project_filter = null, $include_templates = true, $task_type_filter = '', $user_id = null, $limit = 0, $offset = 0, $inbox_filter = null, $assignee_id = null ) {
         $version       = DatabaseContext::getBoardCacheVersion( $board_name, 'tasks' );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_tasks_{$board_name}_{$version}_{$args_key}";
@@ -159,7 +160,7 @@ final class TaskService {
         return $this->repository->wouldCreateDependencyCycle( (int) $task_id, (int) $predecessor_id );
     }
 
-    public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = false, $limit = 0, $offset = 0, $assignee_id = null ) {
+    public function getTasksForUserAcrossBoards( $user_id, $search = '', $sort_by = 'name', $sort_order = 'ASC', $status_filter = '', $archived = 0, $project_filter = null, $private_only = false, $include_templates = true, $limit = 0, $offset = 0, $assignee_id = null ) {
         $version       = DatabaseContext::getUserCacheVersion( $user_id );
         $args_key      = md5( serialize( func_get_args() ) );
         $transient_key = "pandat69_user_tasks_{$user_id}_{$version}_{$args_key}";
@@ -238,6 +239,7 @@ final class TaskService {
     private function decorateTaskForViewer( $canonical_task ) {
         $task = clone $canonical_task;
         $this->decoratePredecessorsForViewer( array( $task ), get_current_user_id() );
+        $this->decorateChecklistForViewer( $task, true );
         $task->board_display_name = $this->board_service->getBoardDisplayName( $task->board_name );
         $task->frontend_url = TaskBoardUrlResolver::resolve( $task->board_name ?? '', (int) ( $task->id ?? 0 ) );
         $task->comments = $this->comment_service->getComments( $task->id, $task );
@@ -260,10 +262,30 @@ final class TaskService {
 
             $task->board_display_name = $display_names[ $task->board_name ];
             $task->frontend_url = TaskBoardUrlResolver::resolve( $task->board_name ?? '', (int) ( $task->id ?? 0 ) );
+            $this->decorateChecklistForViewer( $task, false );
             $this->protectFollowUpSourceForViewer( $task, get_current_user_id() );
         }
 
         return ProtectedAttachmentService::prepareTasks( $tasks );
+    }
+
+    /**
+     * Add canonical checklist fields to a response clone and discard the raw
+     * storage column before any response leaves the service.
+     */
+    private function decorateChecklistForViewer( $task, $include_editability ) {
+        if ( ! is_object( $task ) ) {
+            return;
+        }
+
+        $fields = TaskChecklist::fields( $task );
+        unset( $task->checklist_json );
+        foreach ( $fields as $field => $value ) {
+            $task->{$field} = $value;
+        }
+        if ( $include_editability ) {
+            $task->can_edit_checklist = true === $this->getTaskAccessPolicy()->canUpdateTask( (int) $task->id, get_current_user_id() );
+        }
     }
 
 
@@ -351,6 +373,7 @@ final class TaskService {
 
                     if ( $can_read ) {
                         $visible_predecessor = clone $predecessor;
+                        $this->decorateChecklistForViewer( $visible_predecessor, false );
                         $visible_predecessors[] = $visible_predecessor;
                         $visible_ids[] = $predecessor_id;
                     } else {

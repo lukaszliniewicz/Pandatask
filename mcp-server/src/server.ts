@@ -9,6 +9,8 @@ import { normalizeBatchTaskDescriptions, normalizeTaskDescriptionBody, TASK_DESC
 import {
   batchAction,
   boardName,
+  taskBulkUpdateData,
+  taskChecklistUpdateData,
   clearableDate,
   dryRunField,
   idList,
@@ -33,13 +35,15 @@ import {
   taskListVisibleInput,
   taskListVisibleQuery,
   taskMutableFields,
+  taskRecurrenceGetData,
+  taskRecurrenceGetQuery,
   taskUpdateData,
 } from './schemas.js';
 import { collection, deadlineReview, numberIds, summarizeTasks, workload } from './summaries.js';
 import { setServerToolProfile, toolEnabledForServer } from './tool-profile.js';
 import { registerWorkTools } from './work-tools.js';
 
-const VERSION = '1.3.6';
+const VERSION = '1.4.0';
 
 const readOnly: ToolAnnotations = {
   readOnlyHint: true,
@@ -76,7 +80,7 @@ function register<T extends ZodToolSchema>(
   description: string,
   inputSchema: T,
   annotations: ToolAnnotations,
-  operation: (input: z.output<T>, extra: ToolExtra) => Promise<unknown>,
+  operation: (input: z.output<T>, extra: ToolExtra, rawInput: Record<string, unknown>) => Promise<unknown>,
 ): void {
   if (!toolEnabledForServer(server, name)) return;
   const isMutation = annotations.readOnlyHint === false;
@@ -84,9 +88,10 @@ function register<T extends ZodToolSchema>(
     ? (inputSchema as unknown as z.ZodObject).safeExtend({ response_mode: responseModeField }) as unknown as T
     : inputSchema;
   const callback = (async (input: unknown, extra: ToolExtra) => {
+    const rawInput = input && typeof input === 'object' && !Array.isArray(input) ? { ...(input as Record<string, unknown>) } : {};
     const parsed = registeredInputSchema.parse(input) as z.output<T> & { response_mode?: 'minimal' | 'full' };
     return handled(
-      () => operation(parsed, extra),
+      () => operation(parsed, extra, rawInput),
       {
         responseMode: isMutation ? parsed.response_mode ?? 'minimal' : undefined,
         operation: name,
@@ -223,7 +228,7 @@ async function getAllTasks(
       query: {
         status_filter: options.status ?? '',
         archived: options.archived ? 1 : 0,
-        include_templates: String(options.includeTemplates ?? false),
+        include_templates: String(options.includeTemplates ?? true),
         private_only: options.privateOnly === undefined ? undefined : String(options.privateOnly),
         sort: 'created_at_desc',
         limit,
@@ -399,7 +404,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     { name: 'pandatask', version: VERSION },
     {
       instructions:
-        'Pandatask manages WordPress-backed tasks. Start with connection_check and board_list_writable, then prefer board_get_context, board_get_summary, daily_briefing, or project_plan for multi-step workflows. Use granular tools when precise control is needed. Every result uses an {ok,data} or {ok,error} envelope. dry_run performs local schema/workflow preflight and sends no mutation; WordPress remains authoritative for permissions and references. Supply a stable idempotency_key when executing create or mixed batch operations. Board IDs are scopes: standard boards become discoverable after their first task, while group_* and user_* boards follow BuddyPress/user ownership.',
+        'Pandatask manages WordPress-backed tasks. Start with connection_check and board_list_writable, then prefer board_get_context, board_get_summary, daily_briefing, or project_plan for multi-step workflows. Use granular tools when precise control is needed. Every result uses an {ok,data} or {ok,error} envelope. dry_run performs local schema/workflow preflight and sends no mutation; WordPress remains authoritative for permissions and references. Supply a stable idempotency_key when executing create or mixed batch operations. Board IDs are scopes: standard boards become discoverable after their first task, while group_* and user_* boards follow BuddyPress/user ownership. Recurring rows are concrete task occurrences; use task_recurrence_get for series metadata and history, and reconcile any 409 before retrying a mutation.',
     },
   );
   setServerToolProfile(server, client.config.toolProfile);
@@ -456,7 +461,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
       board_name: boardName,
       include_completed: z.boolean().optional().default(false).describe('Include completed actionable tasks.'),
       include_archived: z.boolean().optional().default(false).describe('Include a bounded archived-task collection.'),
-      include_templates: z.boolean().optional().default(false).describe('Include recurring templates in the returned records, but not actionable totals.'),
+      include_templates: z.boolean().optional().default(true).describe('Include concrete recurring task rows in the returned records and actionable totals. Set false to exclude recurring members.'),
       task_limit: z.number().int().min(1).max(500).optional().default(100).describe('Maximum active and archived tasks returned per collection.'),
       today: isoDate.optional().describe('Override the site-local date for deterministic historical analysis.'),
       user_board_scope: z
@@ -647,7 +652,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_list',
     'List tasks',
-    'Lists tasks on one board with search, status, project, archive, assignee, type, template, and sorting filters. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection.',
+    'Lists tasks on one board with search, status, project, archive, assignee, type, recurrence, and sorting filters. Recurring task rows are included by default; set include_templates=false to exclude recurring members. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection.',
     taskListInput,
     readOnly,
     async (input, extra) =>
@@ -658,7 +663,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_list_visible',
     'List all visible tasks',
-    'Lists every task visible to the authenticated user across boards. One MCP call follows REST pagination and combines the pages, using the same search, status, project, assignment, type, template, and sorting filters as task_list. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection. By default it includes all statuses, both active and archived tasks, and recurring templates; set archived=false for active only or archived=true for archived only. The configured collection cap is surfaced as pagination.truncated=true with total=null.',
+    'Lists every task visible to the authenticated user across boards. One MCP call follows REST pagination and combines the pages, using the same search, status, project, assignment, type, recurrence, and sorting filters as task_list. Recurring task rows are included by default; set include_templates=false to exclude recurring members. Task records include an authoritative frontend_url that is safe to surface as an open-task link; include frontend_url explicitly when using fields projection. By default it includes all statuses and both active and archived tasks; set archived=false for active only or archived=true for archived only. The configured collection cap is surfaced as pagination.truncated=true with total=null.',
     taskListVisibleInput,
     readOnly,
     async (input, extra) => getAllVisibleTasks(client, input, extra.signal),
@@ -668,10 +673,57 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_get',
     'Get task',
-    'Gets full details for one task, including assignments, project, category, parent, predecessors, rendered description, and an authoritative frontend_url that is safe to surface as an open-task link.',
+    'Gets full details for one task occurrence, including assignments, project, category, parent, predecessors, checklist state, recurrence linkage, rendered description, and an authoritative frontend_url that is safe to surface as an open-task link.',
     z.object({ task_id: positiveId }),
     readOnly,
     async ({ task_id }, extra) => client.request({ path: `/tasks/${task_id}`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'task_recurrence_get',
+    'Get task recurrence',
+    'Gets recurring-series metadata and a bounded page of occurrence summaries for a task. The response is authorization-filtered by the REST API; use before_sequence to page toward older occurrences.',
+    taskRecurrenceGetData,
+    readOnly,
+    async ({ task_id, limit, before_sequence }, extra) => client.request({
+      path: `/tasks/${task_id}/recurrence`,
+      query: taskRecurrenceGetQuery({ task_id, limit, before_sequence }),
+      signal: extra.signal,
+    }),
+  );
+
+  register(
+    server,
+    'task_checklist_get',
+    'Get task checklist',
+    'Gets the complete ordered checklist for one task, its optimistic-concurrency revision and counts, and whether the authenticated user may edit it. Use checklist_version as expected_version for task_checklist_update.',
+    z.object({ task_id: positiveId }),
+    readOnly,
+    async ({ task_id }, extra) => client.request({ path: `/tasks/${task_id}/checklist`, signal: extra.signal }),
+  );
+
+  register(
+    server,
+    'task_checklist_update',
+    'Update task checklist',
+    'Replaces a task checklist atomically. The ordered items array is the complete desired state: omitted IDs are assigned by the server, existing IDs stay stable, missing IDs are deleted, and an empty array clears the checklist. Supply the checklist_version read from task_get or task_checklist_get; a stale version returns HTTP 409 so the latest checklist can be fetched and reconciled before retrying explicitly.',
+    taskChecklistUpdateData,
+    write,
+    async (input, extra, rawInput) => {
+      const body = mutationBody(input, ['task_id', 'dry_run', 'idempotency_key']);
+      if (!Object.hasOwn(rawInput, 'recurrence_scope')) delete body.recurrence_scope;
+      return client.mutate(
+        {
+          method: 'POST',
+          path: `/tasks/${input.task_id}/checklist`,
+          body,
+          idempotencyKey: input.idempotency_key,
+          signal: extra.signal,
+        },
+        input.dry_run,
+      );
+    },
   );
 
   register(
@@ -699,7 +751,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_create',
     'Create task',
-    'Creates a fully specified task, bug, recurring template, or top-level work item on a board.',
+    'Creates a fully specified task, bug, recurring schedule, or top-level work item on a board.',
     taskCreateData.safeExtend({ board_name: boardName, dry_run: dryRunField, idempotency_key: idempotencyKey }),
     write,
     async (input, extra) => {
@@ -721,11 +773,12 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_update',
     'Update task',
-    'Updates any supplied task fields. Use the focused assignment, schedule, status, archive, dependency, or move tools when possible.',
+    'Updates any supplied task fields. For recurring rows, recurrence_scope=this edits only the selected occurrence and recurrence_scope=future updates this and future defaults on the latest occurrence with expected_series_version. Use the focused assignment, schedule, status, archive, dependency, or move tools when possible.',
     taskUpdateData.safeExtend({ task_id: positiveId, dry_run: dryRunField }),
     write,
-    async (input, extra) => {
+    async (input, extra, rawInput) => {
       const body = taskMutationBody(input, ['task_id', 'dry_run']);
+      if (!Object.hasOwn(rawInput, 'recurrence_scope')) delete body.recurrence_scope;
       if (Object.keys(body).length === 0) throw new Error('Provide at least one task field to update.');
       if (body.status === 'done') throw new Error('Use task_complete when completing a task so actual time is resolved explicitly.');
       return client.mutate({ method: 'PATCH', path: `/tasks/${input.task_id}`, body, signal: extra.signal }, input.dry_run);
@@ -736,13 +789,13 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     server,
     'task_delete',
     'Delete task',
-    'Permanently deletes a task. Recurring tasks support this, following, or all scope.',
+    'Deletes an ordinary task permanently. For a recurring task, this archives or skips only the selected occurrence and generates a successor when it is the latest member; following stops future generation while preserving the selected and past history; all skips the selected occurrence and stops future generation while preserving history.',
     z.object({
       task_id: positiveId,
       delete_scope: z
         .enum(['this', 'following', 'all'])
         .optional()
-        .describe('For recurring work: delete only this occurrence, this and later occurrences, or the full series.'),
+        .describe('For recurring work: this archives or skips only the selected occurrence and generates a successor when it is latest; following stops future generation while preserving selected/past history; all skips the selected occurrence and stops future generation while preserving history.'),
       dry_run: dryRunField,
     }),
     destructive,
@@ -1139,7 +1192,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     }, input.dry_run),
   );
 
-  const bulkUpdateItem = z.object({ task_id: positiveId, changes: taskUpdateData });
+  const bulkUpdateItem = z.object({ task_id: positiveId, changes: taskBulkUpdateData });
   register(
     server,
     'task_bulk_update',
@@ -1180,7 +1233,7 @@ export function createPandataskServer(client: PandataskClient): McpServer {
     async ({ board_name, completed_on_or_before, dry_run }, extra) => {
       const taskCollection = await getAllTasks(client, board_name, {
         status: 'done',
-        includeTemplates: false,
+        includeTemplates: true,
         signal: extra.signal,
       });
       const tasks = taskCollection.tasks.filter((task) => {
@@ -1726,12 +1779,12 @@ export function createPandataskServer(client: PandataskClient): McpServer {
             '# Pandatask MCP',
             '',
             '1. Call `connection_check`, then `board_list_writable`.',
-            '2. Prefer `board_get_context`, `board_get_summary`, `daily_briefing`, and `project_plan` for efficient multi-step work.',
+            '2. Prefer `board_get_context`, `board_get_summary`, `daily_briefing`, and `project_plan` for efficient multi-step work. Use `task_recurrence_get` to inspect a recurring series and its concrete occurrences.',
             '3. Use granular task/project/category/comment tools for exact changes.',
             '4. Every result uses `{ok:true,data}` or `{ok:false,error}`; inspect structured content.',
             '5. `dry_run` is local schema/workflow preflight and sends no mutation; WordPress validates permissions and references during execution.',
             '6. Supply a stable `idempotency_key` for creates, project plans, and administrator batches so retries do not duplicate work.',
-            '7. Use archive for reversible cleanup and delete only when permanent removal is intended.',
+            '7. Use archive for reversible cleanup. Ordinary task deletion is permanent; recurring delete scopes control occurrence skipping and future generation while preserving history.',
             '8. `PANDATASK_TOOL_PROFILE=core|full|admin` bounds the advertised tool surface; admin exposes administrator-only tools.',
             '9. Standard boards are scopes and appear after their first task; `group_*` and `user_*` boards follow WordPress/BuddyPress ownership.',
             '10. Task descriptions are stored as sanitized HTML. For task create/update inputs, use `description_format=markdown` or `plain` when helpful; the MCP converts them to canonical HTML and supports fenced Mermaid diagrams.',

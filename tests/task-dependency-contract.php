@@ -147,6 +147,7 @@ require_once dirname( __DIR__ ) . '/src/Application/Task/TaskDescriptionService.
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskInvariantService.php';
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Notifications/TaskBoardUrlResolver.php';
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Media/ProtectedAttachmentService.php';
+require_once dirname( __DIR__ ) . '/src/Domain/Task/TaskChecklist.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskService.php';
 require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskMutationService.php';
@@ -226,6 +227,7 @@ final class DependencyContractMediaPolicy {
 }
 
 final class DependencyContractAccessPolicy {
+    public function canUpdateTask( $task_id, $actor_id ) { return false; }
     public $readable = array( 2 );
     public $calls = array();
 
@@ -346,12 +348,12 @@ $delete_source_start = strpos( $mutation_source, 'public function deleteTask' );
 $create_lock_position = strpos( $mutation_source, 'DatabaseContext::acquireDependencyGraphLock()', $create_source_start );
 $create_validation_position = strpos( $mutation_source, 'applyAndValidate( $data )', $create_source_start );
 $update_lock_position = strpos( $mutation_source, 'DatabaseContext::acquireDependencyGraphLock()', $update_source_start );
-$update_validation_position = strpos( $mutation_source, 'applyAndValidate( $data, $current_task )', $update_source_start );
+$update_validation_position = strpos( $mutation_source, 'applyAndValidate( $data, $invariant_context )', $update_source_start );
 $update_commit_position = strpos( $mutation_source, 'DatabaseContext::commit()', $update_source_start );
 $update_release_position = strpos( $mutation_source, 'DatabaseContext::releaseDependencyGraphLock()', $update_source_start );
 $delete_lock_position = strpos( $mutation_source, 'DatabaseContext::acquireDependencyGraphLock()', $delete_source_start );
 $delete_relationship_position = strpos( $mutation_source, 'deleteTaskRelationships( $task_id )', $delete_source_start );
-$delete_release_position = strpos( $mutation_source, 'DatabaseContext::releaseDependencyGraphLock()', $delete_source_start );
+$delete_release_position = strpos( $mutation_source, 'DatabaseContext::releaseDependencyGraphLock()', $delete_relationship_position );
 $assert( $create_lock_position < $create_validation_position, 'Create must acquire the graph lock before graph validation.' );
 $assert( $update_lock_position < $update_validation_position, 'Update must acquire the graph lock before graph validation.' );
 $assert( $update_commit_position < $update_release_position, 'Update must release the graph lock only after commit/rollback paths.' );

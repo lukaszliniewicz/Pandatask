@@ -105,6 +105,19 @@ final class TaskInputNormalizer {
      */
     public function buildUpdateData( array $params, $current_task = null ) {
         $data = array();
+        if ( array_key_exists( 'recurrence_scope', $params ) ) {
+            if ( ! in_array( $params['recurrence_scope'], array( 'this', 'future' ), true ) ) {
+                return new WP_Error( 'rest_invalid_param', __( 'recurrence_scope must be this or future.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+            $data['recurrence_scope'] = $params['recurrence_scope'];
+        }
+        if ( array_key_exists( 'expected_series_version', $params ) ) {
+            if ( ! is_int( $params['expected_series_version'] ) || $params['expected_series_version'] < 0 ) {
+                return new WP_Error( 'rest_invalid_param', __( 'expected_series_version must be a nonnegative integer.', 'pandatask' ), array( 'status' => 422 ) );
+            }
+            $data['expected_series_version'] = $params['expected_series_version'];
+        }
+
 
         if ( array_key_exists( 'board_name', $params ) ) {
             $data['board_name'] = sanitize_key( $params['board_name'] );

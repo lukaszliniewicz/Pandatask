@@ -48,7 +48,7 @@ export const looksLikeTaskMarkdown = ( value ) => {
 export const validateTaskMarkdown = ( value ) => {
 	const text = String( value ?? '' );
 	if ( /^ {0,3}[-+*][ \t]+\[[ xX]\][ \t]+/m.test( text ) ) {
-		return 'Task-list checkboxes are not supported in descriptions. Use a regular bulleted list instead.';
+		return 'Task-list checkboxes are not supported in descriptions. Use the task checklist instead.';
 	}
 	if ( /(?:^|[^\\])!\[[^\]]*\](?:\([^\n)]*\)|\[[^\]]*\])/.test( text ) ) {
 		return 'Markdown images are not supported in descriptions. Add an attachment or paste a link instead.';

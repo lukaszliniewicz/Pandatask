@@ -95,6 +95,7 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Media/ProtectedAttachmentService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskDescriptionService.php';
 require_once dirname( __DIR__ ) . '/src/Infrastructure/Notifications/TaskBoardUrlResolver.php';
+require_once dirname( __DIR__ ) . '/src/Domain/Task/TaskChecklist.php';
 require_once dirname( __DIR__ ) . '/src/Application/Task/TaskService.php';
 require_once dirname( __DIR__ ) . '/src/Application/Security/WorkEntryAccessPolicy.php';
 require_once dirname( __DIR__ ) . '/src/Http/Rest/V1/Support/RequestHelper.php';
